@@ -15,14 +15,14 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI + TUI.
   (same `py-v*` trigger, 3-way version check, per-project PyPI publish, GH
   Release carries all 17 wheels, image installs both CLIs, `pytauargus[tui]`).
   Status-line off-screen bug fixed (regression test; TUI suite 68).
-  TUI guide `docs/tui.md` + screenshots; README now PyPI-safe (in-sdist images,
-  absolute doc links). Conventional Commits adopted for new history (§6/§7).
+  TUI guide `docs/tui.md` + screenshots. Conventional Commits adopted for
+  new history (§6/§7).
+- [x] **Release 0.3.3 shipped** (docs-only): PyPI freezes each version's
+  README; this puts the improved TUI README (in-sdist screenshots, absolute
+  doc links) on the published PyPI page. Verified on PyPI + GH Release.
 
 ## In flight
 - [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
-- [ ] **Release 0.3.3** (docs-only): PyPI freezes each version's README, so
-  the improved TUI README (screenshots, fixed doc links) needs this bump to
-  reach the PyPI page. Tag `py-v0.3.3` next.
 
 ## Feature branches
 - `feature/example-tables`: `data/examples/ex1` fixture (pushed, unmerged).
