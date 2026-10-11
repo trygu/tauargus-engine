@@ -7,7 +7,7 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
   `protect()`, cp310–cp313).
 - [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`) + legacy
   `ErrorStrings.txt` embedded (hitas `d3e5b91`); re-OPT → 5008 (legacy behavior).
-- [x] PR #7: shared Python release + clear CI; Windows re-OPT check investigated.
+- [x] PR #7: shared Python release/CI; FullJJ file leak fixed, Windows rechecked.
 
 ## In flight — TUI (branch `tui`, `bindings/tui/`, pkg `pytauargus-tui`)
 - [x] v1: nav/grid/detail/log + staged s/r preview-delta + spinner; 5008 carry-fwd.

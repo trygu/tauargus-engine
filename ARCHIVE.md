@@ -26,6 +26,12 @@
   Python versions. Windows passes 64/65 tests but the second-OPT test never
   observes error 5008. Improved that assertion to report actual completion
   state/error instead of timing out on a platform-specific mismatch.
+- Windows diagnostics confirmed `WinError 32` on JJ.OUT masks native 5008.
+  A direct FullJJ regression reproduces the open output descriptor on macOS.
+  FullJJ now owns input/output streams with RAII across success and all error
+  returns (HiTaS `0305330`, isolated native branch). After rebuilding, the
+  leak regression, GIL test and 65 TUI tests all pass (67 total). The release
+  pair matrix also runs these native tests. Default HiTaS branch is unchanged.
 
 ## Separate TUI distribution (2026-10-11)
 

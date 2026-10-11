@@ -374,8 +374,8 @@ jobs:
         run: |
           tauargus --version
           tauargus-tui --help
-      - name: Test installed TUI with matching engine
-        run: python -m pytest bindings/tui/tests -q
+      - name: Test installed engine and TUI pair
+        run: python -m pytest bindings/python/tests/test_opt_cleanup.py bindings/python/tests/test_gil_release.py bindings/tui/tests -q
 
   publish-engine:
     name: PyPI · Engine
