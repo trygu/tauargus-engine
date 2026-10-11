@@ -42,12 +42,12 @@ class DistributionTests(unittest.TestCase):
 
     def test_separate_portable_package(self):
         self.make_distribution()
-        checker.check_distribution(self.dist, "0.1.0", "tui-v0.1.0")
+        checker.check_distribution(self.dist, "0.1.0", "py-v0.1.0")
 
     def test_wrong_release_tag(self):
         self.make_distribution()
         with self.assertRaisesRegex(ValueError, "tag"):
-            checker.check_distribution(self.dist, "0.1.0", "tui-v0.2.0")
+            checker.check_distribution(self.dist, "0.1.0", "py-v0.2.0")
 
     def test_core_package_cannot_be_published_as_tui(self):
         self.make_distribution(name="pytauargus")

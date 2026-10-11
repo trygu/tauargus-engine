@@ -66,15 +66,20 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 
 ## 7. Releasing (PyPI + GHCR image)
 - Releases are tag-driven: tag `py-v<version>` runs `.github/workflows/wheels.yml`
-  (wheels -> GitHub Release -> PyPI via trusted publishing -> GHCR image).
+  (engine + TUI wheels -> installed-wheel tests -> both PyPI projects -> one
+  GitHub Release -> GHCR image). Both Python packages share the same version;
+  the TUI requires `pytauargus==<version>`. There are no separate TUI tags.
 - PyPI versions are immutable and the workflow fails if the tag differs from the
   package version. Never reuse or move a published tag.
 - To release (only when the user asks):
-  1. Bump `version` in `bindings/python/pyproject.toml` (semver: patch = fixes,
-     minor = features, major = breaking).
-  2. `cd bindings/python && uv lock && uv run pytest` must pass.
+  1. Set both versions with `python .github/scripts/python_release.py
+     --set-version X.Y.Z` (Python 3.11+; patch = fixes, minor = features,
+     major = breaking), then `uv lock --project bindings/python` and
+     `uv lock --project bindings/tui`.
+  2. Follow docs/tui-publishing.md: local engine + TUI tests and shared version
+     checks must pass; the release workflow tests both built packages together.
   3. Commit (`Release X.Y.Z`) and push the branch.
   4. `git tag py-vX.Y.Z && git push origin py-vX.Y.Z`.
-  5. Watch the run: `gh run list --workflow wheels --limit 1`.
+  5. Watch the run: `gh run list --workflow wheels.yml --limit 1`.
 - Wheels: macOS arm64, Linux x86_64+aarch64 (manylinux_2_28), Windows x64; Python 3.10-3.13.
 - The image is `ghcr.io/trygu/tauargus-engine:<version>` and `:latest`.

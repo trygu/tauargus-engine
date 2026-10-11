@@ -1,19 +1,19 @@
-# TUI package and publishing
+# Python packages and shared releases
 
-The interactive frontend ships as **`pytauargus-tui`**, independently of
-**`pytauargus`**. Both projects live in this repository. Developing the TUI
-does not require a new engine release unless it needs a new engine API.
+**`pytauargus` and `pytauargus-tui` are separate PyPI packages with one
+version and one release.** Every `py-v<version>` tag builds, tests and
+publishes both packages through `.github/workflows/wheels.yml`. There are
+no separate TUI tags or version decisions.
 
-| Project | Contents | Command | Release tag |
-| --- | --- | --- | --- |
-| `pytauargus` | Native engine, Python API and headless CLI | `tauargus` | `py-v<version>` |
-| `pytauargus-tui` | Pure-Python terminal frontend | `tauargus-tui` | `tui-v<version>` |
+| Package | Contents | Command |
+| --- | --- | --- |
+| `pytauargus` | Native engine, Python API and headless CLI | `tauargus` |
+| `pytauargus-tui` | Pure-Python terminal frontend and Textual dependency | `tauargus-tui` |
 
-The TUI has its own version in `bindings/tui/pyproject.toml`. Its dependency
-range describes compatible published engine versions. Textual belongs to the
-TUI package; installing the engine alone does not install the interface.
-
-After the first TUI release is published:
+Installing the engine alone does not install Textual or the TUI. Installing
+`pytauargus-tui` installs the exact matching engine version. A fix in either
+package advances both versions, even when the other package is unchanged.
+The first TUI distribution will be available with the next Python release.
 
 ```bash
 pip install --upgrade pytauargus-tui
@@ -22,69 +22,80 @@ uv tool install --upgrade pytauargus-tui
 tauargus-tui path/to/batch.arb
 ```
 
-## Development and release checks
+## Checks and release flow
 
-The existing `tool.uv.sources` entry resolves the engine from the sibling
-package for local development. Keep using the local-engine development flow
-and `scripts/sync-venv.sh` after native changes.
+`tests.yml` appears as **Checks**: engine and TUI tests use the local engine,
+plus a portable TUI distribution check. Pushes to `master`/`tui` and pull
+requests targeting them run checks; side branches use PR checks instead of
+running the same suite on both their push and PR events. Manual checks remain
+available. A push to `tui` while it has a PR to `master` also tests that PR's
+integration with its base branch.
 
-Published TUI distributions retain an ordinary `pytauargus` dependency,
-without a checkout path or bundled engine. `.github/workflows/tui-release.yml`
-builds the source distribution and a `py3-none-any` wheel, checks package
-metadata and the console entry point, and rejects native/core payloads or
-local engine dependency URLs.
+`wheels.yml` appears as **Release** and runs on `py-v*` tags or manually:
 
-The workflow tests the installed wheel on Linux, macOS and Windows, with
-Python 3.10 and 3.13, using the released engine resolved by its dependency
-range. This is a consumer-install check, separate from local engine
-development. If the TUI needs an unreleased engine API, release that engine
-first and set the TUI's minimum dependency accordingly.
+1. Verify both project versions, lockfile versions, the TUI's exact engine
+   dependency and (on release) the tag. Fail before native builds on drift.
+2. Build engine wheels for all supported platforms/Python versions and one
+   pure-Python TUI wheel plus source distribution.
+3. Install the newly built engine and TUI wheels together on Linux x64/arm64,
+   macOS arm64 and Windows x64, with Python 3.10 and 3.13; test the TUI and
+   both commands. The engine is installed from the artifacts, not PyPI.
+4. Publish the engine to PyPI, then its matching TUI.
+5. Attach both packages to one GitHub release, then publish the engine's
+   container image to GHCR.
 
-The first release also needs the in-tree native fixes for repeated OPT and
-embedded legacy error strings. As of 2026-10-11, the published engine is
-0.3.0: the current TUI's second-OPT preview regression aborts with that wheel.
-Publish an engine containing those fixes, then raise the TUI's minimum engine
-version to that release before tagging the TUI. Keep the consumer tests using
-published wheels so local development fixes cannot hide a release blocker.
+Manual runs build and test only. Publishing requires a `py-v*` tag.
+PyPI uploads are not atomic across projects: if the TUI upload fails after
+an engine upload, rerun the failed jobs on the same immutable tag. Existing
+files are skipped; the GitHub release and image wait for both PyPI uploads.
+Do not move tags or replace published versions.
 
-Branch pushes, pull requests and manual runs only build and test. Publishing runs
-only on `tui-v*` tags, after all checks pass and the tag matches the TUI's
-project version. The core `py-v*` wheel/container workflow stays unchanged.
+The existing `tool.uv.sources` entry still resolves the local sibling engine
+for development. Use `scripts/sync-venv.sh` after native changes. Published
+TUI distributions contain no local dependency URL or bundled native engine.
+Testing the newly built pair includes the repeated-OPT and error-string
+fixes; the old published engine 0.3.0 does not contain those fixes.
 
 ## One-time PyPI setup
 
-Configure a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
-for the TUI project. If the project does not exist, use a
-[pending publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
+Keep the engine's existing Trusted Publisher for `wheels.yml`. Configure a
+[Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
+or [pending publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
+for the TUI project:
 
 | Setting | Value |
 | --- | --- |
 | PyPI project | `pytauargus-tui` |
 | GitHub owner | `trygu` |
 | Repository | `tauargus-engine` |
-| Workflow filename | `tui-release.yml` |
+| Workflow filename | `wheels.yml` |
 | GitHub environment | `pypi-tui` |
 
-Create/configure that environment in the repository before the first release.
-The publish job uses OIDC through `pypa/gh-action-pypi-publish`; it does not
-reuse the engine publisher or require a PyPI token in the repository.
+Create/configure `pypi-tui` in GitHub before the first release. The engine
+publisher identity is unchanged; the TUI publisher now uses `wheels.yml`,
+not the superseded `tui-release.yml`. Both projects are always published
+on release tags; the former engine-only `PYPI_ENABLED` switch is removed.
 
-## Release
+## Release procedure
 
-1. Finish the TUI changes and update its own package version and lockfile.
-2. Ensure the build and installed-wheel test matrix is green on the exact
-   commit to release. A manual workflow run is available for this check.
-3. Push a new tag matching the package version. From the repository root,
-   using Python 3.11 or newer:
+From a checkout containing both packages, using Python 3.11 or newer:
 
-   ```bash
-   TUI_VERSION=$(python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("bindings/tui/pyproject.toml").read_text())["project"]["version"])')
-   git tag "tui-v$TUI_VERSION"
-   git push origin "tui-v$TUI_VERSION"
-   ```
+```bash
+python .github/scripts/python_release.py --set-version X.Y.Z
+uv lock --project bindings/python
+uv lock --project bindings/tui
+python .github/scripts/python_release.py
+```
 
-4. The workflow publishes to PyPI, then attaches the TUI wheel and source
-   distribution to its own GitHub release. That release does not replace the
-   engine's GitHub "latest release" link and does not publish a Docker image.
+Run local engine and TUI tests as described in AGENTS.md and the TUI README.
+Commit both manifests and lockfiles, push the branch, and confirm Checks is
+green. A manual Release run can validate the cross-platform wheel pair
+before tagging. Once the release commit is on `master`:
 
-Published package versions and release tags are not reused.
+```bash
+VERSION=$(python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("bindings/python/pyproject.toml").read_text())["project"]["version"])')
+git tag "py-v$VERSION"
+git push origin "py-v$VERSION"
+```
+
+No release tag or upload is performed by the version-setting helper.

@@ -26,7 +26,7 @@ preview → accept result → export.** Saving a workspace is a separate action.
 ## 2. Decision
 
 The headless CLI remains the independently shipped product (Option A).
-Option B is the chosen interactive companion and has its own release cadence.
+Option B is the chosen interactive companion and ships with each Python release.
 
 ### Option A — Headless CLI (the shipped product)
 
@@ -57,20 +57,20 @@ break the terminal, the main risk with a home-rolled `rich` grid).
 it forces us to hand-wire pane layout and focus; `textual` gives that for free.
 
 **Distribution: its own PyPI package, `pytauargus-tui`** (decided). It is a
-separate project — its own `pyproject.toml`, version, wheel, and release
-cadence — but **lives in this monorepo** (`bindings/tui/`, sibling to
+separate project — its own `pyproject.toml` and wheel — with the **same version
+and release cadence as `pytauargus`**. It **lives in this monorepo** (`bindings/tui/`, sibling to
 `bindings/python/`) and is developed on its **own branch** while in flight, so:
 - the core `pytauargus` wheel stays minimal — `textual` is never a dependency
   of it (no extra, no subcommand in the core `tauargus` CLI);
-- the TUI can move (features, breaking UI changes) without bumping the engine
-  release;
-- `pip install pytauargus-tui` pulls `pytauargus>=<min>` (the native engine +
-  CLI) as its only engine dependency.
+- every Python release publishes both packages under one `py-v<version>` tag,
+  even when a change affects only one of them;
+- `pip install pytauargus-tui` pulls the exact matching `pytauargus` version
+  (the native engine + CLI) as its only engine dependency.
 
 - Console script: `tauargus-tui` (distinct from the core `tauargus` CLI).
-- Depends on: `pytauargus>=0.2.1`, `textual>=0.50`.
-- Release: its own tag scheme (e.g. `tui-v*`) + wheel; can reuse the existing
-  `wheels.yml` pattern once the layout is proven.
+- Depends on: `pytauargus==<same-version>`, `textual>=0.50`.
+- Release: shared `py-v*` tag and `wheels.yml`; one GitHub release contains
+  both packages. Distribution and engine versions are checked before building.
 
 ### B.1 Layout
 

@@ -1,5 +1,25 @@
 # Tau-Argus Rewrite — Archive
 
+## Shared Python release strategy (2026-10-11)
+
+- User superseded independent TUI versions/tags: `pytauargus` and
+  `pytauargus-tui` remain separate distributions but share one version,
+  one `py-v*` tag, one workflow and one GitHub release.
+- Superseded `tui-release.yml` removed; Release builds and tests both
+  packages, publishes engine then TUI, then creates the release and image.
+- TUI metadata now matches engine 0.3.0 and requires that exact version;
+  no new release/tag is made here. Next release bumps both together.
+- Added a version-setting helper and guards for manifests, lock versions,
+  dependency and tag. Initial eight new contract tests failed before the
+  helper existed; all sixteen contract/distribution tests now pass.
+- Checks has descriptive Engine + TUI / Package jobs. Side branches run
+  through PR checks; pushes to master/tui still validate direct changes.
+- Completed core WRITETABLE/apriori/MOD/OPT/RND/Intervalle and local-wheel
+  dev-loop checkpoints moved from PROGRESS.md; implementation unchanged.
+- Updated design, installation/development docs and release instructions.
+  Release tests install both artifacts from the same build; local consumer
+  installation of the unreleased engine no longer depends on old PyPI fixes.
+
 ## Separate TUI distribution (2026-10-11)
 
 - Isolated `ci/tui-pypi` branch from `tui` (`3c8e2ab`), leaving the other

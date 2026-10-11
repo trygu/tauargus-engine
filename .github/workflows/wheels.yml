@@ -1,5 +1,5 @@
-# Build self-contained cross-platform wheels for pytauargus and publish
-# them as GitHub Release assets (and, on tag, optionally to PyPI).
+# Build and test both Python packages; py-v* tags publish both to PyPI,
+# one GitHub Release and the engine container image.
 #
 # Why a manual matrix instead of cibuildwheel: the Python build links
 # against a pre-built engine in the sibling `engine/` dir
@@ -14,11 +14,14 @@
 #      (delocate / auditwheel / delvewheel) -> self-contained wheel,
 #   5. uploads it as an artifact.
 #
-# The release job (on tag) aggregates the artifacts into a GitHub Release
-# and, if a PyPI token is configured, publishes there too. The image job then
-# builds a multi-arch (amd64/arm64) container image from the Linux wheels and pushes it to GHCR.
+# Publish the engine and matching TUI only after the installed pair passes.
+# The image job uses Linux engine wheels; Textual stays out of the container.
 
-name: wheels
+name: Release
+run-name: Release · ${{ github.ref_name }}
+
+permissions:
+  contents: read
 
 on:
   workflow_dispatch:
@@ -26,8 +29,8 @@ on:
     tags: ["py-v*"]
 
 concurrency:
-  group: wheels-${{ github.ref }}
-  cancel-in-progress: true
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   HIGHS_TAG: v1.15.1
@@ -38,8 +41,55 @@ env:
 # ---------------------------------------------------------------------------
 
 jobs:
+  build-tui:
+    name: Package · TUI
+    needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check release contracts
+        run: python -m unittest discover -s .github/tests
+      - name: Verify shared release version
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/py-v') && github.ref_name || '' }}
+        run: python .github/scripts/python_release.py --tag "$RELEASE_TAG"
+      - name: Install build tools
+        run: python -m pip install --upgrade build twine
+      - name: Build TUI wheel and source distribution
+        run: python -m build --outdir dist bindings/tui
+      - name: Check TUI distributions
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/py-v') && github.ref_name || '' }}
+        run: |
+          python .github/scripts/check_tui_dist.py dist --tag "$RELEASE_TAG"
+          python -m twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pytauargus-tui-distributions
+          path: dist/
+          if-no-files-found: error
+
+  validate:
+    name: Versions + tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check release contracts
+        run: python -m unittest discover -s .github/tests
+      - name: Verify shared release version
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/py-v') && github.ref_name || '' }}
+        run: python .github/scripts/python_release.py --tag "$RELEASE_TAG"
+
   build-macos:
-    name: macos-arm64 py${{ matrix.python }}
+    name: Wheel · macOS arm64 · ${{ matrix.python }}
+    needs: validate
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -114,7 +164,8 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    name: manylinux2028 ${{ matrix.arch }} py${{ matrix.python }}
+    name: Wheel · Linux ${{ matrix.arch }} · ${{ matrix.python-version }}
+    needs: validate
     runs-on: ${{ matrix.runner }}
     container:
       image: quay.io/pypa/manylinux_2_28_${{ matrix.arch }}:latest
@@ -128,6 +179,14 @@ jobs:
             runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
+          - python: cp310-cp310
+            python-version: "3.10"
+          - python: cp311-cp311
+            python-version: "3.11"
+          - python: cp312-cp312
+            python-version: "3.12"
+          - python: cp313-cp313
+            python-version: "3.13"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -179,7 +238,8 @@ jobs:
           if-no-files-found: error
 
   build-windows:
-    name: windows py${{ matrix.python }}
+    name: Wheel · Windows x64 · ${{ matrix.python }}
+    needs: validate
     runs-on: windows-2022
     strategy:
       fail-fast: false
@@ -263,49 +323,125 @@ jobs:
           path: repaired/*.whl
           if-no-files-found: error
 
-  release:
-    name: Publish release
-    needs: [build-macos, build-linux, build-windows]
+  test-installed:
+    name: Install · ${{ matrix.platform }} · ${{ matrix.python }}
+    needs: [build-macos, build-linux, build-windows, build-tui]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.13"]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, windows-2022]
+        include:
+          - os: ubuntu-24.04
+            platform: Linux x64
+          - os: ubuntu-24.04-arm
+            platform: Linux arm64
+          - os: macos-14
+            platform: macOS arm64
+          - os: windows-2022
+            platform: Windows x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pytauargus-*
+          path: dist/
+          merge-multiple: true
+      - name: Install engine and TUI from this build
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+          from email.parser import BytesParser
+          from zipfile import ZipFile
+
+          tui = next(Path("dist").glob("pytauargus_tui-*.whl"))
+          with ZipFile(tui) as wheel:
+              info = next(name for name in wheel.namelist() if name.endswith(".dist-info/METADATA"))
+              version = BytesParser().parsebytes(wheel.read(info))["Version"]
+          subprocess.run([sys.executable, "-m", "pip", "install", "--no-index",
+                          "--find-links", "dist", f"pytauargus=={version}"], check=True)
+          subprocess.run([sys.executable, "-m", "pip", "install", f"{tui}[test]"], check=True)
+          PY
+      - name: Check commands
+        shell: bash
+        run: |
+          tauargus --version
+          tauargus-tui --help
+      - name: Test installed TUI with matching engine
+        run: python -m pytest bindings/tui/tests -q
+
+  publish-engine:
+    name: PyPI · Engine
+    needs: [test-installed]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/py-v')
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-
-      # PyPI versions are immutable: refuse to publish if the tag and the
-      # package version disagree.
-      - name: Check tag matches package version
-        run: |
-          set -euo pipefail
-          TAG_VERSION="${GITHUB_REF_NAME#py-v}"
-          PKG_VERSION="$(python3 -c "import tomllib;print(tomllib.load(open('bindings/python/pyproject.toml','rb'))['project']['version'])")"
-          echo "tag=$TAG_VERSION package=$PKG_VERSION"
-          [ "$TAG_VERSION" = "$PKG_VERSION" ] || { echo "::error::Tag py-v$TAG_VERSION does not match pyproject version $PKG_VERSION"; exit 1; }
-
       - uses: actions/download-artifact@v4
         with:
+          pattern: pytauargus-*
           path: dist
           merge-multiple: true
+      - name: Separate engine distributions
+        shell: bash
+        run: |
+          mkdir engine-dist
+          find dist -maxdepth 1 -name 'pytauargus-*.whl' -exec cp {} engine-dist/ \;
+      - name: Publish engine to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: engine-dist/
+          skip-existing: true
 
-      - name: Show wheels
-        run: ls -la dist
+  publish-tui:
+    name: PyPI · TUI
+    needs: publish-engine
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi-tui
+      url: https://pypi.org/project/pytauargus-tui/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pytauargus-tui-distributions
+          path: dist/
+      - name: Publish matching TUI to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
-      # Downloadable wheels on the GitHub Release page.
-      - name: Create GitHub Release
+  release:
+    name: GitHub release
+    needs: publish-tui
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pytauargus-*
+          path: dist/
+          merge-multiple: true
+      - name: Attach both packages to one release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.whl
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
           generate_release_notes: true
 
-      # Optional PyPI publish (trusted publishing or token).
-      - name: Publish to PyPI
-        if: ${{ vars.PYPI_ENABLED == 'true' }}
-        uses: pypa/gh-action-pypi-publish@release/v1
-
   image:
-    name: Publish container image
+    name: Container · GHCR
     needs: [release]
     runs-on: ubuntu-24.04
     permissions:
@@ -320,6 +456,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
+          pattern: pytauargus-manylinux-*
           path: dist
           merge-multiple: true
 

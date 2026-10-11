@@ -44,6 +44,12 @@ uv tool install pytauargus      # or: pipx install pytauargus (isolated, puts `t
 tauargus --version
 ```
 
+The interactive frontend is a separate package, `pytauargus-tui`, available
+with the next Python release. It shares the engine's version and release:
+`pip install pytauargus-tui` installs the matching engine and adds the
+`tauargus-tui` command. The engine package stays independent of Textual.
+See [Python packages and shared releases](docs/tui-publishing.md).
+
 Use it from Python as well:
 
 ```python

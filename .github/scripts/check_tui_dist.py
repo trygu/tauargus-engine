@@ -25,7 +25,7 @@ def check_metadata(data, version):
 
 def check_distribution(directory, version, tag=""):
     directory = Path(directory)
-    if tag and tag != f"tui-v{version}":
+    if tag and tag != f"py-v{version}":
         raise ValueError("Release tag must match the TUI project version")
     wheels = list(directory.glob("*.whl"))
     sources = list(directory.glob("*.tar.gz"))

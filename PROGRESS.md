@@ -3,14 +3,11 @@
 Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headless CLI.
 
 ## Verified checkpoints (details in ARCHIVE.md)
-- [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
 - [x] Headless CLI; wheel + CI → PyPI + GHCR; Release 0.3.0 (DataFrame
   `protect()`, cp310–cp313).
 - [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`) + legacy
   `ErrorStrings.txt` embedded (hitas `d3e5b91`); re-OPT → 5008 (legacy behavior).
-- [x] Dev loop: `scripts/sync-venv.sh` (drift gate → engine → wheel → install);
-  venvs run local wheels, not PyPI. `references/` + Java frontend cleaned up.
-- [x] TUI package CI prepared (PR #7); first release needs published engine fixes.
+- [x] PR #7: separate PyPI packages, shared version/tag/release; clear CI names.
 
 ## In flight — TUI (branch `tui`, `bindings/tui/`, pkg `pytauargus-tui`)
 - [x] v1: nav/grid/detail/log + staged s/r preview-delta + spinner; 5008 carry-fwd.
@@ -24,7 +21,7 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
 - [x] Freeze fix (py binding): native solve/audit/file-scan calls release the GIL,
   so the TUI event loop stays responsive while a solve runs in a worker thread.
   GIL gap test in `bindings/python/tests/test_gil_release.py`.
-- [ ] Next (§B.7/§B.8): reopen/restore + replay/export; `tui-v*`.
+- [ ] Next (§B.7/§B.8): reopen/restore + replay/export; shared `py-v*` release.
 - Dev: `uv sync` uses local pytauargus (uv path source); sync-venv.sh after
   engine changes.
 

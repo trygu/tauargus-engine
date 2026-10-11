@@ -18,6 +18,12 @@ Wheels bundle HiGHS and the native engine; no other installation is needed.
 Available for Python 3.10-3.13 on macOS arm64, Linux x86_64 and aarch64 (manylinux_2_28) and
 Windows x64. Other platforms: build from source (see the repository).
 
+The optional interactive frontend ships as `pytauargus-tui` with the same
+version as this package. Both are published together under one `py-v*` tag;
+installing the TUI pulls the matching engine, while this package stays free
+of Textual. The first TUI distribution arrives with the next Python release.
+See [the shared release procedure](../../docs/tui-publishing.md).
+
 ## Cloud native
 
 Built to run unattended in containers, CI and batch services:

@@ -14,7 +14,11 @@ a thin interactive view over the `pytauargus` engine.
 pip install pytauargus-tui
 ```
 
-This pulls `pytauargus` (the native engine + CLI) and `textual`.
+This pulls the matching version of `pytauargus` (the native engine + CLI)
+and `textual`. The two packages share one version and release together under
+`py-v<version>`; installing the engine alone does not install the TUI.
+See [the shared release procedure](../../docs/tui-publishing.md).
+The first TUI package will be available with the next Python release.
 
 ## Run
 
@@ -38,10 +42,9 @@ suppression/rounding, audit feasibility intervals, and save outputs.
 ## Develop
 
 ```bash
-cd bindings/tui
-# 0.3.0 wheels on PyPI cover CPython 3.10-3.13 (no cp314 yet):
-uv venv --python 3.13 .venv
-uv pip install -p .venv "pytauargus==0.3.0" textual pytest pytest-asyncio
-uv pip install -p .venv -e .
-.venv/bin/python -m pytest
+# From the repository root; build the in-tree engine, not an older PyPI wheel:
+uv venv --python 3.13 bindings/tui/.venv
+scripts/sync-venv.sh bindings/tui/.venv
+uv sync --project bindings/tui --extra test
+uv run --project bindings/tui pytest bindings/tui/tests -q
 ```
