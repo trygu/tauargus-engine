@@ -11,9 +11,8 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
 - [x] Legacy `ErrorStrings.txt` restored + embedded at build time (hitas
   `d3e5b91`); `error_string()` returns real messages (5008 verified).
 - [x] Core worktree realigned to pin `ab37b03` (stale drift broke the wheel build).
-- [x] Dev loop: `scripts/sync-venv.sh <venv>` (drift gate → engine → wheel →
-  install); venvs run local wheels, not PyPI. Cleanup: `references/` removed;
-  Java frontend removed from `master`, kept on `tui` as porting reference.
+- [x] TUI distribution guards + installed-wheel consumer tests: 21 passed.
+- [x] Own `tui-v*` release workflow + setup guide prepared (`ci/tui-pypi`).
 
 ## In flight — TUI (branch `tui`, `bindings/tui/`, pkg `pytauargus-tui`)
 - [x] `model.py` + `app.py` (navigator, grid, detail, log; j/k s r a o).

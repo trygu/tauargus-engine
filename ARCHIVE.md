@@ -1,5 +1,32 @@
 # Tau-Argus Rewrite — Archive
 
+## Separate TUI distribution (2026-10-11)
+
+- Isolated `ci/tui-pypi` branch from `tui` (`3c8e2ab`), leaving the other
+  agent's application/model/state files and package metadata unchanged.
+- Existing `bindings/tui/pyproject.toml` already defines `pytauargus-tui`,
+  version 0.1.0, a `tauargus-tui` entry point, and dependencies on
+  `pytauargus>=0.3.0` and Textual. Only core releases have a publish workflow.
+- The design already specifies independent release cadence; this work adds
+  the missing distribution checks and publishing path, without releasing yet.
+- Completed dev-loop checkpoint moved from PROGRESS.md: sync-venv.sh builds
+  local engine wheels for development; mainline references/Java were removed,
+  with Java retained on `tui` as a porting reference.
+- Built a universal TUI wheel from its source distribution without compiling
+  native modules. Metadata keeps the published engine dependency and does not
+  include the development `tool.uv.sources` path.
+- Distribution guards: 8 tests passed, including mismatched tags, native/core
+  payloads, local dependency URLs and missing console entry points.
+- Clean consumer environment installed that wheel with published pytauargus
+  0.3.0. All 13 existing TUI tests, console help and Twine metadata checks pass.
+- Added a separate build/test/tag workflow with a 3-OS, 2-Python installed-wheel
+  matrix. Only `tui-v*` tag pushes can publish; manual/PR runs only validate.
+- Added `pypi-tui` OIDC publishing and a separate GitHub release that leaves
+  the engine's latest-release link intact. Core wheel/container CI is unchanged.
+- Actionlint v1.7.12 passed. Documented one-time Trusted Publisher setup and
+  version/tag steps in docs/tui-publishing.md. No release tag was created and
+  no PyPI project/environment configuration was changed.
+
 Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 (repo meta-cleanup). See `PROGRESS.md` for current state.
 
