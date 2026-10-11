@@ -127,25 +127,20 @@ wheels = [
 [[package]]
 name = "pytauargus"
 version = "0.3.0"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/3a/b039f3287051383f6422998d46c30e500f6d37011c97a0aafa01fbd0fbe0/pytauargus-0.3.0-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:10f9b3ca8bc2d0e83f780a030519969db7a1dd7a12dbd5a7d499dca9bc0bdda8", size = 2662771, upload-time = "2026-10-10T21:32:41.128Z" },
-    { url = "https://files.pythonhosted.org/packages/04/3a/f76e3df254078b49de100399c0bd8e1433ad76ce1108473438aab03a782e/pytauargus-0.3.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ba65fe6a4a072ffbea439b49b3121f94f6c303664c8eba910babc900c29a8d88", size = 2986108, upload-time = "2026-10-10T21:32:42.943Z" },
-    { url = "https://files.pythonhosted.org/packages/32/17/40e502d717f56a4e66bca47cb07d14d9d7e2cdb4c15028d8ea0fad776306/pytauargus-0.3.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f9f6ae5cd5b267acbaa0ccbb302e919ed70a0c9948cc8ee5e909e478c13f717d", size = 3222593, upload-time = "2026-10-10T21:32:44.742Z" },
-    { url = "https://files.pythonhosted.org/packages/06/48/a640980db85b810d164497f526c3856eb925d4b142818edbb324ee829625/pytauargus-0.3.0-cp310-cp310-win_amd64.whl", hash = "sha256:5f203a158ec3e4d473848ced8e44fb9263beea248208e0a7647910c119126ec3", size = 8398065, upload-time = "2026-10-10T21:32:46.673Z" },
-    { url = "https://files.pythonhosted.org/packages/b7/1c/0e90e4fbc2d21d8d4cb34248905aa118836501fc01bb627b8242e9da89b1/pytauargus-0.3.0-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:415aafcc20f572b57944f5b30e936a929dfdf4c0c031df668c98ddddb7b83846", size = 2664150, upload-time = "2026-10-10T21:32:49.391Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/d3/9e699618f3b2a3a7155e0e782e38356ced07e9e65d7e2b9322b23fbbf9c2/pytauargus-0.3.0-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3517ffeff2f04ae9fc3936083e9ce0f0a5bae58a7aac8515a71764b05a82cb69", size = 2987186, upload-time = "2026-10-10T21:32:51.208Z" },
-    { url = "https://files.pythonhosted.org/packages/c2/ce/6647f6e2564d996f614214d7d46969b3b53088493d0cdc7b70f65adc0f70/pytauargus-0.3.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1052993ed65895e1d9a39a9904e8dd5de8084a74f0a32280509061aae121cdfb", size = 3223484, upload-time = "2026-10-10T21:32:53.395Z" },
-    { url = "https://files.pythonhosted.org/packages/7e/df/7357375a3d524f92b20141803f56e00fb14017fb56dc4b0355290d1b9a74/pytauargus-0.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:71913bd2314367b85f5e76b64361d15631983a30249d67e9e31bb76945c30d3c", size = 8398523, upload-time = "2026-10-10T21:32:54.892Z" },
-    { url = "https://files.pythonhosted.org/packages/d0/21/f745b294417d2a025467111e7a5c22cb5c4d3546fa346933e05d0dda8e1c/pytauargus-0.3.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:f57b18de0bf98697c25c0305c7a8408fe1ff2df5586c1cdc778583bc42586e02", size = 2665875, upload-time = "2026-10-10T21:32:57.038Z" },
-    { url = "https://files.pythonhosted.org/packages/d8/af/ee9ccb18f2700dcae33f9cddc5c9254f35c087f7b5a120055b651f6cef43/pytauargus-0.3.0-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9afc43d4c41c15b89742054da32d1dd4f9f61766984e18b61f424cf91a732af9", size = 2989233, upload-time = "2026-10-10T21:32:58.897Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/43/8790cca9716a053ba29211ed3a5b9ce15b2c6e7b6cc0d56369563ffec1e8/pytauargus-0.3.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ffbc1bc490f956313ee91041798c0c07d25b4e9a2367cca321daa43aee24eec7", size = 3226911, upload-time = "2026-10-10T21:33:00.496Z" },
-    { url = "https://files.pythonhosted.org/packages/20/4a/7125766fefd754d6470d48fa31735b6b0f72ec9c71f256fe45bb3e4433bd/pytauargus-0.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:41ae9a8875ae7960d8b51d60262d6c4bedd681bf0968d2bf1728f0023e73020a", size = 8399418, upload-time = "2026-10-10T21:33:02.117Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/2b/e6bafa91d76502731babd3172969181d5684ef5fb3f1895c4308ad79c7d2/pytauargus-0.3.0-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:a0cc3c95dadb51c3abc5081fad6803192023f6ee365bb4aae94387f4a4a3c99f", size = 2665940, upload-time = "2026-10-10T21:33:04.014Z" },
-    { url = "https://files.pythonhosted.org/packages/da/39/09b2de15cbc6ec0dc8044b9d3824f394cf32f7374c57ca59b4634d919ef4/pytauargus-0.3.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e0fad67d9fc13cb7571e6c51da523542d1650a5d8c2635d3dcec0514c55358f3", size = 2989240, upload-time = "2026-10-10T21:33:05.489Z" },
-    { url = "https://files.pythonhosted.org/packages/b2/35/6a361184bb412c3d18bbbf8ba5fb7dd02ead0ea6806899a5a33f8a2a7970/pytauargus-0.3.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:cd95651f9a0f3ffabab3707b900a37bcf44a7f605d32c645c4b9cfca82a4ffbf", size = 3227002, upload-time = "2026-10-10T21:33:07.118Z" },
-    { url = "https://files.pythonhosted.org/packages/09/4a/383e774f663ae8894f4cab95a71ae628f688d02f21ffa35662ca71455a3f/pytauargus-0.3.0-cp313-cp313-win_amd64.whl", hash = "sha256:48966ac46924168c4ab8c6d22f6b5f596d40e7ed81342e98e44a34c93c6962fe", size = 8399374, upload-time = "2026-10-10T21:33:08.66Z" },
+source = { directory = "../python" }
+
+[package.metadata]
+requires-dist = [
+    { name = "ipykernel", marker = "extra == 'notebooks'" },
+    { name = "jupyterlab", marker = "extra == 'notebooks'" },
+    { name = "nbclient", marker = "extra == 'notebooks'" },
+    { name = "nbformat", marker = "extra == 'notebooks'" },
+    { name = "pandas", marker = "extra == 'dataframe'" },
+    { name = "pandas", marker = "extra == 'notebooks'" },
+    { name = "pandas", marker = "extra == 'test'" },
+    { name = "pytest", marker = "extra == 'test'" },
 ]
+provides-extras = ["dataframe", "test", "notebooks"]
 
 [[package]]
 name = "pytauargus-tui"
@@ -164,7 +159,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pytauargus", specifier = ">=0.3.0" },
+    { name = "pytauargus", directory = "../python" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-asyncio", marker = "extra == 'test'" },
     { name = "textual", specifier = ">=0.50" },

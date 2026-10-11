@@ -21,6 +21,15 @@ dependencies = [
     "textual>=0.50",
 ]
 
+# Monorepo dev: resolve pytauargus from the local sibling package so the TUI
+# follows the in-tree engine instead of a frozen PyPI snapshot. Precondition:
+# the superbuild output engine/build/lib must exist (same as any local wheel
+# build; sync-venv.sh builds it if needed). Published wheels are unaffected —
+# hatchling only reads [project], so PyPI metadata keeps the plain version
+# range.
+[tool.uv.sources]
+pytauargus = { path = "../python" }
+
 [project.optional-dependencies]
 test = ["pytest", "pytest-asyncio"]
 

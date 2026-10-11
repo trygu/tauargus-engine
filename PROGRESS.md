@@ -23,7 +23,9 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
   table view; confirm applies to live session; save writes outputs (later: `.arb` emit).
 - [ ] Next: staged s/r + preview-delta impl; spinner for long engine calls;
   file-picker startup; `.arb` emit; `tui-v*`.
-- Dev: py3.13 venv, synced from tree via `scripts/sync-venv.sh`.
+- Dev: py3.13 venv; `uv sync` resolves pytauargus from `../python` (uv path
+  source — TUI follows the in-tree engine). sync-venv.sh = fast path after
+  engine changes (rebuilds superbuild + force-install).
 
 ## Watch items / next non-TUI
 - tui→master merge: `src/tauargus` modify/delete conflict → resolve by deletion.
