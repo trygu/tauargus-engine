@@ -11,8 +11,10 @@ from pathlib import Path
 import pytest
 
 from pytauargus_tui.model import (
+    CellInstruction,
     Session,
     SuppressionOp,
+    apriory_lines,
     arb_with_ops,
     format_status_delta,
 )
@@ -134,3 +136,82 @@ def test_preview_changes_table_statuses(session, preview_session):
     assert sum(after.values()) == 126
     # The previewed OPT(1) changes table 1's cell statuses.
     assert after != before
+
+
+# ===========================================================================
+# Draft cell instructions + apriori preview (design §B.4 / §B.5)
+# ===========================================================================
+def test_apriory_lines_render(session):
+    g = session.grid(0)
+    instrs = [
+        CellInstruction(table=1, dim=(g.rows[1], g.cols[2]), kind="U"),
+        CellInstruction(table=1, dim=(g.rows[2], g.cols[3]), kind="P"),
+    ]
+    assert apriory_lines(instrs).splitlines() == [
+        f"{g.rows[1]};{g.cols[2]};U",
+        f"{g.rows[2]};{g.cols[3]};P",
+    ]
+
+
+def test_apriory_lines_empty():
+    assert apriory_lines([]) == ""
+
+
+def test_suppression_op_suppress_cmd():
+    cmd = SuppressionOp("OPT", 1).suppress_cmd()
+    assert (cmd.kind, cmd.tab_no) == ("OPT", 1)
+    rcmd = SuppressionOp("RND", 2, rnd_base=7).suppress_cmd()
+    assert (rcmd.kind, rcmd.tab_no, rcmd.rnd_base) == ("RND", 2, 7)
+
+
+def _find_cells_by_symbol(session, i, symbol, n):
+    """First ``n`` non-total cells of table ``i`` with the given symbol."""
+    g = session.grid(i)
+    out = []
+    for ri, row in enumerate(g.cells):
+        for ci, cell in enumerate(row):
+            if cell.symbol != symbol:
+                continue
+            dim = (g.rows[ri], g.cols[ci]) if g.col_var is not None else (g.rows[ri],)
+            if session.is_total(i, dim):
+                continue  # total cells are not apriori targets (this iteration)
+            out.append((ri, ci))
+            if len(out) == n:
+                return out
+    return out
+
+
+def test_preview_applies_instruction_to_marked_cell(session):
+    """Marking a safe cell ``U`` and previewing OPT changes that cell in the
+    scratch run, and leaves the live (accepted) run untouched."""
+    targets = _find_cells_by_symbol(session, 0, "S", 1)
+    assert targets, "no safe cell to mark"
+    r, c = targets[0]
+    g = session.grid(0)
+    dim = (g.rows[r], g.cols[c])
+    before_live = dict(session.status_counts(0))
+    before_status = g.cells[r][c].status
+    instr = CellInstruction(table=1, dim=dim, kind="U")
+    prev = session.preview([SuppressionOp("OPT", 1)], [instr])
+    after_status = prev.grid(0).cells[r][c].status
+    assert after_status != before_status, "marked cell should change after OPT"
+    # The live session is untouched (no native mutation of the accepted run).
+    assert session.status_counts(0) == before_live
+    assert session.grid(0).cells[r][c].status == before_status
+
+
+def test_preview_batches_multiple_instructions(session):
+    """One preview run applies the complete set of pending instructions."""
+    targets = _find_cells_by_symbol(session, 0, "S", 2)
+    assert len(targets) == 2, "need two safe cells"
+    g = session.grid(0)
+    instrs = [
+        CellInstruction(table=1, dim=(g.rows[r], g.cols[c]), kind="U")
+        for r, c in targets
+    ]
+    before = {(r, c): g.cells[r][c].status for r, c in targets}
+    prev = session.preview([SuppressionOp("OPT", 1)], instrs)
+    pg = prev.grid(0)
+    for r, c in targets:
+        assert pg.cells[r][c].status != before[(r, c)], (
+            f"marked cell {(r, c)} should change")

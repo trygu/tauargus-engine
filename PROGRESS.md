@@ -12,17 +12,16 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
   venvs run local wheels, not PyPI. `references/` + Java frontend cleaned up.
 
 ## In flight — TUI (branch `tui`, `bindings/tui/`, pkg `pytauargus-tui`)
-- [x] v1 (2026-10-11): navigator, grid, detail, log (j/k s r a o), real-
-  terminal verified. Staged s/r + preview-delta + spinner; 25 tests. Preview
-  = throwaway `run_batch` (spec + confirmed + staged ops, §B.3); `y` accepts,
-  `n` discards; re-OPT 5008 displayed (proves carry-forward); adopted session
-  re-binds to the original `.arb`. textual 8.x notes in app.py comments.
-- [x] **State design (2026-10-11):** immediate draft edits → explicit preview
-  → accept result; workspace save and export separate. Legacy Java traced;
-  revision/audit/job ownership + B.8 acceptance checks in `docs/ui-design.md`.
-- [ ] Next (ui-design §2/§B.8): revisioned draft commands + history (cell
-  instructions, undo/redo), isolated previews with freshness, acceptance/
-  audit ownership; then workspace save + replay/export; `tui-v*`.
+- [x] v1: navigator/grid/detail/log + staged s/r preview-delta + spinner;
+  real-terminal verified; re-OPT 5008 (carry-forward); 25 tests.
+- [x] **Cell instructions (2026-10-11)**: `u`/`p`/`S` = immediate draft edits
+  (pending markers, no solver); one Preview batches confirmed + pending apriori
+  + method ops on a scratch run (programmatic run_batch → apply_apriori →
+  suppress, §B.6); `y` promotes marks to confirmed, `n` keeps the draft. Total
+  cells not markable (refinement). 36 tests.
+- [ ] Next (ui-design §B.8): draft revision + undo/redo, preview
+  freshness/eligibility, per-revision audit ownership; workspace save +
+  replay/export; `tui-v*`.
 - Dev: `uv sync` uses local pytauargus (uv path source); sync-venv.sh after
   engine changes.
 

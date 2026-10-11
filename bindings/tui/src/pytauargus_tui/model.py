@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
+from pytauargus.batch import Apriory, Suppress
 from pytauargus.engine import Engine, _status_symbol, run_batch
 from pytauargus import cli as _cli
 
@@ -78,6 +79,40 @@ class TableGrid:
 
 
 # ===========================================================================
+# Draft cell instructions (design §B.4)
+# ===========================================================================
+@dataclass(frozen=True)
+class CellInstruction:
+    """One draft cell instruction: a stable cell identity plus an apriori
+    action (design §B.4).
+
+    Instructions live in the TUI draft and are applied on the preview
+    (scratch) run only — never on the accepted run. ``dim`` holds the ordered
+    categorical code labels (as strings, one per explanatory variable) of
+    ``table``; ``kind`` is ``U`` (require suppression / manually unsafe),
+    ``S`` (override as safe) or ``P`` (retain from secondary suppression).
+    Screen coordinates and native indices are display/run details, not the
+    identity — the code tuple is what survives navigation and recoding.
+    """
+
+    table: int  # 1-based table number
+    dim: Tuple[str, ...]  # code labels, one per explanatory variable
+    kind: str  # "U" | "S" | "P"
+
+
+def apriory_lines(instructions: Sequence[CellInstruction],
+                  sep: str = ";") -> str:
+    """Render one table's cell instructions as apriori file text.
+
+    Each line is ``<code1>;<code2>;...;<cmd>`` — dimension codes then the
+    action — the legacy apriori row format read by ``Engine.apply_apriori``
+    (legacy source: agent reference §"Apriori file", ``_parse_apriory``).
+    """
+    lines = [sep.join(list(instr.dim) + [instr.kind]) for instr in instructions]
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+# ===========================================================================
 # Staged suppression (design §B.3)
 # ===========================================================================
 @dataclass(frozen=True)
@@ -96,6 +131,17 @@ class SuppressionOp:
         if self.kind == "RND":
             return f"<SUPPRESS> RND({self.tab},{self.rnd_base})"
         return f"<SUPPRESS> {self.kind}({self.tab})"
+
+    def suppress_cmd(self) -> Suppress:
+        """The equivalent ``pytauargus.batch.Suppress`` command.
+
+        The preview applies the method through the engine API on a scratch
+        run (design §B.6) rather than by rewriting the spec text; this is the
+        same command the batch parser would build for ``arb_line()``.
+        """
+        if self.kind == "RND":
+            return Suppress(kind="RND", tab_no=self.tab, rnd_base=self.rnd_base)
+        return Suppress(kind=self.kind, tab_no=self.tab)
 
 
 def arb_with_ops(arb_text: str, ops: Sequence[SuppressionOp]) -> str:
@@ -279,6 +325,24 @@ class Session:
                 counts[cell.status] = counts.get(cell.status, 0) + 1
         return counts
 
+    def is_total(self, i: int, dim: Sequence[str]) -> bool:
+        """True if any code in ``dim`` is its variable's total code.
+
+        Total (marginal) cells are shown in the grid but are not valid
+        apriori targets in this iteration: the grid shows the display label
+        (``get_total_code()``, which falls back to ``"Total"``) while the
+        apriori parser matches only the variable's real total code. Marking a
+        total cell is a refinement (it needs the real total code, which the
+        display label does not preserve).
+        """
+        meta = self.table(i)
+        for var_name, label in zip(meta.exp_vars, dim):
+            var = self._eng.metadata.variables[
+                self._eng.metadata.index_of(var_name)]
+            if label == var.get_total_code():
+                return True
+        return False
+
     # -- throwaway preview (design §B.3) --------------------------------------
     def adopt_spec(self, arb_path: Union[str, Path]) -> None:
         """Re-bind this session to a spec file so later previews can re-run
@@ -288,28 +352,44 @@ class Session:
         (design §B.3 step 4)."""
         self._arb_path = Path(arb_path)
 
-    def preview(self, ops: Sequence[SuppressionOp]) -> "Session":
-        """Fresh, throwaway run of this session's ``.arb`` with ``ops``
-        appended (or inserted before its ``<WRITETABLE>``).
+    def preview(self, ops: Sequence[SuppressionOp],
+                instructions: Sequence[CellInstruction] = ()) -> "Session":
+        """Fresh, throwaway run of this session's ``.arb`` (design §B.3/§B.6).
 
-        The engine is stateful with no in-place undo, so a "preview" is a
-        fresh ``run_batch`` of the same spec plus the suppression — the same
-        mechanism the CLI and notebooks use. The returned session is for
-        inspection/diffing only; it is not meant to be re-previewed.
+        The execution recipe is reconstructed on a scratch engine: the
+        original preparation/compute spec runs first, then the draft's cell
+        instructions (apriori) are applied, then the chosen method ops
+        (confirmed + staged) run. The engine is stateful with no in-place
+        undo, so a "preview" is a fresh ``run_batch`` — the same mechanism the
+        CLI uses. The returned session is for inspection/diffing only; it is
+        not meant to be re-previewed.
         """
         if self._arb_path is None or not self._arb_path.is_file():
             raise RuntimeError("this session has no .arb file to re-run")
-        text = arb_with_ops(self._arb_path.read_text(), ops)
-        # The temp arb must sit next to the original one: the batch resolves
-        # data files relative to the arb's directory.
-        fd, tmp = tempfile.mkstemp(prefix=".preview-", suffix=".arb",
-                                   dir=str(self._arb_path.parent))
-        try:
-            with os.fdopen(fd, "w") as f:
-                f.write(text)
-            return type(self)(run_batch(tmp), tmp)
-        finally:
-            Path(tmp).unlink(missing_ok=True)
+        eng = run_batch(self._arb_path)
+        # Apply the draft's cell instructions before solving (design §B.6),
+        # one apriori file per table. The apriori path resolves relative to
+        # the arb's directory, so the temp file is written there.
+        by_table: Dict[int, List[CellInstruction]] = {}
+        for instr in instructions:
+            by_table.setdefault(instr.table, []).append(instr)
+        for tab_no in sorted(by_table):
+            fd, tmp = tempfile.mkstemp(prefix=".apri-", suffix=".apri",
+                                        dir=str(self._arb_path.parent))
+            try:
+                with os.fdopen(fd, "w") as f:
+                    f.write(apriory_lines(by_table[tab_no]))
+                # ignore_error=False: a bad code/command is a real problem
+                # (e.g. an edit invalidated by recoding) - surface it rather
+                # than silently retarget (design §B.4/§B.8).
+                eng.apply_apriori(Apriory(file=tmp, tab_no=tab_no,
+                                           separator=";", ignore_error=False))
+            finally:
+                Path(tmp).unlink(missing_ok=True)
+        # Then apply the method ops (confirmed first, staged last).
+        for op in ops:
+            eng.suppress(op.suppress_cmd())
+        return type(self)(eng, self._arb_path)
 
     # -- pass-through actions (mutate -> invalidate) -------------------------
     def suppress(self, cmd) -> None:

@@ -507,3 +507,31 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Updated `docs/ui-design.md` with implementation acceptance checks and the
   current `tui` branch status. These are design targets; no UI/engine behaviour
   was changed. Documentation structure/links and diff whitespace checked.
+
+## TUI cell-instruction milestone (2026-10-11)
+
+- First B.8 acceptance check implemented: multiple cell edits update the draft
+  immediately without native mutation of the accepted run; one Preview batches
+  the complete instruction set.
+- Model: `CellInstruction` (stable identity = table + ordered code tuple + kind
+  U/S/P) and `apriory_lines()` (legacy apriori row `<c1>;<c2>;...;<cmd>`).
+  `Session.preview(ops, instructions=())` switched from a spec-text rewrite to a
+  programmatic recipe: fresh `run_batch` (original spec) → per-table
+  `apply_apriori` (`ignore_error=False`, so an edit invalidated by recoding is
+  surfaced, not silently retargeted) → `suppress(op.suppress_cmd())` per op.
+  Equivalent to the old batch-text rewrite (5008 carry-forward test still green).
+- App: `u`/`p`/`shift+s` mark the cursor cell (toggle/replace, one instruction
+  per cell); pending marker on the grid (kept distinct from the status colour) +
+  detail pane; `_all_instructions()` merges confirmed + pending (latest intent
+  wins per cell); accept promotes marks to confirmed; discard keeps the draft;
+  the cursor is restored across marker re-renders.
+- Total (marginal) cells are not markable this iteration: the grid shows the
+  display label (`get_total_code()`, falling back to `"Total"`) while the
+  apriori parser matches only the variable's real total code. Marking a total
+  cell is a refinement that needs the real total code.
+- textual 8.x: `Pilot.press("shift+s")` (no `shift=` kwarg); `move_cursor` is
+  required to keep the cursor after a re-render (clear+re-add drops the
+  highlight). `Pilot.press` waits for process-CPU idle, so the busy window is
+  not observable around `press` (spinner covered by its own contract test).
+- Verification: TUI suite 36/36 (was 25). TDD: tests written first, observed to
+  fail for the right reason before implementing.

@@ -16,10 +16,14 @@ Layout (design §B.1)::
     │ ▸ log: table 1: 126 cells   ▸ hint: j/k=table s=suppress r=round ...  │
     └───────────────────────────────────────────────────────────────────────┘
 
-Keymap: ``j``/``k`` or the navigator select a table; ``s``=OPT suppress,
-``r``=RND round, ``a``=audit, ``o``=save intermediate ``.tab``, ``q``=quit.
+Keymap: ``j``/``k`` or the navigator select a table; ``u``/``p``/``S`` mark
+the cursor cell (require suppression / protect / override safe — immediate
+draft edits, design §B.4); ``s``=OPT suppress, ``r``=RND round, ``a``=audit,
+``o``=save intermediate ``.tab``, ``q``=quit.
 
-Suppress/round are **staged, preview before committing** (design §B.3):
+Cell marks update the pending instruction set with a visible marker and run
+no solver. Suppress/round are **staged, preview before committing**
+(design §B.3):
 ``s``/``r`` run a throwaway ``run_batch`` of the same ``.arb`` with the
 suppression appended and show the per-status delta. ``y`` adopts the
 previewed run as the working session; ``n`` cancels it. Confirmed ops are
@@ -32,7 +36,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -44,6 +48,7 @@ from textual.worker import WorkerState
 
 from .model import (
     Cell,
+    CellInstruction,
     Session,
     SuppressionOp,
     TableGrid,
@@ -61,7 +66,7 @@ _STATUS_COLOR = {
     "?": "default",
 }
 
-_HINT = "j/k=table  s=suppress  r=round  a=audit  o=save  y/n=preview  q=quit"
+_HINT = "j/k=table u/p/S=mark s=OPT r=RND a=audit o=save y/n=preview q=quit"
 
 
 def _fmt(value: float) -> str:
@@ -139,6 +144,10 @@ class TauArgusApp(App):
         Binding("q", "quit", "Quit"),
         Binding("j", "table_next", "Next table"),
         Binding("k", "table_prev", "Prev table"),
+        Binding("u", "mark_suppress", "Mark U (require suppression)",
+                show=False),
+        Binding("p", "mark_protect", "Mark P (protect)", show=False),
+        Binding("shift+s", "mark_safe", "Mark S (override safe)", show=False),
         Binding("s", "suppress", "Suppress (OPT)"),
         Binding("r", "round", "Round (RND)"),
         Binding("a", "audit", "Audit"),
@@ -165,6 +174,14 @@ class TauArgusApp(App):
         self._confirmed: List[SuppressionOp] = []
         self._busy: bool = False
         self._last_action: str = ""
+        # Draft cell instructions (design §B.4): _pending_instr is the current
+        # draft keyed by stable cell identity (table, dim); _confirmed_instr
+        # are the marks adopted by a previous accept (re-applied into every
+        # later preview).
+        self._pending_instr: Dict[Tuple[int, Tuple[str, ...]],
+                                  CellInstruction] = {}
+        self._confirmed_instr: List[CellInstruction] = []
+        self._cursor: Optional[Tuple[int, int]] = None
 
     # -- inspection surface (used by tests / embedders) ----------------------
     @property
@@ -212,6 +229,21 @@ class TauArgusApp(App):
     def confirmed_ops(self) -> Tuple[SuppressionOp, ...]:
         """Suppressions confirmed so far, in order (feed later previews)."""
         return tuple(self._confirmed)
+
+    @property
+    def cursor(self) -> Optional[Tuple[int, int]]:
+        """Grid (row, column) of the highlighted cell (column 0 = label)."""
+        return self._cursor
+
+    @property
+    def pending_instructions(self) -> Tuple[CellInstruction, ...]:
+        """The draft's uncommitted cell instructions (design §B.4)."""
+        return tuple(self._pending_instr.values())
+
+    @property
+    def confirmed_instructions(self) -> Tuple[CellInstruction, ...]:
+        """Cell instructions adopted by a previous accept (feed previews)."""
+        return tuple(self._confirmed_instr)
 
     # -- compose ---------------------------------------------------------------
     def compose(self) -> ComposeResult:
@@ -314,12 +346,26 @@ class TauArgusApp(App):
                         exit_on_error=False)
 
     # -- grid --------------------------------------------------------------------------
-    @staticmethod
-    def _cell_text(cell: Cell) -> Text:
-        color = _STATUS_COLOR.get(cell.symbol, "default")
-        return Text(_fmt(cell.value), style=color)
+    # Pending-mark glyphs per instruction kind (design §B.5: a separate
+    # marker, kept distinct from the status colour).
+    _MARK = {"U": "*", "S": "+", "P": "#"}
 
-    def _populate_grid(self) -> None:
+    @staticmethod
+    def _cell_text(cell: Cell, marker: Optional[str] = None) -> Text:
+        color = _STATUS_COLOR.get(cell.symbol, "default")
+        text = Text(_fmt(cell.value), style=color)
+        if marker:
+            text.append(marker, style="bold magenta")
+        return text
+
+    def _pending_marker(self, tab_index: int,
+                        dim: Tuple[str, ...]) -> Optional[str]:
+        instr = self._pending_instr.get((tab_index, tuple(dim)))
+        if instr is None:
+            return None
+        return self._MARK.get(instr.kind)
+
+    def _populate_grid(self, reset_cursor: bool = True) -> None:
         g = self._grid
         if g is None:
             return
@@ -334,9 +380,14 @@ class TauArgusApp(App):
             grid.add_column(g.tab.resp_var, key="c0")
         for ri, row in enumerate(g.cells):
             values: List[object] = [Text(g.rows[ri], style="bold")]
-            values.extend(self._cell_text(c) for c in row)
+            for ci, cell in enumerate(row):
+                dim = ((g.rows[ri], g.cols[ci]) if g.col_var is not None
+                       else (g.rows[ri],))
+                marker = self._pending_marker(g.tab.index, dim)
+                values.append(self._cell_text(cell, marker))
             grid.add_row(*values, key=f"r{ri}")
-        grid.move_cursor(row=0, column=1)
+        if reset_cursor:
+            grid.move_cursor(row=0, column=1)
 
     def on_data_table_cell_selected(self, event) -> None:
         self._on_cell_coordinate(event.coordinate)
@@ -351,6 +402,7 @@ class TauArgusApp(App):
         r, c = coordinate.row, coordinate.column
         if r < 0 or r >= len(self._grid.cells):
             return
+        self._cursor = (r, c)
         row = self._grid.cells[r]
         if c < 1 or c - 1 >= len(row):
             return
@@ -371,6 +423,13 @@ class TauArgusApp(App):
         pos += ")"
         text = (f"cell {pos}: value={_fmt(cell.value)}  "
                 f"status={cell.symbol} ({cell.status_name})")
+        # Pending draft instruction on this cell (design §B.4).
+        dim = (g.rows[r], g.cols[c]) if g.col_var is not None else (g.rows[r],)
+        instr = self._pending_instr.get((g.tab.index, tuple(dim)))
+        if instr is not None:
+            names = {"U": "require suppression", "S": "override safe",
+                     "P": "protect"}
+            text += f"  pending: {instr.kind} ({names[instr.kind]})"
         # Realised feasibility interval, when this table has been audited
         # (row-major cell index matches the audit row's ``cell`` key).
         n_cols = len(g.cols) if g.col_var is not None else 1
@@ -388,6 +447,15 @@ class TauArgusApp(App):
     def action_round(self) -> None:
         self._stage("RND")
 
+    def action_mark_suppress(self) -> None:
+        self._mark_cell("U")
+
+    def action_mark_protect(self) -> None:
+        self._mark_cell("P")
+
+    def action_mark_safe(self) -> None:
+        self._mark_cell("S")
+
     def action_audit(self) -> None:
         self._run_action("AUDIT")
 
@@ -400,11 +468,17 @@ class TauArgusApp(App):
             return
         op = self._pending
         self._session = self._preview
-        # The adopted session was run from a temp spec (now deleted); bind
-        # it back to the original .arb so later previews re-run the spec
-        # plus the (now longer) confirmed-ops list.
+        # The adopted session already ran from the original spec (plus the
+        # draft instructions); keep it bound to that .arb so later previews
+        # re-run the spec plus the (now longer) confirmed lists.
         self._session.adopt_spec(self._arb)
         self._confirmed.append(op)
+        # Promote the draft's cell instructions to confirmed (design §B.5:
+        # accept commits the marks; the preview already applied them, so the
+        # live grid reflects them and future previews re-apply them).
+        for instr in self._pending_instr.values():
+            self._confirmed_instr.append(instr)
+        self._pending_instr.clear()
         self._pending = None
         self._preview = None
         self._last_action = f"{op.kind} confirmed on table {op.tab}"
@@ -443,14 +517,61 @@ class TauArgusApp(App):
                         exit_on_error=False)
 
     def _run_preview(self, op: SuppressionOp) -> Tuple[Session, str]:
-        """Worker body: throwaway run of the spec + confirmed ops + staged
-        op, and the per-status delta of the staged table (design §B.3)."""
+        """Worker body: throwaway run of the spec + the draft's cell
+        instructions + confirmed ops + staged op, and the per-status delta of
+        the staged table (design §B.3/§B.5 — one preview batches the complete
+        instruction set)."""
         s = self._session
         tab = op.tab - 1
-        prev = s.preview(list(self._confirmed) + [op])
+        prev = s.preview(list(self._confirmed) + [op],
+                         self._all_instructions())
         delta = format_status_delta(s.status_counts(tab),
                                     prev.status_counts(tab))
         return prev, delta
+
+    def _all_instructions(self) -> List[CellInstruction]:
+        """The full instruction set for a preview: confirmed marks plus the
+        current draft, with a pending mark overriding a confirmed one on the
+        same cell (latest intent wins)."""
+        merged: Dict[Tuple[int, Tuple[str, ...]], CellInstruction] = {}
+        for instr in self._confirmed_instr:
+            merged[(instr.table, instr.dim)] = instr
+        for instr in self._pending_instr.values():
+            merged[(instr.table, instr.dim)] = instr
+        return list(merged.values())
+
+    def _mark_cell(self, kind: str) -> None:
+        """Set (or toggle/replace) a draft cell instruction on the cursor
+        cell. Immediate: updates the draft and the grid marker, runs no
+        solver and mutates no accepted run (design §B.5)."""
+        if self._session is None or self._grid is None or self._cursor is None:
+            return
+        if self._pending is not None:
+            return  # locked while a preview is pending
+        g = self._grid
+        r, c = self._cursor
+        if c < 1 or c - 1 >= len(g.cells[r]):
+            return  # not on a data cell
+        data_c = c - 1
+        dim = ((g.rows[r], g.cols[data_c]) if g.col_var is not None
+               else (g.rows[r],))
+        if self._session.is_total(g.tab.index, dim):
+            self._set_log("total cells cannot be marked in this iteration")
+            return
+        key = (g.tab.index, tuple(dim))
+        existing = self._pending_instr.get(key)
+        if existing is not None and existing.kind == kind:
+            del self._pending_instr[key]  # same mark again clears it
+            self._set_log(f"cell {dim}: mark removed")
+        else:
+            self._pending_instr[key] = CellInstruction(
+                table=g.tab.index + 1, dim=tuple(dim), kind=kind)
+            self._set_log(f"cell {dim}: marked {kind}")
+        self._populate_grid(reset_cursor=False)  # re-render (pure, no engine)
+        # Restore the cursor to the marked cell: clear+re-add drops the
+        # highlight, and the next mark must still target this same cell.
+        self.query_one("#grid", DataTable).move_cursor(row=r, column=c)
+        self._set_cell_detail(r, data_c)
 
     def _run_action(self, what: str) -> None:
         if self._session is None or self._pending is not None:
@@ -483,8 +604,13 @@ class TauArgusApp(App):
 
     def _set_log(self, text: str) -> None:
         self._log = text
+        # The draft's pending-mark count is a separate fact from the log
+        # message (design §B.4: distinct facts, not one dirty flag).
+        edits = len(self._pending_instr)
+        suffix = (f"  ·  {edits} mark{'s' if edits != 1 else ''}"
+                  if edits else "")
         self.query_one("#logtext", Static).update(
-            f"▸ log: {text}   ▸ hint: {_HINT}")
+            f"▸ log: {text}{suffix}   ▸ hint: {_HINT}")
 
     def push_log(self, msg: str) -> None:
         self._set_log(msg)

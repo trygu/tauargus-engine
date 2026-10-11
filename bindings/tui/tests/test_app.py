@@ -208,3 +208,101 @@ async def test_save_action_writes_tab(app, tmp_path):
         assert out.is_file()
         content = out.read_text()
         assert len(content.splitlines()) > 7
+
+
+# ===========================================================================
+# Draft cell instructions (design §B.4 / §B.5)
+# ===========================================================================
+async def test_cell_mark_updates_draft_only(app):
+    """Marking a cell updates the draft immediately: no solver run, the
+    live (accepted) session is untouched."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        before = app.session.status_counts(0)
+        await pilot.press("u")
+        # Draft updated: one pending instruction, kind U.
+        assert len(app.pending_instructions) == 1
+        assert app.pending_instructions[0].kind == "U"
+        # No preview / solver run was started.
+        assert app.preview is None and app.pending is None
+        # Live session untouched.
+        assert app.session.status_counts(0) == before
+
+
+async def test_cell_mark_toggle_off(app):
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        assert len(app.pending_instructions) == 1
+        await pilot.press("u")  # the same mark again clears it
+        assert len(app.pending_instructions) == 0
+
+
+async def test_cell_mark_replaces_kind(app):
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        await pilot.press("p")  # a different mark on the same cell replaces it
+        assert len(app.pending_instructions) == 1
+        assert app.pending_instructions[0].kind == "P"
+
+
+async def test_cell_mark_safe_shift_s(app):
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("shift+s")
+        assert len(app.pending_instructions) == 1
+        assert app.pending_instructions[0].kind == "S"
+
+
+async def test_preview_batches_marks_and_accept(app):
+    """Two marks + OPT: one preview run applies both; accepting commits both
+    and promotes them to the confirmed draft."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor 1")
+        await pilot.press("u")
+        g.move_cursor(row=2, column=3)
+        await wait_for(pilot, lambda: app.cursor == (2, 3), what="cursor 2")
+        await pilot.press("u")
+        assert len(app.pending_instructions) == 2
+        before = app.session.status_counts(0)
+        await pilot.press("s")  # OPT preview batches the two marks
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")  # accept
+        assert app.preview is None and app.pending is None
+        assert app.session.status_counts(0) != before
+        assert len(app.confirmed_instructions) == 2
+
+
+async def test_discard_keeps_marks_and_live(app):
+    """Discarding a preview keeps the draft marks and the accepted run."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        assert len(app.pending_instructions) == 1
+        before = app.session.status_counts(0)
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("n")  # discard
+        assert app.preview is None and app.pending is None
+        # Draft kept, live run untouched.
+        assert len(app.pending_instructions) == 1
+        assert app.session.status_counts(0) == before
