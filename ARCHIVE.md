@@ -434,3 +434,24 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Side note: tests.yml uses `concurrency: cancel-in-progress`; a
   `gh run rerun` queued behind a newer run on the same branch cancels
   the in-flight one.
+
+## Acknowledgements source review (2026-10-11)
+
+- Separate `docs/acknowledgements` branch from mainline `211876d`.
+- Checked the original Tau-Argus 4.1 manual and authorship/copyright
+  headers in all five native modules, including CSP implementation credits.
+- Verified all eight rtauargus authors and its four published email addresses
+  in upstream DESCRIPTION; Julien Jamme is listed as maintainer (`cre`).
+- PiArgus metadata publishes `lauwerund@gmail.com`; its author's public
+  GitHub profile identifies `lverweijen` as Laurent Verweijen.
+- HiGHS v1.15.1 AUTHORS lists Julian Hall, Ivet Galabova, Qi Huangfu,
+  Leona Gottwald and Michael Feldmeier.
+- Earlier completed checkpoints moved here to keep PROGRESS.md under 35 lines:
+  the local-wheel sync script and removal of mainline references/Java
+  (the Java frontend remains on `tui` as a porting reference).
+- Updated root and Python README acknowledgements together, preserving
+  the existing interface-inspiration credits and license sections. Source links
+  pin the reviewed native commits, wrapper metadata and HiGHS release.
+- Documentation checks passed: matching sections, resolved Markdown references,
+  public contacts and header credits match upstream; `git diff --check` clean.
+  Runtime tests were not needed for this documentation-only change.

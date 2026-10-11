@@ -327,18 +327,70 @@ uv run pytest
 
 ## Acknowledgements
 
-Thanks to the authors, maintainers and contributors of:
+This project builds on the work of the original Tau-Argus authors, native
+library developers, and the R and Python communities around Tau-Argus.
 
-- [rtauargus](https://github.com/InseeFrLab/rtauargus), developed by InseeFrLab
-  and its contributors. Its metadata, batch and hierarchy generation logic
-  was ported to `pytauargus`; its `micro_rtauargus()` workflow also informed
-  the high-level `protect()` pipeline.
-- [PiArgus (`piargus`)](https://github.com/lverweijen/piargus), by lverweijen
-  and contributors. Its DataFrame-to-table workflow and result API inspired
-  `TableResult` and its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
+### Original Tau-Argus and native libraries
+
+Thank you to **Statistics Netherlands (CBS)** and the contributors credited
+in the [Tau-Argus 4.1 manual][tau-manual]: **Peter-Paul de Wolf** (Modular),
+**Anco Hundepool**, **Sarah Giessing** (GHMITER and audit),
+**Juan José Salazar González** (optimisation methods), and **Jordi Castro**
+(network solutions and CTA). The manual publishes the historical project
+contact [argus@cbs.nl](mailto:argus@cbs.nl).
+
+The native source headers retain these credits. Initials and partial names
+are reproduced as written where the headers do not give a full name.
+
+| Component | Credit in the original sources | Sources |
+| --- | --- | --- |
+| `libtauargus` (core) | Statistics Netherlands; `PTable.h` also credits `pwof`. | [TauArgus.h][core-header], [PTable.h][ptable-header] |
+| `CSP` (cell suppression) | Matteo Fischetti and Juan José Salazar González; linked-table implementation files also credit M. D. Montes de Oca and J. J. Salazar. | [Cspdefns.h][csp-header], [cspback.c][csp-source] |
+| `CRP` (controlled rounding) | Juan José Salazar González; the headers publish the historical contact [jjsalaza@ull.es](mailto:jjsalaza@ull.es). | [crpmain.h][crp-header], [author profile][salazar-profile] |
+| `tauhitas` (modular suppression) | Statistics Netherlands; the manual credits Peter-Paul de Wolf for the Modular method. | [HiTaSCtrl.h][hitas-header], [manual][tau-manual] |
+| `taurounder` (rounding interface) | Statistics Netherlands; `resource.h` also credits `Peter-Paul`. | [RounderCtrl.h][rounder-header], [resource.h][resource-header] |
+| [HiGHS](https://highs.dev/) (current LP/MIP backend) | Julian Hall, Ivet Galabova, Qi Huangfu, Leona Gottwald, Michael Feldmeier, and the HiGHS contributors. | [HiGHS v1.15.1 AUTHORS][highs-authors] |
+
+### R and Python interfaces
+
+Thank you to [rtauargus](https://github.com/InseeFrLab/rtauargus), developed
+at **INSEE / InseeFrLab**, and its authors **Pierre-Yves Berrard**,
+**Julien Jamme**, **Nathanaël Rastout**, **Jeanne Pointet**, **Félix Beroud**,
+**André-Raymond Socard**, **Wistan Pomel**, and **Clara Baudry**, together
+with its contributors. Its metadata, batch and hierarchy generation logic
+was ported to `pytauargus`; its `micro_rtauargus()` workflow also informed
+the high-level `protect()` pipeline.
+
+The upstream [package metadata][rtauargus-authors] lists these public contacts:
+
+- **Julien Jamme**, author and package maintainer: [julien.jamme@insee.fr](mailto:julien.jamme@insee.fr).
+- **Pierre-Yves Berrard**: [pierre-yves.berrard@insee.fr](mailto:pierre-yves.berrard@insee.fr).
+- **Nathanaël Rastout**: [nathanael.rastout@insee.fr](mailto:nathanael.rastout@insee.fr).
+- **Clara Baudry**: [clara.baudry@insee.fr](mailto:clara.baudry@insee.fr).
+
+Thank you to [PiArgus (`piargus`)](https://github.com/lverweijen/piargus),
+by **[Laurent Verweijen (`lverweijen`)](https://github.com/lverweijen)**
+and contributors. Its DataFrame-to-table workflow and result API inspired
+`TableResult` and its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
+Its [package metadata][piargus-authors] publishes the contact
+[lauwerund@gmail.com](mailto:lauwerund@gmail.com).
 
 Their work made these interfaces possible and provides valuable examples of
 integrating Tau-Argus into reproducible data-processing workflows.
+
+[tau-manual]: https://research.cbs.nl/casc/Software/TauManualV4.1.pdf#page=1
+[core-header]: https://github.com/trygu/libtauargus/blob/ab37b030ffe7d2f792d62ea6990f19ec71124ca3/src/TauArgus.h#L1-L5
+[ptable-header]: https://github.com/trygu/libtauargus/blob/ab37b030ffe7d2f792d62ea6990f19ec71124ca3/src/PTable.h#L1-L12
+[csp-header]: https://github.com/trygu/CSP/blob/30078268f2d5e2dec14552b4ab28cf75056969fc/src/Cspdefns.h#L1-L11
+[csp-source]: https://github.com/trygu/CSP/blob/30078268f2d5e2dec14552b4ab28cf75056969fc/src/cspback.c#L1-L12
+[crp-header]: https://github.com/trygu/CRP/blob/644475857de70c525427e32c2a20589b7bd93ef6/src/crpmain.h#L1-L11
+[hitas-header]: https://github.com/trygu/tauhitas/blob/d3e5b91deb7c0dd95431db393edc443f118dc95f/src/HiTaSCtrl.h#L1-L5
+[rounder-header]: https://github.com/trygu/taurounder/blob/981496562ecfae345173489488215418228743fe/src/RounderCtrl.h#L1-L5
+[resource-header]: https://github.com/trygu/taurounder/blob/981496562ecfae345173489488215418228743fe/src/resource.h#L7-L12
+[salazar-profile]: https://portalciencia.ull.es/investigadores/81268/detalle?lang=en
+[highs-authors]: https://github.com/ERGO-Code/HiGHS/blob/v1.15.1/AUTHORS
+[rtauargus-authors]: https://github.com/InseeFrLab/rtauargus/blob/2a1e6b158aded6799d559d124bda163f9029499d/DESCRIPTION#L24-L65
+[piargus-authors]: https://github.com/lverweijen/piargus/blob/ee8d3931a8d7f84ad2062e8ef69fb1b46556e4e1/pyproject.toml#L8-L10
 
 ## License
 
