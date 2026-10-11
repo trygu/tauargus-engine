@@ -487,3 +487,23 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Side note: tests.yml uses `concurrency: cancel-in-progress`; a
   `gh run rerun` queued behind a newer run on the same branch cancels
   the in-flight one.
+
+## TUI state design agreed (2026-10-11)
+
+- Traced Java cell-edit, suppression, undo and export handlers at `3c8e2ab`,
+  with the legacy manual as the behaviour reference. Cell edits changed the
+  working table immediately; solving was explicit, and protection locked most
+  editing until suppression undo. This was source inspection, not a Java run.
+- Replaced the old one-engine/no-persistence design with immediate draft
+  commands, explicit isolated previews, acceptance and independent workspace
+  saving/export. User instructions and solver-selected statuses stay separate.
+- Specified stable cell identity, revisioned audit/cache ownership, serialized
+  jobs, late-result rejection, failure preservation and exact accepted-result
+  artifacts. Existing batch protection/output commands must be separated from
+  preparation rather than blindly replayed/appended during previews.
+- Corrected the claim that no native undo exists: suppression undo is present,
+  but is not a general transaction/restore contract. Fresh scratch runs are the
+  initial preview strategy; optimisation needs verified reset semantics.
+- Updated `docs/ui-design.md` with implementation acceptance checks and the
+  current `tui` branch status. These are design targets; no UI/engine behaviour
+  was changed. Documentation structure/links and diff whitespace checked.
