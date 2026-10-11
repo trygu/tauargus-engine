@@ -587,6 +587,17 @@ class TauArgusApp(App):
         if reset_cursor:
             grid.move_cursor(row=0, column=1)
 
+    def _repopulate_preserving_cursor(self) -> None:
+        """Re-render the grid without moving the cursor off the cell the
+        operator is inspecting. Used when swapping the grid between the
+        accepted session and a pending preview (design §B.5: the operator
+        inspects the preview's secondary suppressions in place)."""
+        saved = self._cursor
+        self._populate_grid(reset_cursor=False)
+        if saved is not None:
+            self.query_one("#grid", DataTable).move_cursor(
+                row=saved[0], column=saved[1])
+
     def on_data_table_cell_selected(self, event) -> None:
         self._on_cell_coordinate(event.coordinate)
 
@@ -761,6 +772,11 @@ class TauArgusApp(App):
         self._preview = None
         self._preview_revision = None  # the preview is discarded
         self._last_action = f"{op.kind} preview cancelled"
+        # The preview's grid was shown for inspection only; restore the live
+        # (accepted) grid. It is a cache read — the table's grid was built on
+        # selection and the session is untouched while a preview is pending.
+        self._grid = self._session.grid(self._tab)
+        self._repopulate_preserving_cursor()
         self._set_detail(self._table_detail(self._session.table(self._tab)))
         self._set_log(f"table {op.tab}: preview cancelled")
 
@@ -931,6 +947,14 @@ class TauArgusApp(App):
     def _show_preview_pending(self) -> None:
         op = self._pending
         assert op is not None
+        # Show the preview's result in the grid so the operator can inspect the
+        # secondary suppressions before deciding (design §B.5: "the operator
+        # inspects its secondary suppressions"). The preview worker already
+        # built this table's grid (it computed the status delta from it), so
+        # this is a pure cache read, not an engine call.
+        if self._preview is not None:
+            self._grid = self._preview.grid(op.tab - 1)
+            self._repopulate_preserving_cursor()
         self._detail = (f"preview {op.kind} on table {op.tab}:\n"
                         f"{self._delta}\n"
                         f"y=confirm (adopt this run)   n=cancel")

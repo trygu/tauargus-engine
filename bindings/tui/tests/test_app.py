@@ -175,6 +175,47 @@ async def test_cancel_keeps_live(app):
         assert app.last_action == "OPT preview cancelled"
 
 
+async def test_preview_result_shown_in_grid(app):
+    """While a preview is pending the grid shows the *preview's* result so the
+    operator can inspect its secondary suppressions; cancel restores the
+    accepted grid (design §B.5: "the operator inspects its secondary
+    suppressions"). Suppressed cells carry status M (secondary) = yellow."""
+    from rich.text import Text
+
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+
+        def secondary_count(sess, tab=0):
+            g = sess.grid(tab)
+            return sum(1 for row in g.cells for c in row if c.status in (11, 12))
+
+        def yellow_cells(g):
+            n = 0
+            for r in range(g.row_count):
+                for c in range(1, len(g.columns)):
+                    t = g.get_cell(f"r{r}", f"c{c - 1}")
+                    if isinstance(t, Text) and t.style == "yellow":
+                        n += 1
+            return n
+
+        g = grid(app)
+        accepted_sec = secondary_count(app.session)
+        before_yellow = yellow_cells(g)
+        assert before_yellow == accepted_sec  # grid reflects the accepted run
+
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        preview_sec = secondary_count(app.preview)
+        assert preview_sec != accepted_sec  # OPT actually suppressed cells
+        # The grid now renders the preview's secondary suppressions.
+        assert yellow_cells(g) == preview_sec
+
+        await pilot.press("n")
+        assert app.preview is None and app.pending is None
+        # Cancelling restores the accepted grid.
+        assert yellow_cells(g) == accepted_sec == before_yellow
+
+
 async def test_second_opt_preview_surfaces_5008(app):
     """A second OPT on an already-optimised table fails with legacy code
     5008; the TUI surfaces it as an error (no crash) and drops the pending
