@@ -26,6 +26,8 @@
 - Actionlint v1.7.12 passed. Documented one-time Trusted Publisher setup and
   version/tag steps in docs/tui-publishing.md. No release tag was created and
   no PyPI project/environment configuration was changed.
+- Enabled path-filtered package validation on side-branch pushes as well as
+  PRs, so the new workflow can be verified before it reaches the TUI branch.
 
 Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 (repo meta-cleanup). See `PROGRESS.md` for current state.

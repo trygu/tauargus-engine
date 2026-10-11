@@ -10,7 +10,7 @@ on:
       - .github/tests/test_tui_distribution.py
       - docs/tui-publishing.md
   push:
-    branches: [master, tui]
+    branches: ["**"]
     tags: ["tui-v*"]
     paths:
       - bindings/tui/**

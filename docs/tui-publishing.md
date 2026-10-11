@@ -40,7 +40,7 @@ range. This is a consumer-install check, separate from local engine
 development. If the TUI needs an unreleased engine API, release that engine
 first and set the TUI's minimum dependency accordingly.
 
-Pull requests and manual workflow runs only build and test. Publishing runs
+Branch pushes, pull requests and manual runs only build and test. Publishing runs
 only on `tui-v*` tags, after all checks pass and the tag matches the TUI's
 project version. The core `py-v*` wheel/container workflow stays unchanged.
 
