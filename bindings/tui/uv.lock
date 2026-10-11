@@ -126,8 +126,8 @@ wheels = [
 
 [[package]]
 name = "pytauargus"
-version = "0.3.0"
-source = { directory = "../python" }
+version = "0.3.2"
+source = { editable = "../python" }
 
 [package.metadata]
 requires-dist = [
@@ -138,13 +138,14 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'dataframe'" },
     { name = "pandas", marker = "extra == 'notebooks'" },
     { name = "pandas", marker = "extra == 'test'" },
+    { name = "pytauargus-tui", marker = "extra == 'tui'", directory = "." },
     { name = "pytest", marker = "extra == 'test'" },
 ]
-provides-extras = ["dataframe", "test", "notebooks"]
+provides-extras = ["dataframe", "test", "notebooks", "tui"]
 
 [[package]]
 name = "pytauargus-tui"
-version = "0.1.0"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
     { name = "pytauargus" },
@@ -159,7 +160,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pytauargus", directory = "../python" },
+    { name = "pytauargus", editable = "../python" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-asyncio", marker = "extra == 'test'" },
     { name = "textual", specifier = ">=0.50" },

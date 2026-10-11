@@ -263,9 +263,50 @@ jobs:
           path: repaired/*.whl
           if-no-files-found: error
 
+  # ---------------------------------------------------------------------------
+  # pytauargus-tui: pure Python -> one universal wheel (no HiGHS/superbuild).
+  # Released in lockstep with pytauargus (same version, same py-v* trigger).
+  # ---------------------------------------------------------------------------
+  build-tui:
+    name: build pytauargus-tui wheel
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip wheel bindings/tui --no-deps -w dist
+
+      - name: Show wheel
+        run: ls -la dist
+
+      - name: Smoke test (clean venv; verify pytauargus is pulled in)
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/smoke"
+          "$RUNNER_TEMP/smoke/bin/pip" install --upgrade pip
+          "$RUNNER_TEMP/smoke/bin/pip" install dist/*.whl
+          echo "--- resolved pytauargus ---"
+          "$RUNNER_TEMP/smoke/bin/pip" show pytauargus | grep -E '^(Name|Version):'
+          "$RUNNER_TEMP/smoke/bin/python" -c "import pytauargus, pytauargus_tui; print('import ok, pytauargus', pytauargus.__version__)"
+          test -x "$RUNNER_TEMP/smoke/bin/tauargus-tui" && echo "entry point ok"
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytauargus-tui-wheel
+          path: dist/*.whl
+          if-no-files-found: error
+
   release:
     name: Publish release
-    needs: [build-macos, build-linux, build-windows]
+    needs: [build-macos, build-linux, build-windows, build-tui]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/py-v')
     runs-on: ubuntu-24.04
     permissions:
@@ -275,14 +316,17 @@ jobs:
       - uses: actions/checkout@v4
 
       # PyPI versions are immutable: refuse to publish if the tag and the
-      # package version disagree.
-      - name: Check tag matches package version
+      # package versions disagree. The TUI is released in lockstep with
+      # pytauargus, so all three must agree.
+      - name: Check tag matches package versions
         run: |
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#py-v}"
-          PKG_VERSION="$(python3 -c "import tomllib;print(tomllib.load(open('bindings/python/pyproject.toml','rb'))['project']['version'])")"
-          echo "tag=$TAG_VERSION package=$PKG_VERSION"
-          [ "$TAG_VERSION" = "$PKG_VERSION" ] || { echo "::error::Tag py-v$TAG_VERSION does not match pyproject version $PKG_VERSION"; exit 1; }
+          PY_VERSION="$(python3 -c "import tomllib;print(tomllib.load(open('bindings/python/pyproject.toml','rb'))['project']['version'])")"
+          TUI_VERSION="$(python3 -c "import tomllib;print(tomllib.load(open('bindings/tui/pyproject.toml','rb'))['project']['version'])")"
+          echo "tag=$TAG_VERSION pytauargus=$PY_VERSION tui=$TUI_VERSION"
+          [ "$TAG_VERSION" = "$PY_VERSION" ] || { echo "::error::Tag py-v$TAG_VERSION does not match pytauargus version $PY_VERSION"; exit 1; }
+          [ "$PY_VERSION" = "$TUI_VERSION" ] || { echo "::error::pytauargus ($PY_VERSION) and pytauargus-tui ($TUI_VERSION) must be released in lockstep"; exit 1; }
 
       - uses: actions/download-artifact@v4
         with:
@@ -299,10 +343,25 @@ jobs:
           files: dist/*.whl
           generate_release_notes: true
 
+      # twine uploads one project per session, so the TUI wheel (a distinct
+      # PyPI project) is separated from the pytauargus wheels first.
+      - name: Separate TUI wheel
+        run: |
+          set -euo pipefail
+          mkdir -p dist-tui
+          mv dist/pytauargus_tui-*.whl dist-tui/
+          ls -la dist dist-tui
+
       # Optional PyPI publish (trusted publishing or token).
-      - name: Publish to PyPI
+      - name: Publish pytauargus to PyPI
         if: ${{ vars.PYPI_ENABLED == 'true' }}
         uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Publish pytauargus-tui to PyPI
+        if: ${{ vars.PYPI_ENABLED == 'true' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-tui
 
   image:
     name: Publish container image

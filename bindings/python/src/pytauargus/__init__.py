@@ -12,7 +12,7 @@ compiled extension ``pytauargus._tauargus``.
 from ._tauargus import TauArgus, HiTaSCtrl, RounderCtrl  # noqa: F401
 from .protect import protect, ProtectResult  # noqa: F401
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 __all__ = [
     "TauArgus", "HiTaSCtrl", "RounderCtrl", "Engine",
     "write_hrc", "HrcError", "protect", "ProtectResult", "TableResult",
