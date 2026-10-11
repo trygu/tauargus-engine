@@ -11,26 +11,20 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI + TUI.
 - [x] Dev loop: `scripts/sync-venv.sh`; venvs run local wheels, not PyPI.
 - [x] TUI on mainline (`bindings/tui/`, pkg `pytauargus-tui`): staged s/r
   preview, marks u/p/S + undo/redo, audit, workspace save, preview-in-grid.
-- [x] `fix/u-hint`: corrected u/p status hints + help text (merged into
-  `feature/tui-release`).
-- [x] **Status-line bug**: line rendered off-screen (Textual 8.x auto-width
-  Static squeezed the `1fr` sibling to width 1); pinned spinner width,
-  `display:none` when idle, line composed to terminal width (never wraps).
-  Regression test asserts the on-screen region. TUI suite now 68 tests.
-- [x] TUI user guide: `docs/tui.md` + 7 screenshots (`docs/tui-images/`),
-  implemented vs outstanding (§B.7/§B.8 gaps listed).
+- [x] **Release 0.3.2 shipped**: TUI published in lockstep with pytauargus
+  (same `py-v*` trigger, 3-way version check, per-project PyPI publish, GH
+  Release carries all 17 wheels, image installs both CLIs, `pytauargus[tui]`).
+  Status-line off-screen bug fixed (regression test; TUI suite 68).
+  TUI guide `docs/tui.md` + screenshots; README now PyPI-safe (in-sdist images,
+  absolute doc links). Conventional Commits adopted for new history (§6/§7).
 
 ## In flight
-- [ ] **Release 0.3.2** on `feature/tui-release` (ready, unmerged): TUI
-  published in **lockstep** with pytauargus — same `py-v*` trigger,
-  `build-tui` job, tag==py==tui version check, per-project PyPI publish,
-  GH Release carries all wheels, container image installs engine + TUI.
-  `pytauargus[tui]` extra. Suites green (py 259/3 skip; TUI 68).
-  Next: merge → master, tag `py-v0.3.2`.
 - [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
+- [ ] **Release 0.3.3** (docs-only): PyPI freezes each version's README, so
+  the improved TUI README (screenshots, fixed doc links) needs this bump to
+  reach the PyPI page. Tag `py-v0.3.3` next.
 
 ## Feature branches
-- `feature/tui-release`: the 0.3.2 release above (see In flight).
 - `feature/example-tables`: `data/examples/ex1` fixture (pushed, unmerged).
 
 ## Watch items
