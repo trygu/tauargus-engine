@@ -79,7 +79,7 @@ _STATUS_COLOR = {
 # Contextual keymap hints for the status line (design §B.1: one-line keymap
 # hint). The base hint is always shown; the pending hint replaces it while a
 # preview awaits confirm/cancel (the only time y/n are live).
-_HINT_BASE = "u/p/S=mark s=preview r=round a=audit o=export w=save ?=help"
+_HINT_BASE = "u/p/S=mark s=OPT table r=round a=audit o=export w=save ?=help"
 _HINT_PENDING = "y=accept  n=cancel  ?=help"
 
 # Help overlay body (press ? or F1). Plain explanation of the workflow, the
@@ -96,6 +96,11 @@ _HELP_TEXT = """
   2. [bold]Preview[/bold] a method (runs on a throwaway copy; the live table is
      untouched until you accept):
        s = suppress (OPT)    r = round (RND)
+     [bold]s runs OPT on the whole table[/bold], not the cell under the cursor:
+     the solver chooses the minimum set of cells to hide so that no unsafe
+     (red) cell can be reconstructed from the others. Hidden cells turn
+     [yellow]yellow[/yellow]. Use u/p/S marks to tell the solver which cells
+     must / must not be hidden before you run it.
   3. [bold]Decide:[/bold]  y = accept (adopt this preview)    n = cancel (discard)
 
 [bold]Cell status colours[/bold] (the number's colour is its status):
@@ -276,7 +281,7 @@ class TauArgusApp(App):
                 show=False),
         Binding("p", "mark_protect", "Mark P (protect)", show=False),
         Binding("shift+s", "mark_safe", "Mark S (override safe)", show=False),
-        Binding("s", "suppress", "Suppress (OPT)"),
+        Binding("s", "suppress", "Run OPT on this table"),
         Binding("r", "round", "Round (RND)"),
         Binding("a", "audit", "Audit"),
         Binding("o", "save", "Export table (.tab)"),

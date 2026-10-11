@@ -373,6 +373,9 @@ async def test_status_line_shows_state_and_hint(app):
         assert "draft r1" in line
         assert "preview —" in line
         assert "acc —" in line
+        # The hint makes clear that s runs OPT on the whole table, not the
+        # cell under the cursor (the exact confusion this wording fixes).
+        assert "s=OPT table" in line
         assert "?=help" in line
         # the widget content is the composed string the app reports
         assert line == app.status_text
@@ -429,6 +432,8 @@ async def test_help_overlay_opens_and_closes(app):
         body = str(app.screen.query_one("#help", Static).content)
         assert "how it works" in body
         assert "s = suppress" in body
+        # The help explains that s runs OPT on the whole table, not one cell.
+        assert "whole table" in body
         assert "safe" in body and "unsafe" in body
         await pilot.press("escape")
         await wait_for(pilot, lambda: not isinstance(app.screen, _HelpScreen),
