@@ -422,3 +422,15 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   Native `cell_buffer_sizes` CTest passed; notebook sources match the generator.
 - The first fresh-environment sync was stopped after stalled downloads; the
   existing environment was synced with test extras and rebuilt as 0.3.0.
+
+## CI: push submodule commits before the parent (2026-10-11)
+
+- Pushing a parent that pins not-yet-pushed submodule commits breaks every
+  runner checkout with "fatal: remote error: upload-pack: not our ref
+  <sha>" (happened for csp 3007826 / hitas d3e5b91 after the 2nd-OPT
+  segfault fix).
+- Cadence: commit in submodule -> **push submodule** -> bump + commit
+  parent -> push parent.
+- Side note: tests.yml uses `concurrency: cancel-in-progress`; a
+  `gh run rerun` queued behind a newer run on the same branch cancels
+  the in-flight one.
