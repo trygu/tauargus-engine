@@ -17,13 +17,13 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] **Release 0.3.3 shipped** (docs-only): PyPI freezes each version's
   README — but relative in-sdist screenshot paths do NOT render on PyPI
   (verified broken; lesson: use absolute hosted image URLs).
+- [x] **Release 0.3.4 shipped** (docs-only): TUI README product-first
+  (what it does / can't yet), screenshots at absolute raw.githubusercontent
+  URLs — verified in the published PyPI description (0 relative refs).
 - [x] Conventional Commits adopted for new history; agent rule: always
   respond in English (AGENTS.md §8).
 
 ## In flight
-- [ ] **Release 0.3.4** (docs-only): TUI README rewritten product-first
-  (what it does / can't yet), screenshots at absolute raw.githubusercontent
-  URLs; in-sdist image copy deleted.
 - [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
 
 ## Feature branches
