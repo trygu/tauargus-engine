@@ -10,9 +10,12 @@ The engine solves with the open-source
 ## Install
 
 ```bash
-pip install pytauargus
+pip install --upgrade pytauargus
 tauargus --version
 ```
+
+These commands install the current release. To keep a specific version, use
+`pytauargus==<version>` from [PyPI](https://pypi.org/project/pytauargus/#history).
 
 Wheels bundle HiGHS and the native engine; no other installation is needed.
 Available for Python 3.10-3.13 on macOS arm64, Linux x86_64 and aarch64 (manylinux_2_28) and
@@ -37,10 +40,15 @@ A ready-made image is published to GitHub Container Registry with each release
 (linux/amd64 and linux/arm64):
 
 ```bash
-docker run --rm -v "$PWD":/work ghcr.io/trygu/tauargus-engine run batch.arb
+docker run --pull=always --rm -v "$PWD":/work ghcr.io/trygu/tauargus-engine:latest run batch.arb
 ```
 
-Pin a version with `ghcr.io/trygu/tauargus-engine:0.3.0`. To build your own image:
+`latest` is updated with each release; `--pull=always` checks for an updated image
+before running. To keep a specific release, choose a version from
+[Releases](https://github.com/trygu/tauargus-engine/releases) and use
+`ghcr.io/trygu/tauargus-engine:<version>` (without the release tag's `py-v` prefix).
+
+To build your own image:
 
 ```dockerfile
 FROM python:3.12-slim
@@ -62,7 +70,7 @@ the table can be controlled-rounded. `tauargus` does this from a batch file.
 ### From a DataFrame
 
 `protect()` is available from version 0.3.0. Install with
-`pip install "pytauargus[dataframe]>=0.3.0"` to include pandas support.
+`pip install --upgrade "pytauargus[dataframe]>=0.3.0"` to include pandas support.
 For a source checkout, follow the
 [source-build instructions](../../README.md#building-from-source),
 then run `uv sync --extra dataframe` here.
@@ -322,18 +330,45 @@ default `uv run pytest` gate stays dependency-free).
 
 ## Acknowledgements
 
-Thanks to the authors, maintainers and contributors of:
+This project stands on the shoulders of the people who developed Tau-Argus,
+its statistical methods and native libraries, and the R and Python tools
+around it. Their work is the foundation for everything built here. We are
+grateful to the authors, maintainers, and contributors behind this work.
 
-- [rtauargus](https://github.com/InseeFrLab/rtauargus), developed by InseeFrLab
-  and its contributors. Its metadata, batch and hierarchy generation logic
-  was ported to `pytauargus`; its `micro_rtauargus()` workflow also informed
-  the high-level `protect()` pipeline.
-- [PiArgus (`piargus`)](https://github.com/lverweijen/piargus), by lverweijen
-  and contributors. Its DataFrame-to-table workflow and result API inspired
-  `TableResult` and its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
+This is what open source makes possible in official statistics: sharing
+methods and tools so that others can inspect, use, and build on them.
 
-Their work made these interfaces possible and provides valuable examples of
-integrating Tau-Argus into reproducible data-processing workflows.
+### Original Tau-Argus and native libraries
+
+The original Tau-Argus authors and contributors include **Statistics
+Netherlands (CBS)**, **Peter-Paul de Wolf**, **Anco Hundepool**,
+**Sarah Giessing** (GHMITER and audit), **Juan José Salazar González**
+(optimisation methods), and **Jordi Castro** (network solutions and CTA).
+
+| Component | Authors and contributors |
+| --- | --- |
+| `libtauargus` (core) | Statistics Netherlands and Peter-Paul de Wolf. |
+| `CSP` (cell suppression) | Matteo Fischetti, Juan José Salazar González, and M. D. Montes de Oca. |
+| `CRP` (controlled rounding) | Juan José Salazar González. |
+| `tauhitas` (modular suppression) | Statistics Netherlands and Peter-Paul de Wolf. |
+| `taurounder` (rounding interface) | Statistics Netherlands and Peter-Paul de Wolf. |
+
+The engine uses [HiGHS](https://highs.dev/) as its open-source LP/MIP solver.
+
+### R and Python interfaces
+
+[rtauargus](https://github.com/InseeFrLab/rtauargus) is developed at
+**INSEE / InseeFrLab** by **Pierre-Yves Berrard**, **Julien Jamme**,
+**Nathanaël Rastout**, **Jeanne Pointet**, **Félix Beroud**,
+**André-Raymond Socard**, **Wistan Pomel**, **Clara Baudry**, and contributors.
+Its metadata, batch and hierarchy generation logic was ported to
+`pytauargus`; its `micro_rtauargus()` workflow also informed the high-level
+`protect()` pipeline.
+
+[PiArgus (`piargus`)](https://github.com/lverweijen/piargus),
+by **[Laurent Verweijen (`lverweijen`)](https://github.com/lverweijen)**
+and contributors, inspired the DataFrame-to-table workflow and `TableResult`
+with its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
 
 ## License
 

@@ -434,3 +434,89 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Side note: tests.yml uses `concurrency: cancel-in-progress`; a
   `gh run rerun` queued behind a newer run on the same branch cancels
   the in-flight one.
+
+## Acknowledgements source review (2026-10-11)
+
+- Separate `docs/acknowledgements` branch from mainline `211876d`.
+- Checked the original Tau-Argus 4.1 manual and authorship/copyright
+  headers in all five native modules, including CSP implementation credits.
+- Verified all eight rtauargus authors and its four published email addresses
+  in upstream DESCRIPTION; Julien Jamme is listed as maintainer (`cre`).
+- PiArgus metadata publishes `lauwerund@gmail.com`; its author's public
+  GitHub profile identifies `lverweijen` as Laurent Verweijen.
+- HiGHS v1.15.1 AUTHORS lists Julian Hall, Ivet Galabova, Qi Huangfu,
+  Leona Gottwald and Michael Feldmeier.
+- Earlier completed checkpoints moved here to keep PROGRESS.md under 35 lines:
+  the local-wheel sync script and removal of mainline references/Java
+  (the Java frontend remains on `tui` as a porting reference).
+- Updated root and Python README acknowledgements together, preserving
+  the existing interface-inspiration credits and license sections. Source links
+  pin the reviewed native commits, wrapper metadata and HiGHS release.
+- Documentation checks passed: matching sections, resolved Markdown references,
+  public contacts and header credits match upstream; `git diff --check` clean.
+  Runtime tests were not needed for this documentation-only change.
+
+## Acknowledgements presentation (2026-10-11)
+
+- Removed the source column, citations and metadata references from both
+  README acknowledgement sections; kept author credits and public contacts.
+- User confirmed that the header names `pwof` and `Peter-Paul` refer to
+  Peter-Paul de Wolf. All three native module credits now use his full name.
+- Combined J. J. Salazar with Juan José Salazar González in the CSP credit.
+- Verified matching README sections, retained contacts, unified names,
+  no remaining source references, and unchanged content outside acknowledgements;
+  `git diff --check` passed and PROGRESS.md remains under 35 lines.
+
+## Acknowledgements framing (2026-10-11)
+
+- Added the agreed opening about standing on the shoulders of earlier authors
+  and the value of sharing methods and tools in official statistics.
+- Confirmed CSP and CRP link to `highs::highs` and call its C API for solving.
+  HiGHS now receives a short separate dependency acknowledgement; the native
+  table focuses on the five inherited Tau-Argus modules.
+- Verified matching README sections, five native credits, retained contacts,
+  and unchanged content outside acknowledgements; `git diff --check` passed.
+
+## Peter-Paul acknowledgement wording (2026-10-11)
+
+- Removed the manual-derived `(Modular)` qualifier after Peter-Paul de Wolf
+  in both READMEs. The user clarified his broader role as the main Tau-Argus
+  author; the acknowledgement should not narrow his contribution to one method.
+
+## Acknowledgements final presentation (2026-10-11)
+
+- Kept one expression of gratitude in the opening; removed repeated thanks
+  and the closing summary. Preserved the open-source framing, author names,
+  project links and descriptions of the wrapper contributions.
+- Removed email addresses from both README sections for a consistent credits
+  presentation. The public contacts found during research are retained below
+  as working notes; the first two come from historical manual/header records.
+
+| Project / person | Published contact |
+| --- | --- |
+| Tau-Argus (historical project address) | argus@cbs.nl |
+| CRP / Juan José Salazar González (historical header address) | jjsalaza@ull.es |
+| rtauargus / Julien Jamme (package maintainer) | julien.jamme@insee.fr |
+| rtauargus / Pierre-Yves Berrard | pierre-yves.berrard@insee.fr |
+| rtauargus / Nathanaël Rastout | nathanael.rastout@insee.fr |
+| rtauargus / Clara Baudry | clara.baudry@insee.fr |
+| PiArgus / Laurent Verweijen | lauwerund@gmail.com |
+- Verified identical sections, one expression of gratitude, all named
+  contributors and project links retained, seven contacts archived, unchanged
+  surrounding README content, and clean `git diff --check`.
+
+## Release-independent installation guidance (2026-10-11)
+
+- Verified that wheels.yml already publishes both the release version and
+  `latest` for the Docker image; no workflow changes are needed.
+- Both READMEs now explicitly use `:latest` with `--pull=always`, preventing
+  a cached image from silently keeping the default example on an older release.
+- Replaced the fixed Docker release example with a generic version placeholder
+  and a Releases link. Added Python version-pinning guidance linked to PyPI;
+  pip examples use `--upgrade` for installations that already have the package.
+- Retained `>=0.3.0` as the DataFrame feature's historical minimum, rather than
+  a moving current-release number. Fixed the stale root README statement that
+  `protect()` was unreleased and aligned it with the binding README.
+- Verified consistent Docker command arguments and version-pinning guidance,
+  existing version/latest publication tags, unchanged acknowledgements, and
+  clean `git diff --check`; PROGRESS.md remains under 35 lines.
