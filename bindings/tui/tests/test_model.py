@@ -10,7 +10,16 @@ from pathlib import Path
 
 import pytest
 
-from pytauargus_tui.model import Session
+from pytauargus_tui.model import (
+    CellEdit,
+    CellInstruction,
+    EditHistory,
+    Session,
+    SuppressionOp,
+    apriory_lines,
+    arb_with_ops,
+    format_status_delta,
+)
 
 DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
 ARB = DATA / "TestRecode.arb"
@@ -71,3 +80,212 @@ def test_rule_display(session):
     t0 = session.table(0)
     # The batch declares NK(2,75) for table 1 (0-based index 0).
     assert any("NK" in r and "2" in r and "75" in r for r in t0.rules)
+
+
+# ===========================================================================
+# Staged suppression + preview (design §B.3)
+# ===========================================================================
+def test_suppression_op_arb_lines():
+    assert SuppressionOp("OPT", 2).arb_line() == "<SUPPRESS> OPT(2)"
+    assert SuppressionOp("MOD", 1).arb_line() == "<SUPPRESS> MOD(1)"
+    assert (SuppressionOp("RND", 3, rnd_base=1000000).arb_line()
+            == "<SUPPRESS> RND(3,1000000)")
+
+
+def test_arb_with_ops_appends():
+    # No <WRITETABLE> in the spec: lines are appended at the end.
+    out = arb_with_ops("a\nb\n", [SuppressionOp("OPT", 1)])
+    assert out == "a\nb\n<SUPPRESS> OPT(1)\n"
+
+
+def test_arb_with_ops_before_writetable():
+    out = arb_with_ops('a\n<WRITETABLE> (1,1,0,"x")\n',
+                       [SuppressionOp("RND", 2, 10)])
+    assert out == 'a\n<SUPPRESS> RND(2,10)\n<WRITETABLE> (1,1,0,"x")\n'
+
+
+def test_format_status_delta():
+    d = format_status_delta({1: 104, 3: 1}, {1: 101, 3: 1, 11: 3})
+    assert "safe 104→101" in d
+    assert "unsafe_rule 1→1" in d
+    assert "secondary_unsafe 0→3" in d
+    # Stable ordering: ascending status code.
+    assert d.index("safe") < d.index("unsafe_rule") < d.index("secondary_unsafe")
+
+
+def test_status_counts(session):
+    counts = session.status_counts(0)
+    assert sum(counts.values()) == 126
+    assert all(1 <= k <= 14 for k in counts)
+    # The pre-suppression sample batch has safe cells.
+    assert counts.get(1, 0) + counts.get(2, 0) > 0
+
+
+@pytest.fixture(scope="module")
+def preview_session(session):
+    """Throwaway run of the same .arb with OPT(1) appended (design §B.3)."""
+    return session.preview([SuppressionOp("OPT", 1)])
+
+
+def test_preview_is_a_full_session(preview_session):
+    assert preview_session.n_tables == 2
+    assert preview_session.table(0).n_cells == 126
+
+
+def test_preview_changes_table_statuses(session, preview_session):
+    before = session.status_counts(0)
+    after = preview_session.status_counts(0)
+    assert sum(after.values()) == 126
+    # The previewed OPT(1) changes table 1's cell statuses.
+    assert after != before
+
+
+# ===========================================================================
+# Draft cell instructions + apriori preview (design §B.4 / §B.5)
+# ===========================================================================
+def test_apriory_lines_render(session):
+    g = session.grid(0)
+    instrs = [
+        CellInstruction(table=1, dim=(g.rows[1], g.cols[2]), kind="U"),
+        CellInstruction(table=1, dim=(g.rows[2], g.cols[3]), kind="P"),
+    ]
+    assert apriory_lines(instrs).splitlines() == [
+        f"{g.rows[1]};{g.cols[2]};U",
+        f"{g.rows[2]};{g.cols[3]};P",
+    ]
+
+
+def test_apriory_lines_empty():
+    assert apriory_lines([]) == ""
+
+
+def test_suppression_op_suppress_cmd():
+    cmd = SuppressionOp("OPT", 1).suppress_cmd()
+    assert (cmd.kind, cmd.tab_no) == ("OPT", 1)
+    rcmd = SuppressionOp("RND", 2, rnd_base=7).suppress_cmd()
+    assert (rcmd.kind, rcmd.tab_no, rcmd.rnd_base) == ("RND", 2, 7)
+
+
+def _find_cells_by_symbol(session, i, symbol, n):
+    """First ``n`` non-total cells of table ``i`` with the given symbol."""
+    g = session.grid(i)
+    out = []
+    for ri, row in enumerate(g.cells):
+        for ci, cell in enumerate(row):
+            if cell.symbol != symbol:
+                continue
+            dim = (g.rows[ri], g.cols[ci]) if g.col_var is not None else (g.rows[ri],)
+            if session.is_total(i, dim):
+                continue  # total cells are not apriori targets (this iteration)
+            out.append((ri, ci))
+            if len(out) == n:
+                return out
+    return out
+
+
+def test_preview_applies_instruction_to_marked_cell(session):
+    """Marking a safe cell ``U`` and previewing OPT changes that cell in the
+    scratch run, and leaves the live (accepted) run untouched."""
+    targets = _find_cells_by_symbol(session, 0, "S", 1)
+    assert targets, "no safe cell to mark"
+    r, c = targets[0]
+    g = session.grid(0)
+    dim = (g.rows[r], g.cols[c])
+    before_live = dict(session.status_counts(0))
+    before_status = g.cells[r][c].status
+    instr = CellInstruction(table=1, dim=dim, kind="U")
+    prev = session.preview([SuppressionOp("OPT", 1)], [instr])
+    after_status = prev.grid(0).cells[r][c].status
+    assert after_status != before_status, "marked cell should change after OPT"
+    # The live session is untouched (no native mutation of the accepted run).
+    assert session.status_counts(0) == before_live
+    assert session.grid(0).cells[r][c].status == before_status
+
+
+def test_preview_batches_multiple_instructions(session):
+    """One preview run applies the complete set of pending instructions."""
+    targets = _find_cells_by_symbol(session, 0, "S", 2)
+    assert len(targets) == 2, "need two safe cells"
+    g = session.grid(0)
+    instrs = [
+        CellInstruction(table=1, dim=(g.rows[r], g.cols[c]), kind="U")
+        for r, c in targets
+    ]
+    before = {(r, c): g.cells[r][c].status for r, c in targets}
+    prev = session.preview([SuppressionOp("OPT", 1)], instrs)
+    pg = prev.grid(0)
+    for r, c in targets:
+        assert pg.cells[r][c].status != before[(r, c)], (
+            f"marked cell {(r, c)} should change")
+
+
+# ===========================================================================
+# Draft edit history — undo/redo (design §B.4 / §B.5)
+# ===========================================================================
+def test_history_starts_empty():
+    h = EditHistory()
+    assert not h.can_undo()
+    assert not h.can_redo()
+    assert h.undo() is None
+    assert h.redo() is None
+
+
+def test_history_undo_redo_roundtrip():
+    h = EditHistory()
+    key = (0, ("A", "B"))
+    h.record(key, None, "U")
+    assert h.can_undo() and not h.can_redo()
+    cmd = h.undo()
+    assert cmd == CellEdit(key=key, before=None, after="U")
+    assert not h.can_undo() and h.can_redo()
+    cmd2 = h.redo()
+    assert cmd2 == cmd
+    assert h.can_undo() and not h.can_redo()
+
+
+def test_history_replacement_and_removal_edits():
+    """before/after capture kind-replacement (U->S) and toggle-off (U->None)."""
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")      # mark U on an unmarked cell
+    h.record((0, ("A",)), "U", "S")       # replace U with S
+    h.record((0, ("A",)), "S", None)      # toggle S off
+    c3 = h.undo()                          # last edit is the toggle-off
+    assert c3.before == "S" and c3.after is None
+    c2 = h.undo()                          # the replacement
+    assert c2.before == "U" and c2.after == "S"
+    c1 = h.undo()                          # the original mark
+    assert c1.before is None and c1.after == "U"
+    assert not h.can_undo()
+
+
+def test_history_new_edit_clears_redo_branch():
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")
+    h.undo()
+    assert h.can_redo()
+    h.record((1, ("B",)), None, "P")      # a new edit
+    assert not h.can_redo()               # the redo branch is stale
+    assert h.can_undo()
+
+
+def test_history_multiple_cells_lifo_order():
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")
+    h.record((1, ("B",)), "U", "S")
+    first = h.undo()
+    assert first.key == (1, ("B",))       # last-in, first-out
+    second = h.undo()
+    assert second.key == (0, ("A",))
+    # redo restores in the reverse (LIFO of the redo stack) order
+    h.redo()
+    again = h.redo()
+    assert again.key == (1, ("B",))
+
+
+def test_history_reset_drops_both_stacks():
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")
+    h.undo()
+    assert h.can_redo()
+    h.reset()
+    assert not h.can_undo() and not h.can_redo()

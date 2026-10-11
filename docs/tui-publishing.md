@@ -40,6 +40,13 @@ range. This is a consumer-install check, separate from local engine
 development. If the TUI needs an unreleased engine API, release that engine
 first and set the TUI's minimum dependency accordingly.
 
+The first release also needs the in-tree native fixes for repeated OPT and
+embedded legacy error strings. As of 2026-10-11, the published engine is
+0.3.0: the current TUI's second-OPT preview regression aborts with that wheel.
+Publish an engine containing those fixes, then raise the TUI's minimum engine
+version to that release before tagging the TUI. Keep the consumer tests using
+published wheels so local development fixes cannot hide a release blocker.
+
 Branch pushes, pull requests and manual runs only build and test. Publishing runs
 only on `tui-v*` tags, after all checks pass and the tag matches the TUI's
 project version. The core `py-v*` wheel/container workflow stays unchanged.

@@ -16,8 +16,19 @@ Layout (design §B.1)::
     │ ▸ log: table 1: 126 cells   ▸ hint: j/k=table s=suppress r=round ...  │
     └───────────────────────────────────────────────────────────────────────┘
 
-Keymap: ``j``/``k`` or the navigator select a table; ``s``=OPT suppress,
-``r``=RND round, ``a``=audit, ``o``=save intermediate ``.tab``, ``q``=quit.
+Keymap: ``j``/``k`` or the navigator select a table; ``u``/``p``/``S`` mark
+the cursor cell (require suppression / protect / override safe — immediate
+draft edits, design §B.4); ``s``=OPT suppress, ``r``=RND round, ``a``=audit,
+``o``=save intermediate ``.tab``, ``q``=quit.
+
+Cell marks update the pending instruction set with a visible marker and run
+no solver. Suppress/round are **staged, preview before committing**
+(design §B.3):
+``s``/``r`` run a throwaway ``run_batch`` of the same ``.arb`` with the
+suppression appended and show the per-status delta. ``y`` adopts the
+previewed run as the working session; ``n`` cancels it. Confirmed ops are
+materialised into the spec, so every later preview re-runs the spec plus
+all confirmed ops plus the staged one.
 """
 
 from __future__ import annotations
@@ -25,17 +36,34 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
-from textual.widgets import DataTable, Footer, Label, ListView, Static
+from textual.screen import ModalScreen
+from textual.containers import Horizontal, Vertical
+from textual.widgets import (
+    DataTable,
+    DirectoryTree,
+    Footer,
+    Label,
+    ListView,
+    Static,
+)
 from textual.widgets._list_view import ListItem
 from textual.worker import WorkerState
 
-from .model import Cell, Session, TableGrid, TableMeta
+from .model import (
+    Cell,
+    CellInstruction,
+    EditHistory,
+    Session,
+    SuppressionOp,
+    TableGrid,
+    TableMeta,
+    format_status_delta,
+)
 
 # Status symbol → colour (design §B.1).
 _STATUS_COLOR = {
@@ -47,7 +75,37 @@ _STATUS_COLOR = {
     "?": "default",
 }
 
-_HINT = "j/k=table  s=suppress  r=round  a=audit  o=save  q=quit"
+# Contextual keymap hints for the status line (design §B.1: one-line keymap
+# hint). The base hint is always shown; the pending hint replaces it while a
+# preview awaits confirm/cancel (the only time y/n are live).
+_HINT_BASE = "u/p/S=mark  s=preview  r=round  a=audit  o=save  ?=help"
+_HINT_PENDING = "y=accept  n=cancel  ?=help"
+
+# Help overlay body (press ? or F1). Plain explanation of the workflow, the
+# keys, and the cell-status colours — the TUI has no other on-screen legend.
+_HELP_TEXT = """
+[bold]Tau-Argus TUI — how it works[/bold]
+
+[bold]Workflow:[/bold] mark cells → preview a method → accept or cancel
+
+  1. [bold]Mark[/bold] a cell (instant draft edit, no solve, nothing changes yet):
+       u = U require suppression    p = P protect    S = safe (override)
+     press the same mark again on that cell to remove it.
+     ctrl+z / ctrl+y undo / redo your marks (a new mark clears the redo list).
+  2. [bold]Preview[/bold] a method (runs on a throwaway copy; the live table is
+     untouched until you accept):
+       s = suppress (OPT)    r = round (RND)
+  3. [bold]Decide:[/bold]  y = accept (adopt this preview)    n = cancel (discard)
+
+[bold]Cell status colours[/bold] (the number's colour is its status):
+  [green]S[/green] safe · [red]U[/red] unsafe · [cyan]P[/cyan] protect · [yellow]M[/yellow] secondary unsafe · E empty
+
+[bold]Draft markers[/bold] on the cursor cell (bold magenta):  * = U   + = S   # = P
+
+[bold]Keys:[/bold]  j/k next/prev table · arrows move the cursor ·
+  a = audit · o = save table (.tab) · ? = help · q = quit
+  ctrl+z = undo edit · ctrl+y = redo edit
+"""
 
 
 def _fmt(value: float) -> str:
@@ -72,6 +130,124 @@ class _EngineLogHandler(logging.Handler):
             pass
 
 
+class _BusySpinner(Static):
+    """Self-animating spinner shown while an engine call runs.
+
+    textual 8.x ships no built-in ``Spinner`` widget, so the TUI carries
+    this stand-in. Pure UI decoration — no engine logic.
+    """
+
+    _FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._frame = 0
+        self._timer = None
+
+    def start(self) -> None:
+        self.visible = True
+        if self._timer is None:
+            self._frame = 0
+            self._timer = self.set_interval(0.1, self._tick)
+            self._tick()
+
+    def stop(self) -> None:
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+        self._frame = 0
+        self.update("")
+        self.visible = False
+
+    def _tick(self) -> None:
+        self._frame += 1
+        self.update(self._FRAMES[self._frame % len(self._FRAMES)])
+
+
+class _HelpScreen(ModalScreen[None]):
+    """Overlay explaining the workflow, keys and cell-status colours.
+
+    The TUI has no persistent legend, so this is the single place that says
+    out loud what everything on screen means. Pure UI — no engine logic.
+    """
+
+    BINDINGS = [
+        Binding("question_mark", "close", "Close"),
+        Binding("f1", "close", "Close", show=False),
+        Binding("escape", "close", "Close", show=False),
+    ]
+
+    CSS = """
+    _HelpScreen { align-horizontal: center; align-vertical: middle; }
+    _HelpScreen #help { width: 80; height: auto; border: round $accent;
+                        padding: 0 1; }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Static(_HELP_TEXT, id="help")
+
+    def action_close(self) -> None:
+        self.app.pop_screen()
+
+
+class _ArbDirectoryTree(DirectoryTree):
+    """A DirectoryTree that lists only subdirectories and ``.arb`` files —
+    i.e. only files that make sense to open (design §B.7)."""
+
+    def filter_paths(self, paths):
+        for path in paths:
+            name = path.name
+            if name.startswith("."):
+                continue
+            if path.is_dir() or path.suffix.lower() == ".arb":
+                yield path
+
+
+class _FileBrowser(ModalScreen[Path]):
+    """Startup picker for a no-argument launch: choose a ``.arb`` batch file.
+
+    Wraps the standard textual ``DirectoryTree`` (filtered to ``.arb``).
+    Pure UI — on a pick it calls ``app._on_arb_chosen(path)``; on cancel,
+    ``app._on_arb_cancelled()``.
+    """
+
+    BINDINGS = [
+        Binding("q", "cancel", "Cancel"),
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    CSS = """
+    _FileBrowser { align-horizontal: center; align-vertical: middle; }
+    _FileBrowser #fb { width: 72; height: 32; }
+    #fbtree { height: 1fr; border: round $primary; }
+    #fbhint { height: 1; }
+    """
+
+    def __init__(self, start: Path) -> None:
+        super().__init__()
+        self._start = start
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="fb"):
+            yield _ArbDirectoryTree(self._start, id="fbtree")
+            yield Static("choose a .arb batch file — Enter opens · q cancels",
+                         id="fbhint")
+
+    def on_mount(self) -> None:
+        self.query_one("#fbtree", DirectoryTree).focus()
+
+    def on_directory_tree_file_selected(self, event) -> None:
+        # The tree is filtered to .arb files; this guard makes Enter open a
+        # real batch file (and ignore anything unexpected).
+        if event.path is not None and event.path.suffix.lower() == ".arb":
+            self.app._on_arb_chosen(event.path)
+            self.dismiss()
+
+    def action_cancel(self) -> None:
+        self.app._on_arb_cancelled()
+        self.dismiss()
+
+
 class TauArgusApp(App):
     """Tau-Argus TUI: navigator + grid + detail + log over one Engine."""
 
@@ -82,28 +258,69 @@ class TauArgusApp(App):
     #nav { width: 30; border: round $primary; }
     #grid { width: 1fr; border: round $primary; }
     #detail { height: 3; border: round $primary; }
-    #logline { height: 1; }
+    #logline { height: 1; layout: horizontal; align-vertical: middle; }
+    #logline #spin { margin-right: 1; }
+    #logtext { width: 1fr; }
     """
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("j", "table_next", "Next table"),
         Binding("k", "table_prev", "Prev table"),
+        Binding("u", "mark_suppress", "Mark U (require suppression)",
+                show=False),
+        Binding("p", "mark_protect", "Mark P (protect)", show=False),
+        Binding("shift+s", "mark_safe", "Mark S (override safe)", show=False),
         Binding("s", "suppress", "Suppress (OPT)"),
         Binding("r", "round", "Round (RND)"),
         Binding("a", "audit", "Audit"),
         Binding("o", "save", "Save .tab"),
+        Binding("y", "confirm", "Confirm preview", show=False),
+        Binding("n", "cancel", "Cancel preview", show=False),
+        Binding("ctrl+z", "undo", "Undo edit", show=False),
+        Binding("ctrl+y", "redo", "Redo edit", show=False),
+        Binding("question_mark", "help", "Help"),
+        Binding("f1", "help", "Help", show=False),
     ]
 
-    def __init__(self, arb_path: Path) -> None:
+    def __init__(self, arb_path: Optional[Path] = None) -> None:
         super().__init__()
-        self._arb = Path(arb_path)
+        # None => no-arg launch: show the file browser first (design §B.7).
+        self._arb: Optional[Path] = Path(arb_path) if arb_path is not None else None
         self._session: Optional[Session] = None
         self._tab: int = 0
         self._grid: Optional[TableGrid] = None
         self._detail = ""
         self._log = "ready"
         self._log_handler: Optional[_EngineLogHandler] = None
+        # Staged preview state (design §B.3): _pending is the staged op,
+        # _preview the throwaway session it produced, _confirmed the ops
+        # already adopted (re-run into every later preview).
+        self._pending: Optional[SuppressionOp] = None
+        self._preview: Optional[Session] = None
+        self._delta: str = ""
+        self._confirmed: List[SuppressionOp] = []
+        self._busy: bool = False
+        self._last_action: str = ""
+        # Draft cell instructions (design §B.4): _pending_instr is the current
+        # draft keyed by stable cell identity (table, dim); _confirmed_instr
+        # are the marks adopted by a previous accept (re-applied into every
+        # later preview).
+        self._pending_instr: Dict[Tuple[int, Tuple[str, ...]],
+                                  CellInstruction] = {}
+        self._confirmed_instr: List[CellInstruction] = []
+        # Undo/redo command history over the draft's cell edits (design §B.4).
+        self._history = EditHistory()
+        self._cursor: Optional[Tuple[int, int]] = None
+        # Authoritative state (design §B.4: separate facts, not one dirty
+        # flag). _draft_revision advances on every draft edit; _accepted_rev
+        # records the draft revision an accepted result was promoted from
+        # (0 = none yet); _preview_revision is the draft revision the live
+        # preview was built from (None = no preview) → drives "fresh"/"outdated".
+        self._draft_revision: int = 1
+        self._accepted_revision: int = 0
+        self._preview_revision: Optional[int] = None
+        self._status_line: str = ""
 
     # -- inspection surface (used by tests / embedders) ----------------------
     @property
@@ -122,13 +339,93 @@ class TauArgusApp(App):
     def log_text(self) -> str:
         return self._log
 
+    @property
+    def preview(self) -> Optional[Session]:
+        """The throwaway session of the pending preview (None if none)."""
+        return self._preview
+
+    @property
+    def pending(self) -> Optional[SuppressionOp]:
+        """The staged suppression awaiting confirm/cancel (None if none)."""
+        return self._pending
+
+    @property
+    def preview_delta(self) -> str:
+        """Formatted per-status delta of the pending preview ("" if none)."""
+        return self._delta
+
+    @property
+    def busy(self) -> bool:
+        """True while an engine worker runs (spinner visible)."""
+        return self._busy
+
+    @property
+    def last_action(self) -> str:
+        """Human-readable outcome of the last preview/confirm/cancel."""
+        return self._last_action
+
+    @property
+    def confirmed_ops(self) -> Tuple[SuppressionOp, ...]:
+        """Suppressions confirmed so far, in order (feed later previews)."""
+        return tuple(self._confirmed)
+
+    @property
+    def cursor(self) -> Optional[Tuple[int, int]]:
+        """Grid (row, column) of the highlighted cell (column 0 = label)."""
+        return self._cursor
+
+    @property
+    def pending_instructions(self) -> Tuple[CellInstruction, ...]:
+        """The draft's uncommitted cell instructions (design §B.4)."""
+        return tuple(self._pending_instr.values())
+
+    @property
+    def confirmed_instructions(self) -> Tuple[CellInstruction, ...]:
+        """Cell instructions adopted by a previous accept (feed previews)."""
+        return tuple(self._confirmed_instr)
+
+    @property
+    def can_undo(self) -> bool:
+        """Whether a draft edit is available to undo (design §B.5)."""
+        return self._history.can_undo()
+
+    @property
+    def can_redo(self) -> bool:
+        """Whether an undone draft edit is available to redo (design §B.5)."""
+        return self._history.can_redo()
+
+    @property
+    def draft_revision(self) -> int:
+        """Current draft revision (1 = spec as loaded; +1 per draft edit)."""
+        return self._draft_revision
+
+    @property
+    def accepted_revision(self) -> int:
+        """Draft revision the accepted result was promoted from (0 = none)."""
+        return self._accepted_revision
+
+    @property
+    def preview_freshness(self) -> str:
+        """— (no preview) / fresh / outdated, vs the current draft revision."""
+        if self._preview_revision is None:
+            return "—"
+        return ("fresh" if self._preview_revision == self._draft_revision
+                else "outdated")
+
+    @property
+    def status_text(self) -> str:
+        """The composed bottom status line — what the user actually sees."""
+        return self._status_line
+
     # -- compose ---------------------------------------------------------------
     def compose(self) -> ComposeResult:
         with Horizontal(id="body"):
             yield ListView(id="nav")
             yield DataTable(id="grid", cursor_type="cell")
         yield Static("", id="detail")
-        yield Static("", id="logline")
+        with Horizontal(id="logline"):
+            yield _BusySpinner(id="spin")
+            yield Static("", id="logtext")
         yield Footer()
 
     # -- lifecycle ---------------------------------------------------------------
@@ -136,9 +433,30 @@ class TauArgusApp(App):
         self._log_handler = _EngineLogHandler(self)
         self._log_handler.setFormatter(logging.Formatter("%(message)s"))
         logging.getLogger("pytauargus").addHandler(self._log_handler)
+        if self._arb is not None:
+            self._start_load()
+        else:
+            # No batch: show the picker; it calls back with the choice.
+            self._set_log("no batch given — choose a .arb file (or q to quit)")
+            self.push_screen(_FileBrowser(start=Path.cwd()))
+
+    def _start_load(self) -> None:
+        """Kick off the (exclusive) load worker for the chosen batch file."""
         self._set_log(f"loading {self._arb.name} ...")
+        self._set_busy(True)
+        # exit_on_error=False: engine errors are expected, displayable
+        # conditions (e.g. legacy 5008 on re-OPT) — log them, don't panic.
         self.run_worker(self._load, group="engine", exclusive=True, thread=True,
-                        description="load")
+                        description="load", exit_on_error=False)
+
+    def _on_arb_chosen(self, path: Path) -> None:
+        """The file browser returned a batch file: load it (design §B.7)."""
+        self._arb = Path(path)
+        self._start_load()
+
+    def _on_arb_cancelled(self) -> None:
+        """The file browser was cancelled: quit (nothing to load)."""
+        self.exit()
 
     def on_unmount(self) -> None:
         if self._log_handler is not None:
@@ -167,8 +485,26 @@ class TauArgusApp(App):
                 self._grid = self._session.grid(self._tab)
                 self._populate_grid()
                 self._set_log(w.result)
+            elif w.description == "preview":
+                if self._pending is not None:
+                    self._preview, self._delta = w.result
+                    self._preview_revision = self._draft_revision
+                    self._last_action = (f"{self._pending.kind} previewed "
+                                          f"on table {self._pending.tab}")
+                    self._show_preview_pending()
         elif w.state is WorkerState.ERROR:
+            if w.description == "preview" and self._pending is not None:
+                # A failed preview (e.g. legacy 5008 on re-OPT) is dropped;
+                # the live session is untouched.
+                self._pending = None
+                self._preview = None
+                self._preview_revision = None
+                self._set_detail(self._table_detail(
+                    self._session.table(self._tab)))
             self._set_log(f"error: {w.error}")
+        if w.state in (WorkerState.SUCCESS, WorkerState.ERROR,
+                       WorkerState.CANCELLED):
+            self._set_busy(False)
 
     # -- navigator --------------------------------------------------------------------
     def _populate_nav(self) -> None:
@@ -189,21 +525,39 @@ class TauArgusApp(App):
             self._select_table(self._tab - 1)
 
     def _select_table(self, i: int) -> None:
+        if self._pending is not None:
+            return  # table switching is locked while a preview is pending
         self._tab = i
         meta = self._session.table(i)
         self.query_one("#grid", DataTable).clear(columns=True)
         self._set_detail(self._table_detail(meta))
         self._set_log(f"table {i + 1}: loading grid ...")
+        self._set_busy(True)
         self.run_worker(lambda: self._session.grid(i), group="engine",
-                        exclusive=True, thread=True, description="grid")
+                        exclusive=True, thread=True, description="grid",
+                        exit_on_error=False)
 
     # -- grid --------------------------------------------------------------------------
-    @staticmethod
-    def _cell_text(cell: Cell) -> Text:
-        color = _STATUS_COLOR.get(cell.symbol, "default")
-        return Text(_fmt(cell.value), style=color)
+    # Pending-mark glyphs per instruction kind (design §B.5: a separate
+    # marker, kept distinct from the status colour).
+    _MARK = {"U": "*", "S": "+", "P": "#"}
 
-    def _populate_grid(self) -> None:
+    @staticmethod
+    def _cell_text(cell: Cell, marker: Optional[str] = None) -> Text:
+        color = _STATUS_COLOR.get(cell.symbol, "default")
+        text = Text(_fmt(cell.value), style=color)
+        if marker:
+            text.append(marker, style="bold magenta")
+        return text
+
+    def _pending_marker(self, tab_index: int,
+                        dim: Tuple[str, ...]) -> Optional[str]:
+        instr = self._pending_instr.get((tab_index, tuple(dim)))
+        if instr is None:
+            return None
+        return self._MARK.get(instr.kind)
+
+    def _populate_grid(self, reset_cursor: bool = True) -> None:
         g = self._grid
         if g is None:
             return
@@ -218,9 +572,14 @@ class TauArgusApp(App):
             grid.add_column(g.tab.resp_var, key="c0")
         for ri, row in enumerate(g.cells):
             values: List[object] = [Text(g.rows[ri], style="bold")]
-            values.extend(self._cell_text(c) for c in row)
+            for ci, cell in enumerate(row):
+                dim = ((g.rows[ri], g.cols[ci]) if g.col_var is not None
+                       else (g.rows[ri],))
+                marker = self._pending_marker(g.tab.index, dim)
+                values.append(self._cell_text(cell, marker))
             grid.add_row(*values, key=f"r{ri}")
-        grid.move_cursor(row=0, column=1)
+        if reset_cursor:
+            grid.move_cursor(row=0, column=1)
 
     def on_data_table_cell_selected(self, event) -> None:
         self._on_cell_coordinate(event.coordinate)
@@ -235,6 +594,7 @@ class TauArgusApp(App):
         r, c = coordinate.row, coordinate.column
         if r < 0 or r >= len(self._grid.cells):
             return
+        self._cursor = (r, c)
         row = self._grid.cells[r]
         if c < 1 or c - 1 >= len(row):
             return
@@ -255,6 +615,13 @@ class TauArgusApp(App):
         pos += ")"
         text = (f"cell {pos}: value={_fmt(cell.value)}  "
                 f"status={cell.symbol} ({cell.status_name})")
+        # Pending draft instruction on this cell (design §B.4).
+        dim = (g.rows[r], g.cols[c]) if g.col_var is not None else (g.rows[r],)
+        instr = self._pending_instr.get((g.tab.index, tuple(dim)))
+        if instr is not None:
+            names = {"U": "require suppression", "S": "override safe",
+                     "P": "protect"}
+            text += f"  pending: {instr.kind} ({names[instr.kind]})"
         # Realised feasibility interval, when this table has been audited
         # (row-major cell index matches the audit row's ``cell`` key).
         n_cols = len(g.cols) if g.col_var is not None else 1
@@ -267,10 +634,46 @@ class TauArgusApp(App):
 
     # -- actions ---------------------------------------------------------------------------
     def action_suppress(self) -> None:
-        self._run_action("OPT")
+        self._stage("OPT")
 
     def action_round(self) -> None:
-        self._run_action("RND")
+        self._stage("RND")
+
+    def action_mark_suppress(self) -> None:
+        self._mark_cell("U")
+
+    def action_mark_protect(self) -> None:
+        self._mark_cell("P")
+
+    def action_mark_safe(self) -> None:
+        self._mark_cell("S")
+
+    def action_undo(self) -> None:
+        """Reverse the last draft edit (design §B.5). Reverting an edit still
+        advances the draft revision, so any preview is no longer eligible."""
+        if self._session is None or self._pending is not None:
+            return  # no draft, or locked while a preview is pending
+        cmd = self._history.undo()
+        if cmd is None:
+            self._set_log("nothing to undo")
+            return
+        self._apply_instr(cmd.key, cmd.before)
+        self._draft_revision += 1
+        self._set_log(f"undo: cell {cmd.key[1]} -> {cmd.before or 'cleared'}")
+        self._redraft()
+
+    def action_redo(self) -> None:
+        """Re-apply the last undone draft edit (design §B.5)."""
+        if self._session is None or self._pending is not None:
+            return
+        cmd = self._history.redo()
+        if cmd is None:
+            self._set_log("nothing to redo")
+            return
+        self._apply_instr(cmd.key, cmd.after)
+        self._draft_revision += 1
+        self._set_log(f"redo: cell {cmd.key[1]} -> {cmd.after or 'cleared'}")
+        self._redraft()
 
     def action_audit(self) -> None:
         self._run_action("AUDIT")
@@ -278,25 +681,160 @@ class TauArgusApp(App):
     def action_save(self) -> None:
         self._run_action("SAVE")
 
+    def action_help(self) -> None:
+        """Show the on-screen explanation of keys, colours and workflow."""
+        self.push_screen(_HelpScreen())
+
+    def action_confirm(self) -> None:
+        """Adopt the pending preview as the working session (design §B.3)."""
+        if self._pending is None or self._preview is None:
+            return
+        op = self._pending
+        self._session = self._preview
+        # The adopted session already ran from the original spec (plus the
+        # draft instructions); keep it bound to that .arb so later previews
+        # re-run the spec plus the (now longer) confirmed lists.
+        self._session.adopt_spec(self._arb)
+        self._confirmed.append(op)
+        # Promote the draft's cell instructions to confirmed (design §B.5:
+        # accept commits the marks; the preview already applied them, so the
+        # live grid reflects them and future previews re-apply them).
+        for instr in self._pending_instr.values():
+            self._confirmed_instr.append(instr)
+        self._pending_instr.clear()
+        self._history.reset()  # the draft is committed; start a fresh history
+        self._pending = None
+        self._preview = None
+        self._preview_revision = None  # the preview is consumed into accepted
+        self._accepted_revision = self._draft_revision  # result = this revision
+        self._last_action = f"{op.kind} confirmed on table {op.tab}"
+        # The preview worker already cached this table's grid (it computed
+        # the status counts from it), so the refresh is a pure cache read.
+        self._grid = self._session.grid(self._tab)
+        self._populate_grid()
+        self._set_log(f"table {op.tab}: {op.kind} confirmed — grid updated")
+
+    def action_cancel(self) -> None:
+        """Discard the pending preview; the live session is untouched."""
+        if self._pending is None:
+            return
+        op = self._pending
+        self._pending = None
+        self._preview = None
+        self._preview_revision = None  # the preview is discarded
+        self._last_action = f"{op.kind} preview cancelled"
+        self._set_detail(self._table_detail(self._session.table(self._tab)))
+        self._set_log(f"table {op.tab}: preview cancelled")
+
+    def _stage(self, kind: str) -> None:
+        """Stage a suppression: preview it on a throwaway run, show the
+        per-status delta, wait for confirm (y) / cancel (n)."""
+        if self._session is None or self._pending is not None:
+            return
+        tab = self._tab
+        base = 0
+        if kind == "RND":
+            base = self._session.engine._min_round_base(tab)
+        op = SuppressionOp(kind=kind, tab=tab + 1, rnd_base=base)
+        self._pending = op
+        self._set_log(f"table {tab + 1}: previewing {kind} ...")
+        self._set_busy(True)
+        self.run_worker(lambda: self._run_preview(op), group="engine",
+                        exclusive=True, thread=True, description="preview",
+                        exit_on_error=False)
+
+    def _run_preview(self, op: SuppressionOp) -> Tuple[Session, str]:
+        """Worker body: throwaway run of the spec + the draft's cell
+        instructions + confirmed ops + staged op, and the per-status delta of
+        the staged table (design §B.3/§B.5 — one preview batches the complete
+        instruction set)."""
+        s = self._session
+        tab = op.tab - 1
+        prev = s.preview(list(self._confirmed) + [op],
+                         self._all_instructions())
+        delta = format_status_delta(s.status_counts(tab),
+                                    prev.status_counts(tab))
+        return prev, delta
+
+    def _all_instructions(self) -> List[CellInstruction]:
+        """The full instruction set for a preview: confirmed marks plus the
+        current draft, with a pending mark overriding a confirmed one on the
+        same cell (latest intent wins)."""
+        merged: Dict[Tuple[int, Tuple[str, ...]], CellInstruction] = {}
+        for instr in self._confirmed_instr:
+            merged[(instr.table, instr.dim)] = instr
+        for instr in self._pending_instr.values():
+            merged[(instr.table, instr.dim)] = instr
+        return list(merged.values())
+
+    def _mark_cell(self, kind: str) -> None:
+        """Set (or toggle/replace) a draft cell instruction on the cursor
+        cell. Immediate: updates the draft and the grid marker, runs no
+        solver and mutates no accepted run (design §B.5)."""
+        if self._session is None or self._grid is None or self._cursor is None:
+            return
+        if self._pending is not None:
+            return  # locked while a preview is pending
+        g = self._grid
+        r, c = self._cursor
+        if c < 1 or c - 1 >= len(g.cells[r]):
+            return  # not on a data cell
+        data_c = c - 1
+        dim = ((g.rows[r], g.cols[data_c]) if g.col_var is not None
+               else (g.rows[r],))
+        if self._session.is_total(g.tab.index, dim):
+            self._set_log("total cells cannot be marked in this iteration")
+            return
+        key = (g.tab.index, tuple(dim))
+        existing = self._pending_instr.get(key)
+        before = existing.kind if existing is not None else None
+        # Same mark again clears it; otherwise set/replace with ``kind``.
+        after = (None if (existing is not None and existing.kind == kind)
+                 else kind)
+        self._record_edit(key, before, after)
+        msg = (f"cell {dim}: mark removed" if after is None
+               else f"cell {dim}: marked {after}")
+        self._set_log(msg)
+        self._redraft()
+
+    def _apply_instr(self, key: Tuple[int, Tuple[str, ...]],
+                     kind: Optional[str]) -> None:
+        """Set (or clear) the draft instruction for a cell by its identity."""
+        if kind is None:
+            self._pending_instr.pop(key, None)
+        else:
+            self._pending_instr[key] = CellInstruction(
+                table=key[0] + 1, dim=key[1], kind=kind)
+
+    def _record_edit(self, key: Tuple[int, Tuple[str, ...]],
+                     before: Optional[str], after: Optional[str]) -> None:
+        """Apply a draft edit and enter it in the undoable history
+        (design §B.4). Every edit advances the draft revision."""
+        self._history.record(key, before, after)
+        self._apply_instr(key, after)
+        self._draft_revision += 1
+
+    def _redraft(self) -> None:
+        """Re-render the grid after a draft edit, restoring the cursor to its
+        previous cell (clear+re-add drops the highlight)."""
+        r, c = self._cursor
+        self._populate_grid(reset_cursor=False)
+        if r is not None and c >= 1 and c - 1 < len(self._grid.cells[r]):
+            self.query_one("#grid", DataTable).move_cursor(row=r, column=c)
+            self._set_cell_detail(r, c - 1)
+
     def _run_action(self, what: str) -> None:
-        if self._session is None:
+        if self._session is None or self._pending is not None:
             return
         self._set_log(f"table {self._tab + 1}: {what.lower()} ...")
+        self._set_busy(True)
         self.run_worker(lambda: self._action(what), group="engine",
-                        exclusive=True, thread=True, description="action")
+                        exclusive=True, thread=True, description="action",
+                        exit_on_error=False)
 
     def _action(self, what: str) -> str:
-        from pytauargus.batch import Suppress
-
         s = self._session
         tab = self._tab
-        if what == "OPT":
-            s.suppress(Suppress(kind="OPT", tab_no=tab + 1))
-            return f"table {tab + 1}: OPT applied"
-        if what == "RND":
-            base = s.engine._min_round_base(tab)
-            s.suppress(Suppress(kind="RND", tab_no=tab + 1, rnd_base=base))
-            return f"table {tab + 1}: rounded (base {base})"
         if what == "AUDIT":
             rows = s.audit(tab)
             return f"table {tab + 1}: audited {len(rows)} cell(s)"
@@ -316,21 +854,61 @@ class TauArgusApp(App):
 
     def _set_log(self, text: str) -> None:
         self._log = text
-        self.query_one("#logline", Static).update(
-            f"▸ log: {text}   ▸ hint: {_HINT}")
+        self._refresh_status()
+
+    def _refresh_status(self) -> None:
+        """Compose the bottom status line (design §B.1) and publish it.
+
+        Carries the distinct state facts the spec requires rather than one
+        dirty flag: draft revision, pending edit count, preview freshness,
+        accepted revision — plus the log message and a contextual keymap hint.
+        """
+        edits = len(self._pending_instr)
+        acc = ("—" if self._accepted_revision == 0
+               else f"r{self._accepted_revision}")
+        hint = (_HINT_PENDING if self._pending is not None else _HINT_BASE)
+        state = (f"draft r{self._draft_revision} · {edits} edit(s) · "
+                 f"preview {self.preview_freshness} · acc {acc}")
+        self._status_line = f"{state}   ·   {self._log}   ·   {hint}"
+        try:
+            self.query_one("#logtext", Static).update(self._status_line)
+        except Exception:
+            pass  # widget not composed yet
 
     def push_log(self, msg: str) -> None:
         self._set_log(msg)
 
+    def _set_busy(self, busy: bool) -> None:
+        """Track engine-worker activity; the spinner mirrors the flag."""
+        self._busy = busy
+        try:
+            spin = self.query_one("#spin", _BusySpinner)
+        except Exception:
+            return  # widget not composed yet
+        if busy:
+            spin.start()
+        else:
+            spin.stop()
+
+    def _show_preview_pending(self) -> None:
+        op = self._pending
+        assert op is not None
+        self._detail = (f"preview {op.kind} on table {op.tab}:\n"
+                        f"{self._delta}\n"
+                        f"y=confirm (adopt this run)   n=cancel")
+        self.query_one("#detail", Static).update(self._detail)
+        self._set_log(f"table {op.tab}: {op.kind} previewed — confirm? (y/n)")
+
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Console entry point: ``tauargus-tui <batch.arb>``."""
+    """Console entry point: ``tauargus-tui [batch.arb]`` (browse if omitted)."""
     p = argparse.ArgumentParser(
         prog="tauargus-tui",
         description="Tau-Argus terminal UI over the pytauargus engine")
-    p.add_argument("arb", help="path to a .arb batch file")
+    p.add_argument("arb", nargs="?", default=None,
+                   help="path to a .arb batch file (omit to browse)")
     args = p.parse_args(argv)
-    app = TauArgusApp(Path(args.arb))
+    app = TauArgusApp(Path(args.arb) if args.arb else None)
     app.run()
     return 0
 

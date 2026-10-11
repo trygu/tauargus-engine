@@ -28,6 +28,14 @@
   no PyPI project/environment configuration was changed.
 - Enabled path-filtered package validation on side-branch pushes as well as
   PRs, so the new workflow can be verified before it reaches the TUI branch.
+- Initial 13-test consumer matrix passed on all three OSes and both Python
+  versions. After syncing TUI `f8a06c6`, the 56-test suite aborts with PyPI
+  engine 0.3.0 in `test_second_opt_preview_surfaces_5008`, inside native OPT.
+  PROGRESS.md already records the in-tree second-OPT fix (`csp 3007826`).
+  The release must wait for those engine fixes on PyPI and a matching minimum
+  dependency in the TUI; the consumer check deliberately remains in place.
+  Updated package builds, distribution guards, Twine, console help and
+  Actionlint pass. Application/model/tests/design remain exactly from `tui`.
 
 Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 (repo meta-cleanup). See `PROGRESS.md` for current state.
@@ -516,3 +524,54 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Side note: tests.yml uses `concurrency: cancel-in-progress`; a
   `gh run rerun` queued behind a newer run on the same branch cancels
   the in-flight one.
+
+## TUI state design agreed (2026-10-11)
+
+- Traced Java cell-edit, suppression, undo and export handlers at `3c8e2ab`,
+  with the legacy manual as the behaviour reference. Cell edits changed the
+  working table immediately; solving was explicit, and protection locked most
+  editing until suppression undo. This was source inspection, not a Java run.
+- Replaced the old one-engine/no-persistence design with immediate draft
+  commands, explicit isolated previews, acceptance and independent workspace
+  saving/export. User instructions and solver-selected statuses stay separate.
+- Specified stable cell identity, revisioned audit/cache ownership, serialized
+  jobs, late-result rejection, failure preservation and exact accepted-result
+  artifacts. Existing batch protection/output commands must be separated from
+  preparation rather than blindly replayed/appended during previews.
+- Corrected the claim that no native undo exists: suppression undo is present,
+  but is not a general transaction/restore contract. Fresh scratch runs are the
+  initial preview strategy; optimisation needs verified reset semantics.
+- Updated `docs/ui-design.md` with implementation acceptance checks and the
+  current `tui` branch status. These are design targets; no UI/engine behaviour
+  was changed. Documentation structure/links and diff whitespace checked.
+
+## TUI cell-instruction milestone (2026-10-11)
+
+- First B.8 acceptance check implemented: multiple cell edits update the draft
+  immediately without native mutation of the accepted run; one Preview batches
+  the complete instruction set.
+- Model: `CellInstruction` (stable identity = table + ordered code tuple + kind
+  U/S/P) and `apriory_lines()` (legacy apriori row `<c1>;<c2>;...;<cmd>`).
+  `Session.preview(ops, instructions=())` switched from a spec-text rewrite to a
+  programmatic recipe: fresh `run_batch` (original spec) → per-table
+  `apply_apriori` (`ignore_error=False`, so an edit invalidated by recoding is
+  surfaced, not silently retargeted) → `suppress(op.suppress_cmd())` per op.
+  Equivalent to the old batch-text rewrite (5008 carry-forward test still green).
+- App: `u`/`p`/`shift+s` mark the cursor cell (toggle/replace, one instruction
+  per cell); pending marker on the grid (kept distinct from the status colour) +
+  detail pane; `_all_instructions()` merges confirmed + pending (latest intent
+  wins per cell); accept promotes marks to confirmed; discard keeps the draft;
+  the cursor is restored across marker re-renders.
+- Total (marginal) cells are not markable this iteration: the grid shows the
+  display label (`get_total_code()`, falling back to `"Total"`) while the
+  apriori parser matches only the variable's real total code. Marking a total
+  cell is a refinement that needs the real total code.
+- textual 8.x: `Pilot.press("shift+s")` (no `shift=` kwarg); `move_cursor` is
+  required to keep the cursor after a re-render (clear+re-add drops the
+  highlight). `Pilot.press` waits for process-CPU idle, so the busy window is
+  not observable around `press` (spinner covered by its own contract test).
+- Verification: TUI suite 36/36 (was 25). TDD: tests written first, observed to
+  fail for the right reason before implementing.
+- Aligned the packaging branch with current TUI `f8a06c6` after parallel
+  frontend changes; app/model/tests/state design and package metadata are
+  preserved byte-for-byte from that branch. Resolved only progress bookkeeping.
