@@ -5,6 +5,20 @@ Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 
 Branch: `rewrite`
 
+## Feature-branch policy and TUI checkpoints (2026-10-12)
+
+- AGENTS now requires feature branches for every change, including documentation,
+  release preparation and native submodules. Related work reuses its feature
+  branch; unrelated work gets a separate branch. Changes are delivered by PR,
+  with user authorization required for merging; release tags point to mainline.
+- Moved completed checkpoints from PROGRESS to keep it below 35 lines:
+  `fix/u-hint` corrected u/p hints and help, then merged into `feature/tui-release`.
+  The status-line fix pins spinner width, hides it when idle, and composes the
+  line to terminal width. Its regression asserts the on-screen region; the
+  reported TUI suite has 68 tests.
+- Release preparation is now on master; `py-v0.3.2` points to `923f41c`.
+  Publication success is not established by this documentation change.
+
 ## Consolidated DataFrame branch (2026-10-10)
 - Merged master (`c0b6e48`, PR #3) into `feature/dataframe-protect`, which
   already contains PR #4 and the native capacity query (`5f913c95`).

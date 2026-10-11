@@ -11,26 +11,21 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI + TUI.
 - [x] Dev loop: `scripts/sync-venv.sh`; venvs run local wheels, not PyPI.
 - [x] TUI on mainline (`bindings/tui/`, pkg `pytauargus-tui`): staged s/r
   preview, marks u/p/S + undo/redo, audit, workspace save, preview-in-grid.
-- [x] `fix/u-hint`: corrected u/p status hints + help text (merged into
-  `feature/tui-release`).
-- [x] **Status-line bug**: line rendered off-screen (Textual 8.x auto-width
-  Static squeezed the `1fr` sibling to width 1); pinned spinner width,
-  `display:none` when idle, line composed to terminal width (never wraps).
-  Regression test asserts the on-screen region. TUI suite now 68 tests.
+- [x] TUI hints + status-line visibility fixed; 68 tests (details in ARCHIVE).
+- [x] AGENTS requires feature branches and PRs for all changes, including submodules.
 - [x] TUI user guide: `docs/tui.md` + 7 screenshots (`docs/tui-images/`),
   implemented vs outstanding (§B.7/§B.8 gaps listed).
 
 ## In flight
-- [ ] **Release 0.3.2** on `feature/tui-release` (ready, unmerged): TUI
+- [ ] **Release 0.3.2**: preparation is on master; `py-v0.3.2` tags `923f41c`. TUI
   published in **lockstep** with pytauargus — same `py-v*` trigger,
   `build-tui` job, tag==py==tui version check, per-project PyPI publish,
   GH Release carries all wheels, container image installs engine + TUI.
   `pytauargus[tui]` extra. Suites green (py 259/3 skip; TUI 68).
-  Next: merge → master, tag `py-v0.3.2`.
+  Next: verify publication completes successfully.
 - [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
 
 ## Feature branches
-- `feature/tui-release`: the 0.3.2 release above (see In flight).
 - `feature/example-tables`: `data/examples/ex1` fixture (pushed, unmerged).
 
 ## Watch items

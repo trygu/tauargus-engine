@@ -54,6 +54,13 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   (Preload runtime for Python: `DYLD_INSERT_LIBRARIES="$(clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" uv run ...`)
 
 ## 6. Verification & Commits
+- **Always use feature branches:** All changes (code, documentation, fixes and
+  release preparation) MUST be made on a feature branch, never directly on
+  `master` or another default branch. This also applies inside native submodules.
+  Reuse the relevant existing feature branch for related work; create a new
+  branch for unrelated work. Verify the current branch before editing or committing.
+  Deliver changes through a PR to the target branch; do not merge without user
+  authorization. Release tags must point to the approved mainline commit.
 - **TDD:** The agent is an avid TDD fan. For every feature/port, write the test
   *first* (it encodes the legacy contract), watch it fail for the right reason,
   then implement until green. A feature is not done until its test passes.
@@ -73,7 +80,8 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   1. Bump `version` in `bindings/python/pyproject.toml` (semver: patch = fixes,
      minor = features, major = breaking).
   2. `cd bindings/python && uv lock && uv run pytest` must pass.
-  3. Commit (`Release X.Y.Z`) and push the branch.
+  3. Commit (`Release X.Y.Z`) and push the feature branch; create a PR and
+     merge into `master` when authorized, before tagging the mainline commit.
   4. `git tag py-vX.Y.Z && git push origin py-vX.Y.Z`.
   5. Watch the run: `gh run list --workflow wheels --limit 1`.
 - Wheels: macOS arm64, Linux x86_64+aarch64 (manylinux_2_28), Windows x64; Python 3.10-3.13.
