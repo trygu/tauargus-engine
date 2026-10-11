@@ -8,9 +8,15 @@ import time
 from pathlib import Path
 
 import pytest
-from textual.widgets import DataTable, ListView, Static
+from textual.widgets import DataTable, DirectoryTree, ListView, Static
 
-from pytauargus_tui.app import TauArgusApp, _BusySpinner, _HelpScreen
+from pytauargus_tui.app import (
+    TauArgusApp,
+    _ArbDirectoryTree,
+    _BusySpinner,
+    _FileBrowser,
+    _HelpScreen,
+)
 
 DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
 ARB = DATA / "TestRecode.arb"
@@ -385,3 +391,68 @@ async def test_help_overlay_opens_and_closes(app):
         await pilot.press("escape")
         await wait_for(pilot, lambda: not isinstance(app.screen, _HelpScreen),
                        what="help closed")
+
+
+# ===========================================================================
+# No-arg launch: file browser (design §B.7)
+# ===========================================================================
+
+@pytest.fixture
+def app_none() -> TauArgusApp:
+    return TauArgusApp(None)
+
+
+def test_arb_directory_tree_filters_to_arb_and_dirs(tmp_path):
+    """Only subdirectories and .arb files are listed/openable (no others)."""
+    (tmp_path / "good.arb").write_text("x")
+    (tmp_path / "notes.txt").write_text("x")
+    (tmp_path / "sub").mkdir()
+    (tmp_path / ".hidden.arb").write_text("x")
+    tree = _ArbDirectoryTree(tmp_path)
+    shown = {p.name for p in tree.filter_paths(list(tmp_path.iterdir()))}
+    assert "good.arb" in shown
+    assert "sub" in shown
+    assert "notes.txt" not in shown
+    assert ".hidden.arb" not in shown
+
+
+async def test_noarg_shows_filebrowser(app_none):
+    """Running with no batch shows the file browser (not an empty app)."""
+    async with app_none.run_test(size=(100, 35)) as pilot:
+        await wait_for(pilot, lambda: isinstance(app_none.screen, _FileBrowser),
+                       what="file browser")
+        assert app_none.session is None  # nothing loaded yet
+        assert app_none.screen.query_one("#fbtree", DirectoryTree) is not None
+
+
+async def test_filebrowser_open_arb_loads(app_none):
+    """Picking a .arb (the browser's callback) loads it, same path as arg mode."""
+    async with app_none.run_test(size=(100, 35)) as pilot:
+        await wait_for(pilot, lambda: isinstance(app_none.screen, _FileBrowser),
+                       what="file browser")
+        app_none._on_arb_chosen(ARB)  # what the browser does on Enter over a .arb
+        await wait_for(pilot, lambda: app_none.session is not None,
+                       what="load after pick")
+        assert app_none.session.n_tables == 2
+
+
+async def test_filebrowser_handler_opens_arb_only(app_none):
+    """The tree's file-selected handler routes .arb to the load callback, and
+    ignores anything else (only files that make sense to open are openable)."""
+    async with app_none.run_test(size=(100, 35)) as pilot:
+        await wait_for(pilot, lambda: isinstance(app_none.screen, _FileBrowser),
+                       what="file browser")
+        fb = app_none.screen
+        chosen = []
+        fb.app._on_arb_chosen = lambda p: chosen.append(p)
+        fb.dismiss = lambda *a, **k: None  # don't actually pop in this test
+
+        class Event:
+            pass
+        e = Event(); e.path = ARB
+        fb.on_directory_tree_file_selected(e)
+        assert chosen == [ARB]                      # .arb opens
+
+        e2 = Event(); e2.path = ARB.with_suffix(".txt")
+        fb.on_directory_tree_file_selected(e2)
+        assert chosen == [ARB]                      # non-.arb ignored

@@ -42,8 +42,15 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.screen import ModalScreen
-from textual.containers import Horizontal
-from textual.widgets import DataTable, Footer, Label, ListView, Static
+from textual.containers import Horizontal, Vertical
+from textual.widgets import (
+    DataTable,
+    DirectoryTree,
+    Footer,
+    Label,
+    ListView,
+    Static,
+)
 from textual.widgets._list_view import ListItem
 from textual.worker import WorkerState
 
@@ -180,6 +187,64 @@ class _HelpScreen(ModalScreen[None]):
         self.app.pop_screen()
 
 
+class _ArbDirectoryTree(DirectoryTree):
+    """A DirectoryTree that lists only subdirectories and ``.arb`` files —
+    i.e. only files that make sense to open (design §B.7)."""
+
+    def filter_paths(self, paths):
+        for path in paths:
+            name = path.name
+            if name.startswith("."):
+                continue
+            if path.is_dir() or path.suffix.lower() == ".arb":
+                yield path
+
+
+class _FileBrowser(ModalScreen[Path]):
+    """Startup picker for a no-argument launch: choose a ``.arb`` batch file.
+
+    Wraps the standard textual ``DirectoryTree`` (filtered to ``.arb``).
+    Pure UI — on a pick it calls ``app._on_arb_chosen(path)``; on cancel,
+    ``app._on_arb_cancelled()``.
+    """
+
+    BINDINGS = [
+        Binding("q", "cancel", "Cancel"),
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    CSS = """
+    _FileBrowser { align-horizontal: center; align-vertical: middle; }
+    _FileBrowser #fb { width: 72; height: 32; }
+    #fbtree { height: 1fr; border: round $primary; }
+    #fbhint { height: 1; }
+    """
+
+    def __init__(self, start: Path) -> None:
+        super().__init__()
+        self._start = start
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="fb"):
+            yield _ArbDirectoryTree(self._start, id="fbtree")
+            yield Static("choose a .arb batch file — Enter opens · q cancels",
+                         id="fbhint")
+
+    def on_mount(self) -> None:
+        self.query_one("#fbtree", DirectoryTree).focus()
+
+    def on_directory_tree_file_selected(self, event) -> None:
+        # The tree is filtered to .arb files; this guard makes Enter open a
+        # real batch file (and ignore anything unexpected).
+        if event.path is not None and event.path.suffix.lower() == ".arb":
+            self.app._on_arb_chosen(event.path)
+            self.dismiss()
+
+    def action_cancel(self) -> None:
+        self.app._on_arb_cancelled()
+        self.dismiss()
+
+
 class TauArgusApp(App):
     """Tau-Argus TUI: navigator + grid + detail + log over one Engine."""
 
@@ -213,9 +278,10 @@ class TauArgusApp(App):
         Binding("f1", "help", "Help", show=False),
     ]
 
-    def __init__(self, arb_path: Path) -> None:
+    def __init__(self, arb_path: Optional[Path] = None) -> None:
         super().__init__()
-        self._arb = Path(arb_path)
+        # None => no-arg launch: show the file browser first (design §B.7).
+        self._arb: Optional[Path] = Path(arb_path) if arb_path is not None else None
         self._session: Optional[Session] = None
         self._tab: int = 0
         self._grid: Optional[TableGrid] = None
@@ -350,12 +416,30 @@ class TauArgusApp(App):
         self._log_handler = _EngineLogHandler(self)
         self._log_handler.setFormatter(logging.Formatter("%(message)s"))
         logging.getLogger("pytauargus").addHandler(self._log_handler)
+        if self._arb is not None:
+            self._start_load()
+        else:
+            # No batch: show the picker; it calls back with the choice.
+            self._set_log("no batch given — choose a .arb file (or q to quit)")
+            self.push_screen(_FileBrowser(start=Path.cwd()))
+
+    def _start_load(self) -> None:
+        """Kick off the (exclusive) load worker for the chosen batch file."""
         self._set_log(f"loading {self._arb.name} ...")
         self._set_busy(True)
         # exit_on_error=False: engine errors are expected, displayable
         # conditions (e.g. legacy 5008 on re-OPT) — log them, don't panic.
         self.run_worker(self._load, group="engine", exclusive=True, thread=True,
                         description="load", exit_on_error=False)
+
+    def _on_arb_chosen(self, path: Path) -> None:
+        """The file browser returned a batch file: load it (design §B.7)."""
+        self._arb = Path(path)
+        self._start_load()
+
+    def _on_arb_cancelled(self) -> None:
+        """The file browser was cancelled: quit (nothing to load)."""
+        self.exit()
 
     def on_unmount(self) -> None:
         if self._log_handler is not None:
@@ -751,13 +835,14 @@ class TauArgusApp(App):
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Console entry point: ``tauargus-tui <batch.arb>``."""
+    """Console entry point: ``tauargus-tui [batch.arb]`` (browse if omitted)."""
     p = argparse.ArgumentParser(
         prog="tauargus-tui",
         description="Tau-Argus terminal UI over the pytauargus engine")
-    p.add_argument("arb", help="path to a .arb batch file")
+    p.add_argument("arb", nargs="?", default=None,
+                   help="path to a .arb batch file (omit to browse)")
     args = p.parse_args(argv)
-    app = TauArgusApp(Path(args.arb))
+    app = TauArgusApp(Path(args.arb) if args.arb else None)
     app.run()
     return 0
 
