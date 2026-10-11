@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from textual.widgets import DataTable, DirectoryTree, ListView, Static
 
+from pytauargus_tui import workspace as ws
 from pytauargus_tui.app import (
     TauArgusApp,
     _ArbDirectoryTree,
@@ -543,3 +544,68 @@ async def test_undo_reset_after_accept(app):
         assert app.can_undo is False                  # history reset
         await pilot.press("ctrl+z")                   # undo: nothing to do
         assert len(app.pending_instructions) == 0
+
+
+# ===========================================================================
+# Audit ownership — one result, one revision (design §B.5)
+# ===========================================================================
+async def test_audit_not_carried_into_accepted_result(app):
+    """Audit belongs to the result it was computed on (design §B.5): the
+    accepted result's audit may stay available while editing a draft, but
+    accepting a *new* result must not carry the old result's audit into it.
+    The new result has no audit until it is audited itself."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        await pilot.press("a")                         # audit table 1
+        await wait_for(pilot, lambda: len(app.session.audit_rows(0)) > 0,
+                       what="audit")
+        # Preview + accept a new result (OPT suppress on table 1).
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")                         # accept
+        await wait_for(pilot, lambda: app.pending is None, what="confirmed")
+        # The new (accepted) result has no audit yet — the old one didn't leak.
+        assert app.session.audit_rows(0) == []
+
+
+# ===========================================================================
+# Workspace save (design §B.7)
+# ===========================================================================
+async def test_workspace_save_writes_manifest(app, tmp_path):
+    """``w`` persists a versioned manifest of the logical draft state (recipe,
+    revisions, accepted outcome) next to the arb — no solver run. A pending
+    mark is captured as a pending instruction."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")                       # a pending draft mark
+        target = tmp_path / "ws.workspace.json"
+        app._workspace_path = lambda: target         # keep the data dir clean
+        await pilot.press("w")
+        await wait_for(pilot, lambda: target.exists(), what="workspace file")
+        m = ws.load_workspace(target)
+        assert m.version == ws.WORKSPACE_VERSION
+        assert m.arb == str(ARB)
+        assert len(m.pending_instructions) == 1
+        assert m.pending_instructions[0].kind == "U"
+        assert m.draft_revision == app.draft_revision
+        # The input fingerprint matches the (unmodified) arb.
+        assert not ws.input_changed(m, ARB)
+
+
+async def test_workspace_save_before_any_preview(app, tmp_path):
+    """Workspace saving must work before a valid preview exists: a freshly
+    loaded session (no ops, no marks) saves a valid empty-recipe manifest."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        target = tmp_path / "ws.workspace.json"
+        app._workspace_path = lambda: target
+        await pilot.press("w")
+        await wait_for(pilot, lambda: target.exists(), what="workspace file")
+        m = ws.load_workspace(target)
+        assert m.pending_instructions == []
+        assert m.confirmed_ops == []
+        # A pre-preview save records no accepted revision yet.
+        assert m.accepted_revision == app.accepted_revision

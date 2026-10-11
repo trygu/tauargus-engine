@@ -289,3 +289,18 @@ def test_history_reset_drops_both_stacks():
     assert h.can_redo()
     h.reset()
     assert not h.can_undo() and not h.can_redo()
+
+
+# ===========================================================================
+# Audit ownership — audit belongs to one result (design §B.5)
+# ===========================================================================
+def test_inplace_mutation_invalidates_audit():
+    """An in-place mutation changes the result, so its cached audit evidence
+    is stale and must be dropped (design §B.5: 'Grid/audit caches must be
+    invalidated accordingly'). A fresh result has no audit until re-audited."""
+    s = Session.from_arb(ARB)
+    s.audit(0)
+    assert len(s.audit_rows(0)) > 0
+    # An in-place mutation: the result is now different, the audit is stale.
+    s.suppress(SuppressionOp("OPT", 1).suppress_cmd())
+    assert s.audit_rows(0) == []

@@ -38,8 +38,14 @@ void init_csp(py::module_ &m) {
             char *st = nullptr;
             int *fl = nullptr;
 
-            int rc = TauAuditJj(jjfile.c_str(), &n, &ci, &mn, &mx, &val,
+            int rc;
+            {
+                // Run the HiGHS audit without the GIL so other threads (TUI
+                // event loop, concurrent workers) keep running during the solve.
+                py::gil_scoped_release release;
+                rc = TauAuditJj(jjfile.c_str(), &n, &ci, &mn, &mx, &val,
                                 &st, &fl);
+            }
             if (rc != 0) {
                 throw std::runtime_error("audit_jj failed (rc=" +
                                          std::to_string(rc) + "): " + jjfile);

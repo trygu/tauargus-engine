@@ -54,6 +54,7 @@ from textual.widgets import (
 from textual.widgets._list_view import ListItem
 from textual.worker import WorkerState
 
+from . import workspace as _ws
 from .model import (
     Cell,
     CellInstruction,
@@ -78,7 +79,7 @@ _STATUS_COLOR = {
 # Contextual keymap hints for the status line (design §B.1: one-line keymap
 # hint). The base hint is always shown; the pending hint replaces it while a
 # preview awaits confirm/cancel (the only time y/n are live).
-_HINT_BASE = "u/p/S=mark  s=preview  r=round  a=audit  o=save  ?=help"
+_HINT_BASE = "u/p/S=mark s=preview r=round a=audit o=export w=save ?=help"
 _HINT_PENDING = "y=accept  n=cancel  ?=help"
 
 # Help overlay body (press ? or F1). Plain explanation of the workflow, the
@@ -103,8 +104,12 @@ _HELP_TEXT = """
 [bold]Draft markers[/bold] on the cursor cell (bold magenta):  * = U   + = S   # = P
 
 [bold]Keys:[/bold]  j/k next/prev table · arrows move the cursor ·
-  a = audit · o = save table (.tab) · ? = help · q = quit
-  ctrl+z = undo edit · ctrl+y = redo edit
+  a = audit · o = export the accepted table (.tab) · w = save workspace
+  ? = help · q = quit · ctrl+z = undo edit · ctrl+y = redo edit
+
+[bold]Workspace:[/bold]  w saves a versioned manifest (the recipe, revisions
+  and the accepted outcome) next to the .arb — no solver run. Reopening it
+  restores the draft; export (o) writes the accepted table only.
 """
 
 
@@ -274,7 +279,8 @@ class TauArgusApp(App):
         Binding("s", "suppress", "Suppress (OPT)"),
         Binding("r", "round", "Round (RND)"),
         Binding("a", "audit", "Audit"),
-        Binding("o", "save", "Save .tab"),
+        Binding("o", "save", "Export table (.tab)"),
+        Binding("w", "workspace_save", "Save workspace"),
         Binding("y", "confirm", "Confirm preview", show=False),
         Binding("n", "cancel", "Cancel preview", show=False),
         Binding("ctrl+z", "undo", "Undo edit", show=False),
@@ -680,6 +686,38 @@ class TauArgusApp(App):
 
     def action_save(self) -> None:
         self._run_action("SAVE")
+
+    def _workspace_path(self) -> Path:
+        """Default manifest location, next to the input ``.arb``."""
+        return self._arb.with_name(self._arb.stem + ".workspace.json")
+
+    def action_workspace_save(self) -> None:
+        """Persist the logical draft state + accepted-result references as a
+        versioned manifest (design §B.7). Works before any preview exists and
+        runs no solver — it only records the current logical state. The write
+        is atomic, so a failed save leaves the last workspace intact."""
+        if self._session is None or self._arb is None:
+            return
+        try:
+            summary = {str(i): self._session.status_counts(i)
+                       for i in range(self._session.n_tables)}
+        except Exception:
+            summary = {}
+        try:
+            m = _ws.build_manifest(
+                self._arb,
+                draft_revision=self._draft_revision,
+                accepted_revision=self._accepted_revision,
+                confirmed_ops=self._confirmed,
+                confirmed_instructions=self._confirmed_instr,
+                pending_instructions=list(self._pending_instr.values()),
+                accepted_summary=summary,
+                tab=self._tab,
+            )
+            path = _ws.save_workspace(m, self._workspace_path())
+            self._set_log(f"workspace saved: {path.name}")
+        except OSError as e:
+            self._set_log(f"workspace save failed: {e}")
 
     def action_help(self) -> None:
         """Show the on-screen explanation of keys, colours and workflow."""
