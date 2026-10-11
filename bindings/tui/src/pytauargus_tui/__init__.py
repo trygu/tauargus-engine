@@ -6,5 +6,5 @@ and re-implements no engine behaviour. See ``docs/ui-design.md`` (Option B).
 
 from .model import Cell, Session, TableGrid, TableMeta
 
-__version__ = "0.3.3"
+__version__ = "0.3.4"
 __all__ = ["Session", "TableMeta", "TableGrid", "Cell", "__version__"]
