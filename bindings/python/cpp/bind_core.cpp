@@ -29,7 +29,13 @@ void init_core(py::module_ &m) {
              py::arg("is_fixed_format"), py::arg("separator"))
         .def("explore_file", [](TauArgus &t, const std::string &file) {
             long err = 0, line = 0, var = 0;
-            bool ok = t.ExploreFile(file.c_str(), &err, &line, &var);
+            bool ok;
+            {
+                // File scan can take a while on large inputs; keep other
+                // threads (TUI event loop) running (see through_table).
+                py::gil_scoped_release release;
+                ok = t.ExploreFile(file.c_str(), &err, &line, &var);
+            }
             return py::make_tuple(ok, err, line, var);
         }, py::arg("file"), "Explore an input file. -> (ok, err, line, var).")
 
@@ -85,16 +91,23 @@ void init_core(py::module_ &m) {
            "-> (ok, is_parent, is_active, is_missing, level, n_children, code)")
         .def("set_var_code_active", &TauArgus::SetVarCodeActive,
              py::arg("var"), py::arg("code"), py::arg("active"))
-        .def("do_active_recode", &TauArgus::DoActiveRecode, py::arg("var"))
-        .def("apply_recode", &TauArgus::ApplyRecode)
-        .def("undo_recode", &TauArgus::UndoRecode, py::arg("var"))
+        .def("do_active_recode", &TauArgus::DoActiveRecode, py::arg("var"),
+             py::call_guard<py::gil_scoped_release>())
+        .def("apply_recode", &TauArgus::ApplyRecode,
+             py::call_guard<py::gil_scoped_release>())
+        .def("undo_recode", &TauArgus::UndoRecode, py::arg("var"),
+             py::call_guard<py::gil_scoped_release>())
         .def("do_recode", [](TauArgus &t, long var, const std::string &data,
                               long n_missing, const std::string &missing1,
                               const std::string &missing2) {
             long et = 0, el = 0, ep = 0;
             const char *warn = nullptr;
-            bool ok = t.DoRecode(var, data.c_str(), n_missing, missing1.c_str(),
-                                  missing2.c_str(), &et, &el, &ep, &warn);
+            bool ok;
+            {
+                py::gil_scoped_release release;
+                ok = t.DoRecode(var, data.c_str(), n_missing, missing1.c_str(),
+                                missing2.c_str(), &et, &el, &ep, &warn);
+            }
             std::string w = warn ? warn : "";
             return py::make_tuple(ok, et, el, ep, w);
         }, py::arg("var"), py::arg("recode_data"), py::arg("n_missing"),
@@ -169,10 +182,19 @@ void init_core(py::module_ &m) {
             py::arg("manual_safety_perc"), py::arg("cell_holding_freq_safety_perc"))
 
         // -- compute ---------------------------------------------------------
-        .def("through_table", &TauArgus::ThroughTable)
+        // The solver calls below run HiGHS, which can take seconds to minutes.
+        // They release the GIL for the duration of the call so that other
+        // threads (e.g. the TUI event loop rendering the spinner / accepting
+        // keys while a solve runs in a worker thread) keep running.
+        .def("through_table", &TauArgus::ThroughTable,
+             py::call_guard<py::gil_scoped_release>())
         .def("compute_tables", [](TauArgus &t) {
             long err = 0, tab = 0;
-            bool ok = t.ComputeTables(&err, &tab);
+            bool ok;
+            {
+                py::gil_scoped_release release;
+                ok = t.ComputeTables(&err, &tab);
+            }
             return py::make_tuple(ok, err, tab);
         }, "-> (ok, err, table_index)")
         .def("get_minimum_cell_value", [](TauArgus &t, long tab) {
@@ -280,7 +302,8 @@ void init_core(py::module_ &m) {
         .def("write_jj_format", &TauArgus::WriteJJFormat, py::arg("tab"),
              py::arg("file"), py::arg("lower"), py::arg("upper"),
              py::arg("with_bogus") = false, py::arg("as_perc") = false,
-             py::arg("for_rounding") = false)
+             py::arg("for_rounding") = false,
+             py::call_guard<py::gil_scoped_release>())
         .def("prepare_hitas", &TauArgus::PrepareHITAS, py::arg("tab"),
              py::arg("name_param_file"), py::arg("name_files_file"), py::arg("tau_temp"))
         .def("set_secondary_hitas", [](TauArgus &t, long tab) {

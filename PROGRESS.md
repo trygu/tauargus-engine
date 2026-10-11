@@ -20,6 +20,9 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
 - [x] Audit ownership (§B.5): audit per-result; mutation drops cache; new result unaudited.
 - [x] Workspace save (§B.7): `w` writes a versioned atomic manifest (recipe, revisions,
   accepted outcome); works pre-preview; input change detected. 65 tests.
+- [x] Freeze fix (py binding): native solve/audit/file-scan calls release the GIL,
+  so the TUI event loop stays responsive while a solve runs in a worker thread.
+  GIL gap test in `bindings/python/tests/test_gil_release.py`.
 - [ ] Next (§B.7/§B.8): reopen/restore + replay/export; `tui-v*`.
 - Dev: `uv sync` uses local pytauargus (uv path source); sync-venv.sh after
   engine changes.
