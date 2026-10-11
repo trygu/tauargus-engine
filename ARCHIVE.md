@@ -19,6 +19,13 @@
 - Updated design, installation/development docs and release instructions.
   Release tests install both artifacts from the same build; local consumer
   installation of the unreleased engine no longer depends on old PyPI fixes.
+- Built the current native engine locally and installed both wheels together:
+  65 TUI tests and the GIL regression pass; Twine and both command checks pass.
+  PR Checks passes on Linux x64/arm64 and macOS arm64. Manual Release built
+  all 16 engine wheels; paired installation passed on Linux/macOS for both
+  Python versions. Windows passes 64/65 tests but the second-OPT test never
+  observes error 5008. Improved that assertion to report actual completion
+  state/error instead of timing out on a platform-specific mismatch.
 
 ## Separate TUI distribution (2026-10-11)
 

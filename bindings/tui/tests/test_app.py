@@ -189,7 +189,8 @@ async def test_second_opt_preview_surfaces_5008(app):
         assert app.last_action == "OPT confirmed on table 1"
         assert [op.arb_line() for op in app.confirmed_ops] == ["<SUPPRESS> OPT(1)"]
         await pilot.press("s")  # preview a second OPT on the same table
-        await wait_for(pilot, lambda: "5008" in app.log_text, what="5008 error")
+        await wait_for(pilot, lambda: not app.busy, what="second OPT completion")
+        assert "5008" in app.log_text, f"{app.last_action}: {app.log_text}"
         assert app.preview is None and app.pending is None
         assert app.busy is False
 
