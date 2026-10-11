@@ -423,6 +423,59 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - The first fresh-environment sync was stopped after stalled downloads; the
   existing environment was synced with test extras and rebuilt as 0.3.0.
 
+## 2nd-OPT SIGABRT fix (2026-10-11, csp submodule 3007826)
+
+- Symptom: `run_batch` + `suppress(OPT)` twice on the same table → SIGABRT in
+  `remove_row` ← `PPCSPfreeprob` ← `FullJJ` catch (HiTaSCtrl.cpp:521). Reproduced
+  deterministically with the plain PyPI 0.3.0 wheel (both TestRecode tables) and
+  with a C++ ASan driver (`/tmp/fj_seq.cpp`: FullJJ normal-JJ then
+  secondary-JJ in one process; `rows[k]` = 0xbebebe… stale pool read).
+- Chain: `PPCSPfreeprob` never reset global counters, so after a successful run
+  `nrows` etc. stayed stale. A 2nd OPT writes a JJ file with `m` (secondary)
+  cells; `change_status` (Cspmain.c) has no `'m'` case → loadprob fails with
+  HITAS_JJNOTLOADED (5008) *after* the `rows` realloc but *before* `nrows=0`
+  → the catch's `CSPfreeprob` walks a garbage row pool → abort.
+- Legacy check: the pre-port csp history and the original `HiTaSCtrl.cpp`
+  (initial commit) contain the identical missing-`'m'` + unreset counters +
+  same catch path, and legacy Java `RunOptimal` has no pre-check for existing
+  secondary suppression (it calls native `WriteJJFormat` + `FullJJ` and throws
+  on result > 1). So τ-ARGUS 4.1 had the same latent crash; the TUI's s-s
+  workflow just triggers it directly.
+- Fix (csp `3007826`): `PPCSPloadprob` resets all global problem counters at
+  entry (failed load leaves a consistent empty problem → freeprob free loops
+  are no-ops); `PPCSPfreeprob` resets the same counters on exit (idempotent).
+  `change_status` documented: `'m'` intentionally rejected (legacy behavior) —
+  re-running OPT on a table with existing secondary suppression returns 5008
+  gracefully instead of crashing.
+- Verification: ASan driver run1→1, run2→5008, clean exit, no ASan report;
+  Python E2E (fixed dylib swapped into the 0.3.0 wheel package — note the
+  wheel keeps a second csp copy in the hidden `.dylibs/` dir that hitas loads
+  via `@loader_path/.dylibs/…`) → both tables: OPT#1 ok, OPT#2 raises
+  `BatchError: FullJJ failed (code 5008)`, no crash.
+
+## Error strings + core sync (2026-10-11, hitas d3e5b91)
+
+- `GetErrorString` (HiTaSCtrl) looked up a global `StringTable` that was only
+  ever populated by `LoadErrorStrings` from `ErrorStrings.txt` in the CWD —
+  a call that was commented out in the port, so every error surfaced with an
+  empty message (e.g. "FullJJ failed (code 5008): ").
+- The txt file was never checked into any repo (shipped next to the legacy
+  jar/exe). Found verbatim upstream:
+  `raw.githubusercontent.com/sdcTools/tauargus/refs/heads/master/ErrorStrings.txt`
+  (35 lines, `NAME = code = text`, codes match `resource.h` exactly).
+- Fix: file restored to `engine/native/hitas/ErrorStrings.txt`; CMakeLists
+  generates `ErrorStrings_generated.inc` at configure time (note: CMake's
+  regex engine does not support `[[:space:]]` — use ` *`); `HiTaSCtrl.cpp`
+  initializes the table from the embedded array; `LoadErrorStrings` kept as
+  optional runtime override.
+- Core submodule: worktree had drifted to `e7ecb98` (ancestor of the pin
+  `ab37b03`), which broke `uv build --wheel` (bind_core.cpp needs
+  `GetTableCellBufferSizes` from `5f913c9`/`ab37b03`). Restored the pin —
+  plain fast-forward, nothing lost; wheel build now passes.
+- Verification with the freshly built cp313 wheel in the TUI venv:
+  `error_string(5008)` → "Couldn't load JJ-routines"; OPT×2 repro →
+  `BatchError: FullJJ failed (code 5008): Couldn't load JJ-routines`, no crash.
+
 ## CI: push submodule commits before the parent (2026-10-11)
 
 - Pushing a parent that pins not-yet-pushed submodule commits breaks every
@@ -520,3 +573,50 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Verified consistent Docker command arguments and version-pinning guidance,
   existing version/latest publication tags, unchanged acknowledgements, and
   clean `git diff --check`; PROGRESS.md remains under 35 lines.
+## TUI state design agreed (2026-10-11)
+
+- Traced Java cell-edit, suppression, undo and export handlers at `3c8e2ab`,
+  with the legacy manual as the behaviour reference. Cell edits changed the
+  working table immediately; solving was explicit, and protection locked most
+  editing until suppression undo. This was source inspection, not a Java run.
+- Replaced the old one-engine/no-persistence design with immediate draft
+  commands, explicit isolated previews, acceptance and independent workspace
+  saving/export. User instructions and solver-selected statuses stay separate.
+- Specified stable cell identity, revisioned audit/cache ownership, serialized
+  jobs, late-result rejection, failure preservation and exact accepted-result
+  artifacts. Existing batch protection/output commands must be separated from
+  preparation rather than blindly replayed/appended during previews.
+- Corrected the claim that no native undo exists: suppression undo is present,
+  but is not a general transaction/restore contract. Fresh scratch runs are the
+  initial preview strategy; optimisation needs verified reset semantics.
+- Updated `docs/ui-design.md` with implementation acceptance checks and the
+  current `tui` branch status. These are design targets; no UI/engine behaviour
+  was changed. Documentation structure/links and diff whitespace checked.
+
+## TUI cell-instruction milestone (2026-10-11)
+
+- First B.8 acceptance check implemented: multiple cell edits update the draft
+  immediately without native mutation of the accepted run; one Preview batches
+  the complete instruction set.
+- Model: `CellInstruction` (stable identity = table + ordered code tuple + kind
+  U/S/P) and `apriory_lines()` (legacy apriori row `<c1>;<c2>;...;<cmd>`).
+  `Session.preview(ops, instructions=())` switched from a spec-text rewrite to a
+  programmatic recipe: fresh `run_batch` (original spec) → per-table
+  `apply_apriori` (`ignore_error=False`, so an edit invalidated by recoding is
+  surfaced, not silently retargeted) → `suppress(op.suppress_cmd())` per op.
+  Equivalent to the old batch-text rewrite (5008 carry-forward test still green).
+- App: `u`/`p`/`shift+s` mark the cursor cell (toggle/replace, one instruction
+  per cell); pending marker on the grid (kept distinct from the status colour) +
+  detail pane; `_all_instructions()` merges confirmed + pending (latest intent
+  wins per cell); accept promotes marks to confirmed; discard keeps the draft;
+  the cursor is restored across marker re-renders.
+- Total (marginal) cells are not markable this iteration: the grid shows the
+  display label (`get_total_code()`, falling back to `"Total"`) while the
+  apriori parser matches only the variable's real total code. Marking a total
+  cell is a refinement that needs the real total code.
+- textual 8.x: `Pilot.press("shift+s")` (no `shift=` kwarg); `move_cursor` is
+  required to keep the cursor after a re-render (clear+re-add drops the
+  highlight). `Pilot.press` waits for process-CPU idle, so the busy window is
+  not observable around `press` (spinner covered by its own contract test).
+- Verification: TUI suite 36/36 (was 25). TDD: tests written first, observed to
+  fail for the right reason before implementing.

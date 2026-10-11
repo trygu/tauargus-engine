@@ -32,7 +32,12 @@ void init_rounder(py::module_ &m) {
             long nj = 0;
             double ut = 0;
             long ec = 0;
-            int result = r.DoRound(const_cast<char *>(solver.c_str()),
+            int result;
+            {
+                // Run the HiGHS MIP without the GIL so other threads (TUI
+                // event loop, concurrent workers) keep running during the solve.
+                py::gil_scoped_release release;
+                result = r.DoRound(const_cast<char *>(solver.c_str()),
                                     const_cast<char *>(in_file.c_str()), base,
                                     u.empty() ? nullptr : u.data(),
                                     l.empty() ? nullptr : l.data(), auditing,
@@ -40,6 +45,7 @@ void init_rounder(py::module_ &m) {
                                     const_cast<char *>(statistics.c_str()), nullptr,
                                     nullptr, max_time, zero_restricted, nullptr, &mj,
                                     &nj, &ut, &ec);
+            }
             return py::make_tuple(result, mj, nj, ut, ec);
         }, py::arg("solver"), py::arg("in_file"), py::arg("base"),
            py::arg("upper_bound") = py::list(), py::arg("lower_bound") = py::list(),

@@ -1,34 +1,29 @@
 # Tau-Argus Rewrite — Progress
 
-Branches: `master` (mainline) + `tui` (TUI). DataFrame work merged to
-`master` in PR #5; **Release 0.3.0** published (tag `py-v0.3.0`).
-Goal: HiGHS solvers, portable cloud-native build, headless Python CLI.
+Branches: `master` (mainline) + short-lived feature branches for fixes.
+Goal: HiGHS solvers, portable cloud-native build, headless Python CLI + TUI.
 
 ## Verified checkpoints (details in ARCHIVE.md)
 - [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
-- [x] Task 4 headless CLI; rename to `pytauargus`; self-contained wheel +
-  CI → GH Release + PyPI + GHCR. **Release 0.2.0**; example notebooks.
-- [x] **High-level API — DataFrame `protect()`** (PR #5): DataFrame/dict ->
-  native batch -> type-5 `TableResult`; optional pandas.
-- [x] OPT/MOD time-limit regressions + audit docs (PR #3); `protect()`
-  score-buffer overflow + import (PR #4); 219 tests + 37 executed cells.
-- [x] **Release 0.3.0** (tag `py-v0.3.0`): cp310–cp313 wheels + GHCR image.
-- [x] 2nd-OPT SIGABRT fixed (csp `3007826`): counters reset at loadprob
-  entry + freeprob exit; re-OPT with secondary cells → 5008, no crash.
-- [x] Legacy `ErrorStrings.txt` restored + embedded at build time (hitas
-  `d3e5b91`); `error_string()` returns real messages.
-- [x] README refresh: author credits + single thanks; installation defaults
-  follow releases, with version pinning explained (PR #6).
+- [x] Headless CLI; wheel + CI → PyPI + GHCR; Release 0.3.0 (DataFrame `protect()`, cp310–cp313).
+- [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`) + legacy `ErrorStrings.txt`
+  embedded (hitas `d3e5b91`) + FullJJ streams closed on solver errors (`caf7528`); re-OPT → 5008.
+- [x] Dev loop: `scripts/sync-venv.sh` (drift gate → engine → wheel → install); venvs run
+  local wheels, not PyPI. `references/` + legacy Java frontend removed from mainline.
+- [x] TUI on mainline (`bindings/tui/`, pkg `pytauargus-tui`): nav/grid/detail/log, staged
+  s/r preview, cell instructions u/p/S, undo/redo, audit ownership, workspace save, GIL-freeze
+  fix, preview-in-grid. 67 tests. `tui` branch merged + deleted.
+- [x] README acknowledgements + release-following install guidance (PR #6).
 
-## Next (priority order)
-1. **GHCR rename → `tauargus-engine`** — 0.2.1 verified. Delete old
-   `trygu/tauargus` package.
-2. **Top-level project rename** (repo/package naming) — decide + execute.
-3. Task 1: document solver strategy (legacy roles → HiGHS); Dockerfile.
-4. **ANSI-TUI** (`textual`, own `pytauargus-tui`) on `tui` branch.
+## In flight
+- [ ] **Release 0.3.1** (tag `py-v0.3.1`): ships the in-tree engine fixes (csp/hitas) + TUI
+  onto PyPI/GHCR. Bump version → tests → tag.
+- [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
+
+## Feature branches
+- `fix/u-hint`: correct the misleading u/p status hints + help text (green, ready to merge).
 
 ## Watch items
-- Ship the 2nd-OPT fix + ErrorStrings as **0.3.1** (in-tree since 0.3.0).
-- OPT/MOD deadline expiry needs separate coverage; positive limits pass.
-- `open_microdata` calls `clean_all` — safe only because tables finalize after.
-- Parquet as the microdata dataframe backend (not started).
+- 5008 on re-OPT w/ secondary suppression is a legacy limitation.
+- GHCR rename; project rename; solver-strategy doc.
+- OPT/MOD deadline expiry coverage; `open_microdata`+`clean_all` note; Parquet.
