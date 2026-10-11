@@ -18,6 +18,9 @@ Branch: `rewrite`
   reported TUI suite has 68 tests.
 - Release preparation is now on master; `py-v0.3.2` points to `923f41c`.
   Publication success is not established by this documentation change.
+- Follow-up: verified both 0.3.2 packages on PyPI and the successful release run.
+  Synced this PR with master, preserving Conventional Commits and current release
+  notes; `py-v0.3.3` is building. Documentation whitespace and line-count checks pass.
 
 ## Consolidated DataFrame branch (2026-10-10)
 - Merged master (`c0b6e48`, PR #3) into `feature/dataframe-protect`, which

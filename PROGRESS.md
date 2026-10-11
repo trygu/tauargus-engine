@@ -11,19 +11,19 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI + TUI.
 - [x] Dev loop: `scripts/sync-venv.sh`; venvs run local wheels, not PyPI.
 - [x] TUI on mainline (`bindings/tui/`, pkg `pytauargus-tui`): staged s/r
   preview, marks u/p/S + undo/redo, audit, workspace save, preview-in-grid.
-- [x] TUI hints + status-line visibility fixed; 68 tests (details in ARCHIVE).
 - [x] AGENTS requires feature branches and PRs for all changes, including submodules.
-- [x] TUI user guide: `docs/tui.md` + 7 screenshots (`docs/tui-images/`),
-  implemented vs outstanding (§B.7/§B.8 gaps listed).
+- [x] **Release 0.3.2 shipped**: TUI published in lockstep with pytauargus
+  (same `py-v*` trigger, 3-way version check, per-project PyPI publish, GH
+  Release carries all 17 wheels, image installs both CLIs, `pytauargus[tui]`).
+  Status-line off-screen bug fixed (regression test; TUI suite 68).
+  TUI guide `docs/tui.md` + screenshots; README now PyPI-safe (in-sdist images,
+  absolute doc links). Conventional Commits adopted for new history (§6/§7).
 
 ## In flight
-- [ ] **Release 0.3.2**: preparation is on master; `py-v0.3.2` tags `923f41c`. TUI
-  published in **lockstep** with pytauargus — same `py-v*` trigger,
-  `build-tui` job, tag==py==tui version check, per-project PyPI publish,
-  GH Release carries all wheels, container image installs engine + TUI.
-  `pytauargus[tui]` extra. Suites green (py 259/3 skip; TUI 68).
-  Next: verify publication completes successfully.
 - [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
+- [ ] **Release 0.3.3** (docs-only): PyPI freezes each version's README, so
+  the improved TUI README (screenshots, fixed doc links) needs this bump to
+  reach the PyPI page. Tag `py-v0.3.3` is building; verify publication.
 
 ## Feature branches
 - `feature/example-tables`: `data/examples/ex1` fixture (pushed, unmerged).
