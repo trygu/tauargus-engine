@@ -35,9 +35,15 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Solver backend: Pure HiGHS (`<highs/interfaces/highs_c_api.h>`). No CPLEX, XPRESS, or legacy SCIP.
 - Python layer: `bindings/python/` (pybind11 bindings + `pytauargus` package, `tauargus` CLI).
   Target product is headless `.arb` batch CLI. A future R binding lives under `bindings/r/`.
-- Legacy to ignore: `src/tauargus/` (Java frontend to be deleted in Task 8). Do NOT inspect or edit.
+- Legacy Java frontend `src/tauargus/`: removed from `master`; kept on the `tui`
+  branch as the TUI porting reference (read-only; restorable from history).
 
 ## 5. Build Commands (macOS / Apple Silicon)
+- **Sync a venv with the current tree — the single dev-loop command, run after
+  ANY change under `engine/` or `bindings/python/`:**
+  `scripts/sync-venv.sh <venv>` — submodule-drift gate → release engine →
+  wheel for the venv's Python → force-install. Dev venvs must run a locally
+  built wheel, never PyPI (PyPI lags in-tree engine fixes by a release).
 - Highs Brew prefix: `-DHighs_DIR=$(brew --prefix)/lib/cmake/Highs`
 - Submodule build:
   `cmake -S engine/native/<mod> -B engine/native/<mod>/build -DHighs_DIR=$(brew --prefix)/lib/cmake/Highs && cmake --build engine/native/<mod>/build`
