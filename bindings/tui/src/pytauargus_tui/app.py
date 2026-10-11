@@ -77,10 +77,16 @@ _STATUS_COLOR = {
 }
 
 # Contextual keymap hints for the status line (design §B.1: one-line keymap
-# hint). The base hint is always shown; the pending hint replaces it while a
-# preview awaits confirm/cancel (the only time y/n are live).
+# hint). The base hint is the default; the pending hint replaces it while a
+# preview awaits confirm/cancel (the only time y/n are live). When the cursor
+# sits on a cell that begs for an action, a per-status hint replaces the vague
+# "u/p/S=mark" so the operator sees exactly what to press *there*:
+#   - unsafe (red)   -> u hides this cell (require suppression)
+#   - secondary (yellow) -> p protects this cell (keep it out of suppression)
 _HINT_BASE = "u/p/S=mark s=OPT table r=round a=audit o=export w=save ?=help"
 _HINT_PENDING = "y=accept  n=cancel  ?=help"
+_HINT_UNSAFE = "u=hide this cell s=OPT table r=round a=audit o=export w=save ?=help"
+_HINT_SECONDARY = "p=protect this cell s=OPT table r=round a=audit o=export w=save ?=help"
 
 # Help overlay body (press ? or F1). Plain explanation of the workflow, the
 # keys, and the cell-status colours — the TUI has no other on-screen legend.
@@ -603,6 +609,23 @@ class TauArgusApp(App):
             self.query_one("#grid", DataTable).move_cursor(
                 row=saved[0], column=saved[1])
 
+    def _current_cell(self) -> Optional[Cell]:
+        """The cell under the cursor, for the contextual status-line hint.
+
+        Returns None when there is no grid, no cursor yet, or the cursor is on
+        the row-label column / out of range (the hint then falls back to base).
+        """
+        if self._grid is None or self._cursor is None:
+            return None
+        r, c = self._cursor
+        if r < 0 or r >= len(self._grid.cells):
+            return None
+        row = self._grid.cells[r]
+        ci = c - 1  # column 0 of the DataTable is the row label
+        if ci < 0 or ci >= len(row):
+            return None
+        return row[ci]
+
     def on_data_table_cell_selected(self, event) -> None:
         self._on_cell_coordinate(event.coordinate)
 
@@ -619,8 +642,10 @@ class TauArgusApp(App):
         self._cursor = (r, c)
         row = self._grid.cells[r]
         if c < 1 or c - 1 >= len(row):
+            self._refresh_status()  # hint may fall back to base (label column)
             return
         self._set_cell_detail(r, c - 1)
+        self._refresh_status()  # the contextual hint depends on this cell
 
     # -- detail pane -----------------------------------------------------------------------
     def _table_detail(self, meta: TableMeta) -> str:
@@ -925,7 +950,19 @@ class TauArgusApp(App):
         edits = len(self._pending_instr)
         acc = ("—" if self._accepted_revision == 0
                else f"r{self._accepted_revision}")
-        hint = (_HINT_PENDING if self._pending is not None else _HINT_BASE)
+        if self._pending is not None:
+            hint = _HINT_PENDING
+        else:
+            # Contextual hint: on an unsafe (red) cell, point at u (hide it);
+            # on a secondary (yellow) cell, point at p (protect it).
+            cell = self._current_cell()
+            sym = cell.symbol if cell is not None else None
+            if sym == "U":
+                hint = _HINT_UNSAFE
+            elif sym == "M":
+                hint = _HINT_SECONDARY
+            else:
+                hint = _HINT_BASE
         state = (f"draft r{self._draft_revision} · {edits} edit(s) · "
                  f"preview {self.preview_freshness} · acc {acc}")
         self._status_line = f"{state}   ·   {self._log}   ·   {hint}"

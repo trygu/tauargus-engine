@@ -13,8 +13,8 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
 ## In flight — TUI (branch `tui`, `bindings/tui/`, pkg `pytauargus-tui`)
 - [x] v1: nav/grid/detail/log + staged s/r preview-delta + spinner; 5008 carry-fwd.
 - [x] Cell instructions: `u`/`p`/`S` draft edits; Preview batches on scratch run; `y`/`n`.
-- [x] Discoverability (§B.1): status line + `?`/F1 help; `s` hint clarifies OPT runs on
-  the whole table, not the cursor cell.
+- [x] Discoverability (§B.1): status line + `?`/F1 help; hints are contextual —
+  `s=OPT table`, and on the cursor cell `u=hide it` (red) / `p=protect it` (yellow).
 - [x] No-arg file browser: no-arg launch opens `DirectoryTree` (subdirs + .arb).
 - [x] Undo/redo (§B.4/§B.5): `ctrl+z`/`ctrl+y` reverse/replay draft edits; rev advances.
 - [x] Audit ownership (§B.5): audit per-result; mutation drops cache; new result unaudited.

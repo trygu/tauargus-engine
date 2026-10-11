@@ -422,6 +422,58 @@ async def test_status_line_accepted_revision_after_confirm(app):
         assert f"acc r{app.draft_revision}" in line
 
 
+async def test_contextual_hint_by_cell_status(app):
+    """The status-line hint adapts to the cell under the cursor (design §B.1):
+    on an unsafe (red) cell it points at u (hide it); on a secondary (yellow)
+    cell it points at p (protect it); elsewhere it shows the base hint."""
+    async with app.run_test(size=(200, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        sess_grid = app.session.grid(0)
+
+        def find_cell(symbol):
+            for r in range(g.row_count):
+                for c in range(1, len(g.columns)):
+                    if sess_grid.cells[r][c - 1].symbol == symbol:
+                        return (r, c)
+            return None
+
+        # Unsafe (red) cell -> the hint points at u.
+        unsafe = find_cell("U")
+        assert unsafe is not None, "expected an unsafe (red) cell in table 0"
+        g.move_cursor(row=unsafe[0], column=unsafe[1])
+        await wait_for(pilot, lambda: "u=hide this cell" in app.status_text,
+                       what="U hint")
+
+        # Safe (green) cell -> back to the base hint.
+        safe = find_cell("S")
+        assert safe is not None, "expected a safe (green) cell in table 0"
+        g.move_cursor(row=safe[0], column=safe[1])
+        await wait_for(pilot, lambda: "u/p/S=mark" in app.status_text,
+                       what="base hint")
+
+        # Secondary (yellow) cell -> the hint points at p. Accept an OPT first
+        # so the session has suppressed (yellow) cells.
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")  # accept -> yellow (M) cells now in the session
+        await wait_for(pilot, lambda: app.preview is None, what="accepted")
+        sess_grid = app.session.grid(0)
+
+        def find_secondary():
+            for r in range(g.row_count):
+                for c in range(1, len(g.columns)):
+                    if sess_grid.cells[r][c - 1].symbol == "M":
+                        return (r, c)
+            return None
+
+        secondary = find_secondary()
+        assert secondary is not None, "expected a yellow cell after OPT"
+        g.move_cursor(row=secondary[0], column=secondary[1])
+        await wait_for(pilot, lambda: "p=protect this cell" in app.status_text,
+                       what="M hint")
+
+
 async def test_help_overlay_opens_and_closes(app):
     """? opens the help overlay; esc closes it. No engine involvement."""
     async with app.run_test(size=(200, 40)) as pilot:
