@@ -8,7 +8,7 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
   embedded (hitas `d3e5b91`); re-OPT → 5008 (legacy behavior).
 - [x] Dev loop: `scripts/sync-venv.sh` (drift gate → engine → wheel → install); venvs run
   local wheels, not PyPI. `references/` + Java frontend cleaned up.
-- [x] PR #7: shared Python release/CI; FullJJ stream fix in HiTaS PR #1.
+- [x] PR #7: shared Python release/CI; all platforms green; HiTaS fix in PR #1.
 
 ## In flight — TUI (branch `tui`, `bindings/tui/`, pkg `pytauargus-tui`)
 - [x] v1: nav/grid/detail/log + staged s/r preview-delta + spinner; 5008 carry-fwd.

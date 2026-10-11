@@ -35,6 +35,12 @@
 - Synced current TUI `7b97cab` (preview grid, OPT wording, cursor hints);
   app/model source remains exactly upstream. Installed the rebuilt TUI wheel
   with the fixed engine: all 69 current engine/TUI tests pass locally.
+- Full Release preflight `38166144900` passed: 16 native wheels and all eight
+  paired install/regression jobs (Linux x64/arm64, macOS arm64, Windows x64;
+  Python 3.10/3.13). Both Windows jobs now surface 5008 and remove JJ.OUT.
+  Tag-only PyPI/GitHub-release/GHCR jobs were skipped, as intended for manual
+  validation. No release was created. HiTaS PR #1 must merge first, retaining
+  `0305330`; parent PR #7 includes current TUI `7b97cab` without app changes.
 
 ## Separate TUI distribution (2026-10-11)
 
