@@ -456,3 +456,90 @@ async def test_filebrowser_handler_opens_arb_only(app_none):
         e2 = Event(); e2.path = ARB.with_suffix(".txt")
         fb.on_directory_tree_file_selected(e2)
         assert chosen == [ARB]                      # non-.arb ignored
+
+
+# ===========================================================================
+# Draft edit history — undo/redo (design §B.4 / §B.5)
+# ===========================================================================
+async def test_undo_reverses_mark(app):
+    """Undo removes the last draft mark; the revision advances (spec: a
+    revert is still a semantic edit)."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        rev0 = app.draft_revision
+        await pilot.press("u")
+        assert len(app.pending_instructions) == 1
+        assert app.can_undo and not app.can_redo
+        await pilot.press("ctrl+z")                 # undo
+        assert len(app.pending_instructions) == 0   # the mark is gone
+        assert app.can_redo and not app.can_undo
+        assert app.draft_revision == rev0 + 2       # mark + undo
+
+
+async def test_redo_reapplies_mark(app):
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        await pilot.press("ctrl+z")
+        assert len(app.pending_instructions) == 0
+        await pilot.press("ctrl+y")                 # redo
+        assert len(app.pending_instructions) == 1
+        assert app.pending_instructions[0].kind == "U"
+        assert app.can_undo and not app.can_redo
+
+
+async def test_undo_walks_back_replacements(app):
+    """A mark then a kind-replacement: undo steps back to the prior kind,
+    then to unmarked (before/after are captured per edit)."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")                       # mark U
+        await pilot.press("p")                       # replace with P
+        assert app.pending_instructions[0].kind == "P"
+        await pilot.press("ctrl+z")                  # undo replacement -> U
+        assert len(app.pending_instructions) == 1
+        assert app.pending_instructions[0].kind == "U"
+        await pilot.press("ctrl+z")                  # undo original mark -> cleared
+        assert len(app.pending_instructions) == 0
+
+
+async def test_new_mark_clears_redo(app):
+    """A fresh edit makes the redo branch stale (standard undo/redo)."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        await pilot.press("ctrl+z")
+        assert app.can_redo
+        await pilot.press("p")                       # a new edit
+        assert not app.can_redo                      # redo branch cleared
+
+
+async def test_undo_reset_after_accept(app):
+    """Accept commits the draft, so the edit history is reset: a subsequent
+    undo cannot reach back into the just-accepted marks."""
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        assert app.can_undo
+        await pilot.press("s")                        # stage OPT preview
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")                        # accept
+        await wait_for(pilot, lambda: app.pending is None, what="confirmed")
+        assert app.can_undo is False                  # history reset
+        await pilot.press("ctrl+z")                   # undo: nothing to do
+        assert len(app.pending_instructions) == 0

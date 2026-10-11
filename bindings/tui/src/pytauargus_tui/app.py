@@ -57,6 +57,7 @@ from textual.worker import WorkerState
 from .model import (
     Cell,
     CellInstruction,
+    EditHistory,
     Session,
     SuppressionOp,
     TableGrid,
@@ -90,6 +91,7 @@ _HELP_TEXT = """
   1. [bold]Mark[/bold] a cell (instant draft edit, no solve, nothing changes yet):
        u = U require suppression    p = P protect    S = safe (override)
      press the same mark again on that cell to remove it.
+     ctrl+z / ctrl+y undo / redo your marks (a new mark clears the redo list).
   2. [bold]Preview[/bold] a method (runs on a throwaway copy; the live table is
      untouched until you accept):
        s = suppress (OPT)    r = round (RND)
@@ -102,6 +104,7 @@ _HELP_TEXT = """
 
 [bold]Keys:[/bold]  j/k next/prev table · arrows move the cursor ·
   a = audit · o = save table (.tab) · ? = help · q = quit
+  ctrl+z = undo edit · ctrl+y = redo edit
 """
 
 
@@ -274,6 +277,8 @@ class TauArgusApp(App):
         Binding("o", "save", "Save .tab"),
         Binding("y", "confirm", "Confirm preview", show=False),
         Binding("n", "cancel", "Cancel preview", show=False),
+        Binding("ctrl+z", "undo", "Undo edit", show=False),
+        Binding("ctrl+y", "redo", "Redo edit", show=False),
         Binding("question_mark", "help", "Help"),
         Binding("f1", "help", "Help", show=False),
     ]
@@ -304,6 +309,8 @@ class TauArgusApp(App):
         self._pending_instr: Dict[Tuple[int, Tuple[str, ...]],
                                   CellInstruction] = {}
         self._confirmed_instr: List[CellInstruction] = []
+        # Undo/redo command history over the draft's cell edits (design §B.4).
+        self._history = EditHistory()
         self._cursor: Optional[Tuple[int, int]] = None
         # Authoritative state (design §B.4: separate facts, not one dirty
         # flag). _draft_revision advances on every draft edit; _accepted_rev
@@ -376,6 +383,16 @@ class TauArgusApp(App):
     def confirmed_instructions(self) -> Tuple[CellInstruction, ...]:
         """Cell instructions adopted by a previous accept (feed previews)."""
         return tuple(self._confirmed_instr)
+
+    @property
+    def can_undo(self) -> bool:
+        """Whether a draft edit is available to undo (design §B.5)."""
+        return self._history.can_undo()
+
+    @property
+    def can_redo(self) -> bool:
+        """Whether an undone draft edit is available to redo (design §B.5)."""
+        return self._history.can_redo()
 
     @property
     def draft_revision(self) -> int:
@@ -631,6 +648,33 @@ class TauArgusApp(App):
     def action_mark_safe(self) -> None:
         self._mark_cell("S")
 
+    def action_undo(self) -> None:
+        """Reverse the last draft edit (design §B.5). Reverting an edit still
+        advances the draft revision, so any preview is no longer eligible."""
+        if self._session is None or self._pending is not None:
+            return  # no draft, or locked while a preview is pending
+        cmd = self._history.undo()
+        if cmd is None:
+            self._set_log("nothing to undo")
+            return
+        self._apply_instr(cmd.key, cmd.before)
+        self._draft_revision += 1
+        self._set_log(f"undo: cell {cmd.key[1]} -> {cmd.before or 'cleared'}")
+        self._redraft()
+
+    def action_redo(self) -> None:
+        """Re-apply the last undone draft edit (design §B.5)."""
+        if self._session is None or self._pending is not None:
+            return
+        cmd = self._history.redo()
+        if cmd is None:
+            self._set_log("nothing to redo")
+            return
+        self._apply_instr(cmd.key, cmd.after)
+        self._draft_revision += 1
+        self._set_log(f"redo: cell {cmd.key[1]} -> {cmd.after or 'cleared'}")
+        self._redraft()
+
     def action_audit(self) -> None:
         self._run_action("AUDIT")
 
@@ -658,6 +702,7 @@ class TauArgusApp(App):
         for instr in self._pending_instr.values():
             self._confirmed_instr.append(instr)
         self._pending_instr.clear()
+        self._history.reset()  # the draft is committed; start a fresh history
         self._pending = None
         self._preview = None
         self._preview_revision = None  # the preview is consumed into accepted
@@ -742,20 +787,41 @@ class TauArgusApp(App):
             return
         key = (g.tab.index, tuple(dim))
         existing = self._pending_instr.get(key)
-        if existing is not None and existing.kind == kind:
-            del self._pending_instr[key]  # same mark again clears it
-            msg = f"cell {dim}: mark removed"
+        before = existing.kind if existing is not None else None
+        # Same mark again clears it; otherwise set/replace with ``kind``.
+        after = (None if (existing is not None and existing.kind == kind)
+                 else kind)
+        self._record_edit(key, before, after)
+        msg = (f"cell {dim}: mark removed" if after is None
+               else f"cell {dim}: marked {after}")
+        self._set_log(msg)
+        self._redraft()
+
+    def _apply_instr(self, key: Tuple[int, Tuple[str, ...]],
+                     kind: Optional[str]) -> None:
+        """Set (or clear) the draft instruction for a cell by its identity."""
+        if kind is None:
+            self._pending_instr.pop(key, None)
         else:
             self._pending_instr[key] = CellInstruction(
-                table=g.tab.index + 1, dim=tuple(dim), kind=kind)
-            msg = f"cell {dim}: marked {kind}"
-        self._draft_revision += 1  # every draft edit advances the revision
-        self._set_log(msg)
-        self._populate_grid(reset_cursor=False)  # re-render (pure, no engine)
-        # Restore the cursor to the marked cell: clear+re-add drops the
-        # highlight, and the next mark must still target this same cell.
-        self.query_one("#grid", DataTable).move_cursor(row=r, column=c)
-        self._set_cell_detail(r, data_c)
+                table=key[0] + 1, dim=key[1], kind=kind)
+
+    def _record_edit(self, key: Tuple[int, Tuple[str, ...]],
+                     before: Optional[str], after: Optional[str]) -> None:
+        """Apply a draft edit and enter it in the undoable history
+        (design §B.4). Every edit advances the draft revision."""
+        self._history.record(key, before, after)
+        self._apply_instr(key, after)
+        self._draft_revision += 1
+
+    def _redraft(self) -> None:
+        """Re-render the grid after a draft edit, restoring the cursor to its
+        previous cell (clear+re-add drops the highlight)."""
+        r, c = self._cursor
+        self._populate_grid(reset_cursor=False)
+        if r is not None and c >= 1 and c - 1 < len(self._grid.cells[r]):
+            self.query_one("#grid", DataTable).move_cursor(row=r, column=c)
+            self._set_cell_detail(r, c - 1)
 
     def _run_action(self, what: str) -> None:
         if self._session is None or self._pending is not None:

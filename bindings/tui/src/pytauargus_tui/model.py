@@ -113,6 +113,76 @@ def apriory_lines(instructions: Sequence[CellInstruction],
 
 
 # ===========================================================================
+# Draft edit history — undo/redo (design §B.4 / §B.5)
+# ===========================================================================
+@dataclass(frozen=True)
+class CellEdit:
+    """One undoable draft edit: a cell's before/after instruction kind.
+
+    ``key`` is the stable cell identity (0-based table index, ordered code
+    tuple) — the same key the draft's pending-instruction map uses. ``before``
+    and ``after`` are the cell's instruction kind (``"U"``/``"S"``/``"P"``) or
+    ``None`` when the cell is unmarked. Undo restores ``before``; redo
+    re-applies ``after``. Each is a semantic edit and advances the draft
+    revision (the caller observes that).
+    """
+
+    key: Tuple[int, Tuple[str, ...]]
+    before: Optional[str]
+    after: Optional[str]
+
+
+class EditHistory:
+    """Undo/redo over draft cell-instruction edits (design §B.4/§B.5).
+
+    Pure state: two command stacks. A fresh edit is recorded on the undo stack
+    and clears the redo branch (a new edit makes later redos stale). ``undo``
+    / ``redo`` pop a command and return it so the caller applies the
+    appropriate state. The revision and preview-eligibility effects (each undo
+    or redo is a semantic edit that advances the draft revision, invalidating
+    any preview's eligibility) are the caller's to observe.
+    """
+
+    def __init__(self) -> None:
+        self._undo: List[CellEdit] = []
+        self._redo: List[CellEdit] = []
+
+    def can_undo(self) -> bool:
+        return bool(self._undo)
+
+    def can_redo(self) -> bool:
+        return bool(self._redo)
+
+    def record(self, key: Tuple[int, Tuple[str, ...]],
+               before: Optional[str], after: Optional[str]) -> None:
+        """Record a fresh edit (it becomes the top of the undo stack)."""
+        self._undo.append(CellEdit(key=key, before=before, after=after))
+        self._redo.clear()
+
+    def undo(self) -> Optional[CellEdit]:
+        """Return the last edit (the caller applies its ``before``)."""
+        if not self._undo:
+            return None
+        cmd = self._undo.pop()
+        self._redo.append(cmd)
+        return cmd
+
+    def redo(self) -> Optional[CellEdit]:
+        """Return the last undone edit (the caller applies its ``after``)."""
+        if not self._redo:
+            return None
+        cmd = self._redo.pop()
+        self._undo.append(cmd)
+        return cmd
+
+    def reset(self) -> None:
+        """Drop all history (e.g. when a preview is accepted and the draft is
+        committed, starting a fresh draft cycle)."""
+        self._undo.clear()
+        self._redo.clear()
+
+
+# ===========================================================================
 # Staged suppression (design §B.3)
 # ===========================================================================
 @dataclass(frozen=True)

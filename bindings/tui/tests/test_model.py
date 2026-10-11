@@ -11,7 +11,9 @@ from pathlib import Path
 import pytest
 
 from pytauargus_tui.model import (
+    CellEdit,
     CellInstruction,
+    EditHistory,
     Session,
     SuppressionOp,
     apriory_lines,
@@ -215,3 +217,75 @@ def test_preview_batches_multiple_instructions(session):
     for r, c in targets:
         assert pg.cells[r][c].status != before[(r, c)], (
             f"marked cell {(r, c)} should change")
+
+
+# ===========================================================================
+# Draft edit history — undo/redo (design §B.4 / §B.5)
+# ===========================================================================
+def test_history_starts_empty():
+    h = EditHistory()
+    assert not h.can_undo()
+    assert not h.can_redo()
+    assert h.undo() is None
+    assert h.redo() is None
+
+
+def test_history_undo_redo_roundtrip():
+    h = EditHistory()
+    key = (0, ("A", "B"))
+    h.record(key, None, "U")
+    assert h.can_undo() and not h.can_redo()
+    cmd = h.undo()
+    assert cmd == CellEdit(key=key, before=None, after="U")
+    assert not h.can_undo() and h.can_redo()
+    cmd2 = h.redo()
+    assert cmd2 == cmd
+    assert h.can_undo() and not h.can_redo()
+
+
+def test_history_replacement_and_removal_edits():
+    """before/after capture kind-replacement (U->S) and toggle-off (U->None)."""
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")      # mark U on an unmarked cell
+    h.record((0, ("A",)), "U", "S")       # replace U with S
+    h.record((0, ("A",)), "S", None)      # toggle S off
+    c3 = h.undo()                          # last edit is the toggle-off
+    assert c3.before == "S" and c3.after is None
+    c2 = h.undo()                          # the replacement
+    assert c2.before == "U" and c2.after == "S"
+    c1 = h.undo()                          # the original mark
+    assert c1.before is None and c1.after == "U"
+    assert not h.can_undo()
+
+
+def test_history_new_edit_clears_redo_branch():
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")
+    h.undo()
+    assert h.can_redo()
+    h.record((1, ("B",)), None, "P")      # a new edit
+    assert not h.can_redo()               # the redo branch is stale
+    assert h.can_undo()
+
+
+def test_history_multiple_cells_lifo_order():
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")
+    h.record((1, ("B",)), "U", "S")
+    first = h.undo()
+    assert first.key == (1, ("B",))       # last-in, first-out
+    second = h.undo()
+    assert second.key == (0, ("A",))
+    # redo restores in the reverse (LIFO of the redo stack) order
+    h.redo()
+    again = h.redo()
+    assert again.key == (1, ("B",))
+
+
+def test_history_reset_drops_both_stacks():
+    h = EditHistory()
+    h.record((0, ("A",)), None, "U")
+    h.undo()
+    assert h.can_redo()
+    h.reset()
+    assert not h.can_undo() and not h.can_redo()
