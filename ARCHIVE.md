@@ -466,3 +466,13 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Verified matching README sections, retained contacts, unified names,
   no remaining source references, and unchanged content outside acknowledgements;
   `git diff --check` passed and PROGRESS.md remains under 35 lines.
+
+## Acknowledgements framing (2026-10-11)
+
+- Added the agreed opening about standing on the shoulders of earlier authors
+  and the value of sharing methods and tools in official statistics.
+- Confirmed CSP and CRP link to `highs::highs` and call its C API for solving.
+  HiGHS now receives a short separate dependency acknowledgement; the native
+  table focuses on the five inherited Tau-Argus modules.
+- Verified matching README sections, five native credits, retained contacts,
+  and unchanged content outside acknowledgements; `git diff --check` passed.

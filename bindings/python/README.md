@@ -322,8 +322,12 @@ default `uv run pytest` gate stays dependency-free).
 
 ## Acknowledgements
 
-This project builds on the work of the original Tau-Argus authors, native
-library developers, and the R and Python communities around Tau-Argus.
+This project stands on the shoulders of the people who developed Tau-Argus,
+its statistical methods and native libraries, and the R and Python tools
+around it. Their work is the foundation for everything built here.
+
+This is what open source makes possible in official statistics: sharing
+methods and tools so that others can inspect, use, and build on them.
 
 ### Original Tau-Argus and native libraries
 
@@ -341,7 +345,9 @@ contributors: **Peter-Paul de Wolf** (Modular),
 | `CRP` (controlled rounding) | Juan José Salazar González; historical contact: [jjsalaza@ull.es](mailto:jjsalaza@ull.es). |
 | `tauhitas` (modular suppression) | Statistics Netherlands and Peter-Paul de Wolf. |
 | `taurounder` (rounding interface) | Statistics Netherlands and Peter-Paul de Wolf. |
-| [HiGHS](https://highs.dev/) (current LP/MIP backend) | Julian Hall, Ivet Galabova, Qi Huangfu, Leona Gottwald, Michael Feldmeier, and the HiGHS contributors. |
+
+We also thank the [HiGHS](https://highs.dev/) developers and contributors for
+the open-source LP/MIP solver used by this engine.
 
 ### R and Python interfaces
 
