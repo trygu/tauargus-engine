@@ -8,9 +8,9 @@ import time
 from pathlib import Path
 
 import pytest
-from textual.widgets import DataTable, ListView
+from textual.widgets import DataTable, ListView, Static
 
-from pytauargus_tui.app import TauArgusApp, _BusySpinner
+from pytauargus_tui.app import TauArgusApp, _BusySpinner, _HelpScreen
 
 DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
 ARB = DATA / "TestRecode.arb"
@@ -306,3 +306,82 @@ async def test_discard_keeps_marks_and_live(app):
         # Draft kept, live run untouched.
         assert len(app.pending_instructions) == 1
         assert app.session.status_counts(0) == before
+
+
+# ===========================================================================
+# Discoverability: spec'd status line + help overlay (design §B.1)
+# ===========================================================================
+
+def logline(app) -> str:
+    """The bottom status line's widget content (what the user actually sees)."""
+    return str(app.query_one("#logtext", Static).content)
+
+
+async def test_status_line_shows_state_and_hint(app):
+    """The bottom line carries the spec state facts + keymap hint (§B.1)."""
+    async with app.run_test(size=(200, 35)) as pilot:
+        await _loaded(pilot, app)
+        line = logline(app)
+        assert "draft r1" in line
+        assert "preview —" in line
+        assert "acc —" in line
+        assert "?=help" in line
+        # the widget content is the composed string the app reports
+        assert line == app.status_text
+
+
+async def test_status_line_marks_bump_revision_and_edits(app):
+    """A draft mark advances the revision and the pending edit count."""
+    async with app.run_test(size=(200, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        assert app.draft_revision == 2
+        line = logline(app)
+        assert "draft r2" in line
+        assert "1 edit(s)" in line
+        assert line == app.status_text
+
+
+async def test_status_line_preview_fresh_and_pending_hint(app):
+    """A live preview reads fresh; the hint switches to y/n while pending."""
+    async with app.run_test(size=(200, 35)) as pilot:
+        await _loaded(pilot, app)
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        assert app.preview_freshness == "fresh"
+        line = logline(app)
+        assert "preview fresh" in line
+        assert "y=accept" in line and "n=cancel" in line
+
+
+async def test_status_line_accepted_revision_after_confirm(app):
+    """Accepting records the accepted revision and clears the preview."""
+    async with app.run_test(size=(200, 35)) as pilot:
+        await _loaded(pilot, app)
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")  # accept
+        assert app.preview is None and app.pending is None
+        assert app.accepted_revision == app.draft_revision
+        line = logline(app)
+        assert "preview —" in line
+        assert f"acc r{app.draft_revision}" in line
+
+
+async def test_help_overlay_opens_and_closes(app):
+    """? opens the help overlay; esc closes it. No engine involvement."""
+    async with app.run_test(size=(200, 40)) as pilot:
+        await _loaded(pilot, app)
+        await pilot.press("?")
+        await wait_for(pilot, lambda: isinstance(app.screen, _HelpScreen),
+                       what="help overlay")
+        body = str(app.screen.query_one("#help", Static).content)
+        assert "how it works" in body
+        assert "s = suppress" in body
+        assert "safe" in body and "unsafe" in body
+        await pilot.press("escape")
+        await wait_for(pilot, lambda: not isinstance(app.screen, _HelpScreen),
+                       what="help closed")

@@ -41,6 +41,7 @@ from typing import Dict, List, Optional, Tuple
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.screen import ModalScreen
 from textual.containers import Horizontal
 from textual.widgets import DataTable, Footer, Label, ListView, Static
 from textual.widgets._list_view import ListItem
@@ -66,7 +67,35 @@ _STATUS_COLOR = {
     "?": "default",
 }
 
-_HINT = "j/k=table u/p/S=mark s=OPT r=RND a=audit o=save y/n=preview q=quit"
+# Contextual keymap hints for the status line (design §B.1: one-line keymap
+# hint). The base hint is always shown; the pending hint replaces it while a
+# preview awaits confirm/cancel (the only time y/n are live).
+_HINT_BASE = "u/p/S=mark  s=preview  r=round  a=audit  o=save  ?=help"
+_HINT_PENDING = "y=accept  n=cancel  ?=help"
+
+# Help overlay body (press ? or F1). Plain explanation of the workflow, the
+# keys, and the cell-status colours — the TUI has no other on-screen legend.
+_HELP_TEXT = """
+[bold]Tau-Argus TUI — how it works[/bold]
+
+[bold]Workflow:[/bold] mark cells → preview a method → accept or cancel
+
+  1. [bold]Mark[/bold] a cell (instant draft edit, no solve, nothing changes yet):
+       u = U require suppression    p = P protect    S = safe (override)
+     press the same mark again on that cell to remove it.
+  2. [bold]Preview[/bold] a method (runs on a throwaway copy; the live table is
+     untouched until you accept):
+       s = suppress (OPT)    r = round (RND)
+  3. [bold]Decide:[/bold]  y = accept (adopt this preview)    n = cancel (discard)
+
+[bold]Cell status colours[/bold] (the number's colour is its status):
+  [green]S[/green] safe · [red]U[/red] unsafe · [cyan]P[/cyan] protect · [yellow]M[/yellow] secondary unsafe · E empty
+
+[bold]Draft markers[/bold] on the cursor cell (bold magenta):  * = U   + = S   # = P
+
+[bold]Keys:[/bold]  j/k next/prev table · arrows move the cursor ·
+  a = audit · o = save table (.tab) · ? = help · q = quit
+"""
 
 
 def _fmt(value: float) -> str:
@@ -125,6 +154,32 @@ class _BusySpinner(Static):
         self.update(self._FRAMES[self._frame % len(self._FRAMES)])
 
 
+class _HelpScreen(ModalScreen[None]):
+    """Overlay explaining the workflow, keys and cell-status colours.
+
+    The TUI has no persistent legend, so this is the single place that says
+    out loud what everything on screen means. Pure UI — no engine logic.
+    """
+
+    BINDINGS = [
+        Binding("question_mark", "close", "Close"),
+        Binding("f1", "close", "Close", show=False),
+        Binding("escape", "close", "Close", show=False),
+    ]
+
+    CSS = """
+    _HelpScreen { align-horizontal: center; align-vertical: middle; }
+    _HelpScreen #help { width: 80; height: auto; border: round $accent;
+                        padding: 0 1; }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Static(_HELP_TEXT, id="help")
+
+    def action_close(self) -> None:
+        self.app.pop_screen()
+
+
 class TauArgusApp(App):
     """Tau-Argus TUI: navigator + grid + detail + log over one Engine."""
 
@@ -154,6 +209,8 @@ class TauArgusApp(App):
         Binding("o", "save", "Save .tab"),
         Binding("y", "confirm", "Confirm preview", show=False),
         Binding("n", "cancel", "Cancel preview", show=False),
+        Binding("question_mark", "help", "Help"),
+        Binding("f1", "help", "Help", show=False),
     ]
 
     def __init__(self, arb_path: Path) -> None:
@@ -182,6 +239,15 @@ class TauArgusApp(App):
                                   CellInstruction] = {}
         self._confirmed_instr: List[CellInstruction] = []
         self._cursor: Optional[Tuple[int, int]] = None
+        # Authoritative state (design §B.4: separate facts, not one dirty
+        # flag). _draft_revision advances on every draft edit; _accepted_rev
+        # records the draft revision an accepted result was promoted from
+        # (0 = none yet); _preview_revision is the draft revision the live
+        # preview was built from (None = no preview) → drives "fresh"/"outdated".
+        self._draft_revision: int = 1
+        self._accepted_revision: int = 0
+        self._preview_revision: Optional[int] = None
+        self._status_line: str = ""
 
     # -- inspection surface (used by tests / embedders) ----------------------
     @property
@@ -245,6 +311,29 @@ class TauArgusApp(App):
         """Cell instructions adopted by a previous accept (feed previews)."""
         return tuple(self._confirmed_instr)
 
+    @property
+    def draft_revision(self) -> int:
+        """Current draft revision (1 = spec as loaded; +1 per draft edit)."""
+        return self._draft_revision
+
+    @property
+    def accepted_revision(self) -> int:
+        """Draft revision the accepted result was promoted from (0 = none)."""
+        return self._accepted_revision
+
+    @property
+    def preview_freshness(self) -> str:
+        """— (no preview) / fresh / outdated, vs the current draft revision."""
+        if self._preview_revision is None:
+            return "—"
+        return ("fresh" if self._preview_revision == self._draft_revision
+                else "outdated")
+
+    @property
+    def status_text(self) -> str:
+        """The composed bottom status line — what the user actually sees."""
+        return self._status_line
+
     # -- compose ---------------------------------------------------------------
     def compose(self) -> ComposeResult:
         with Horizontal(id="body"):
@@ -298,6 +387,7 @@ class TauArgusApp(App):
             elif w.description == "preview":
                 if self._pending is not None:
                     self._preview, self._delta = w.result
+                    self._preview_revision = self._draft_revision
                     self._last_action = (f"{self._pending.kind} previewed "
                                           f"on table {self._pending.tab}")
                     self._show_preview_pending()
@@ -307,6 +397,7 @@ class TauArgusApp(App):
                 # the live session is untouched.
                 self._pending = None
                 self._preview = None
+                self._preview_revision = None
                 self._set_detail(self._table_detail(
                     self._session.table(self._tab)))
             self._set_log(f"error: {w.error}")
@@ -462,6 +553,10 @@ class TauArgusApp(App):
     def action_save(self) -> None:
         self._run_action("SAVE")
 
+    def action_help(self) -> None:
+        """Show the on-screen explanation of keys, colours and workflow."""
+        self.push_screen(_HelpScreen())
+
     def action_confirm(self) -> None:
         """Adopt the pending preview as the working session (design §B.3)."""
         if self._pending is None or self._preview is None:
@@ -481,6 +576,8 @@ class TauArgusApp(App):
         self._pending_instr.clear()
         self._pending = None
         self._preview = None
+        self._preview_revision = None  # the preview is consumed into accepted
+        self._accepted_revision = self._draft_revision  # result = this revision
         self._last_action = f"{op.kind} confirmed on table {op.tab}"
         # The preview worker already cached this table's grid (it computed
         # the status counts from it), so the refresh is a pure cache read.
@@ -495,6 +592,7 @@ class TauArgusApp(App):
         op = self._pending
         self._pending = None
         self._preview = None
+        self._preview_revision = None  # the preview is discarded
         self._last_action = f"{op.kind} preview cancelled"
         self._set_detail(self._table_detail(self._session.table(self._tab)))
         self._set_log(f"table {op.tab}: preview cancelled")
@@ -562,11 +660,13 @@ class TauArgusApp(App):
         existing = self._pending_instr.get(key)
         if existing is not None and existing.kind == kind:
             del self._pending_instr[key]  # same mark again clears it
-            self._set_log(f"cell {dim}: mark removed")
+            msg = f"cell {dim}: mark removed"
         else:
             self._pending_instr[key] = CellInstruction(
                 table=g.tab.index + 1, dim=tuple(dim), kind=kind)
-            self._set_log(f"cell {dim}: marked {kind}")
+            msg = f"cell {dim}: marked {kind}"
+        self._draft_revision += 1  # every draft edit advances the revision
+        self._set_log(msg)
         self._populate_grid(reset_cursor=False)  # re-render (pure, no engine)
         # Restore the cursor to the marked cell: clear+re-add drops the
         # highlight, and the next mark must still target this same cell.
@@ -604,13 +704,26 @@ class TauArgusApp(App):
 
     def _set_log(self, text: str) -> None:
         self._log = text
-        # The draft's pending-mark count is a separate fact from the log
-        # message (design §B.4: distinct facts, not one dirty flag).
+        self._refresh_status()
+
+    def _refresh_status(self) -> None:
+        """Compose the bottom status line (design §B.1) and publish it.
+
+        Carries the distinct state facts the spec requires rather than one
+        dirty flag: draft revision, pending edit count, preview freshness,
+        accepted revision — plus the log message and a contextual keymap hint.
+        """
         edits = len(self._pending_instr)
-        suffix = (f"  ·  {edits} mark{'s' if edits != 1 else ''}"
-                  if edits else "")
-        self.query_one("#logtext", Static).update(
-            f"▸ log: {text}{suffix}   ▸ hint: {_HINT}")
+        acc = ("—" if self._accepted_revision == 0
+               else f"r{self._accepted_revision}")
+        hint = (_HINT_PENDING if self._pending is not None else _HINT_BASE)
+        state = (f"draft r{self._draft_revision} · {edits} edit(s) · "
+                 f"preview {self.preview_freshness} · acc {acc}")
+        self._status_line = f"{state}   ·   {self._log}   ·   {hint}"
+        try:
+            self.query_one("#logtext", Static).update(self._status_line)
+        except Exception:
+            pass  # widget not composed yet
 
     def push_log(self, msg: str) -> None:
         self._set_log(msg)

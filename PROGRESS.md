@@ -19,8 +19,9 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
   + method ops on a scratch run (programmatic run_batch → apply_apriori →
   suppress, §B.6); `y` promotes marks to confirmed, `n` keeps the draft. Total
   cells not markable (refinement). 36 tests.
-- [ ] Next (ui-design §B.8): draft revision + undo/redo, preview
-  freshness/eligibility, per-revision audit ownership; workspace save +
+- [x] **Discoverability (§B.1)**: spec'd status line `draft rN · N edits ·
+  preview fresh|outdated|— · acc rN · <hint>` + `?`/F1 help overlay. 41 tests.
+- [ ] Next (ui-design §B.8): undo/redo, per-revision audit; workspace save +
   replay/export; `tui-v*`.
 - Dev: `uv sync` uses local pytauargus (uv path source); sync-venv.sh after
   engine changes.
