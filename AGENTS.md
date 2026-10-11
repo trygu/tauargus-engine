@@ -83,3 +83,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   5. Watch the run: `gh run list --workflow wheels --limit 1`.
 - Wheels: macOS arm64, Linux x86_64+aarch64 (manylinux_2_28), Windows x64; Python 3.10-3.13.
 - The image is `ghcr.io/trygu/tauargus-engine:<version>` and `:latest`.
+
+## 8. Communication
+- Always respond in English, regardless of the language the user writes in
+  (the user often writes Norwegian; keep replies in English).
