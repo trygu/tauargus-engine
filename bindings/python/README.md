@@ -324,56 +324,43 @@ default `uv run pytest` gate stays dependency-free).
 
 This project stands on the shoulders of the people who developed Tau-Argus,
 its statistical methods and native libraries, and the R and Python tools
-around it. Their work is the foundation for everything built here.
+around it. Their work is the foundation for everything built here. We are
+grateful to the authors, maintainers, and contributors behind this work.
 
 This is what open source makes possible in official statistics: sharing
 methods and tools so that others can inspect, use, and build on them.
 
 ### Original Tau-Argus and native libraries
 
-Thank you to **Statistics Netherlands (CBS)** and the original Tau-Argus
-contributors: **Peter-Paul de Wolf**,
-**Anco Hundepool**, **Sarah Giessing** (GHMITER and audit),
-**Juan José Salazar González** (optimisation methods), and **Jordi Castro**
-(network solutions and CTA). Historical project contact:
-[argus@cbs.nl](mailto:argus@cbs.nl).
+The original Tau-Argus authors and contributors include **Statistics
+Netherlands (CBS)**, **Peter-Paul de Wolf**, **Anco Hundepool**,
+**Sarah Giessing** (GHMITER and audit), **Juan José Salazar González**
+(optimisation methods), and **Jordi Castro** (network solutions and CTA).
 
 | Component | Authors and contributors |
 | --- | --- |
 | `libtauargus` (core) | Statistics Netherlands and Peter-Paul de Wolf. |
 | `CSP` (cell suppression) | Matteo Fischetti, Juan José Salazar González, and M. D. Montes de Oca. |
-| `CRP` (controlled rounding) | Juan José Salazar González; historical contact: [jjsalaza@ull.es](mailto:jjsalaza@ull.es). |
+| `CRP` (controlled rounding) | Juan José Salazar González. |
 | `tauhitas` (modular suppression) | Statistics Netherlands and Peter-Paul de Wolf. |
 | `taurounder` (rounding interface) | Statistics Netherlands and Peter-Paul de Wolf. |
 
-We also thank the [HiGHS](https://highs.dev/) developers and contributors for
-the open-source LP/MIP solver used by this engine.
+The engine uses [HiGHS](https://highs.dev/) as its open-source LP/MIP solver.
 
 ### R and Python interfaces
 
-Thank you to [rtauargus](https://github.com/InseeFrLab/rtauargus), developed
-at **INSEE / InseeFrLab**, and its authors **Pierre-Yves Berrard**,
-**Julien Jamme**, **Nathanaël Rastout**, **Jeanne Pointet**, **Félix Beroud**,
-**André-Raymond Socard**, **Wistan Pomel**, and **Clara Baudry**, together
-with its contributors. Its metadata, batch and hierarchy generation logic
-was ported to `pytauargus`; its `micro_rtauargus()` workflow also informed
-the high-level `protect()` pipeline.
+[rtauargus](https://github.com/InseeFrLab/rtauargus) is developed at
+**INSEE / InseeFrLab** by **Pierre-Yves Berrard**, **Julien Jamme**,
+**Nathanaël Rastout**, **Jeanne Pointet**, **Félix Beroud**,
+**André-Raymond Socard**, **Wistan Pomel**, **Clara Baudry**, and contributors.
+Its metadata, batch and hierarchy generation logic was ported to
+`pytauargus`; its `micro_rtauargus()` workflow also informed the high-level
+`protect()` pipeline.
 
-Public contacts:
-
-- **Julien Jamme**, author and package maintainer: [julien.jamme@insee.fr](mailto:julien.jamme@insee.fr).
-- **Pierre-Yves Berrard**: [pierre-yves.berrard@insee.fr](mailto:pierre-yves.berrard@insee.fr).
-- **Nathanaël Rastout**: [nathanael.rastout@insee.fr](mailto:nathanael.rastout@insee.fr).
-- **Clara Baudry**: [clara.baudry@insee.fr](mailto:clara.baudry@insee.fr).
-
-Thank you to [PiArgus (`piargus`)](https://github.com/lverweijen/piargus),
+[PiArgus (`piargus`)](https://github.com/lverweijen/piargus),
 by **[Laurent Verweijen (`lverweijen`)](https://github.com/lverweijen)**
-and contributors. Its DataFrame-to-table workflow and result API inspired
-`TableResult` and its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
-Public contact: [lauwerund@gmail.com](mailto:lauwerund@gmail.com).
-
-Their work made these interfaces possible and provides valuable examples of
-integrating Tau-Argus into reproducible data-processing workflows.
+and contributors, inspired the DataFrame-to-table workflow and `TableResult`
+with its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
 
 ## License
 

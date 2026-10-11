@@ -482,3 +482,25 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Removed the manual-derived `(Modular)` qualifier after Peter-Paul de Wolf
   in both READMEs. The user clarified his broader role as the main Tau-Argus
   author; the acknowledgement should not narrow his contribution to one method.
+
+## Acknowledgements final presentation (2026-10-11)
+
+- Kept one expression of gratitude in the opening; removed repeated thanks
+  and the closing summary. Preserved the open-source framing, author names,
+  project links and descriptions of the wrapper contributions.
+- Removed email addresses from both README sections for a consistent credits
+  presentation. The public contacts found during research are retained below
+  as working notes; the first two come from historical manual/header records.
+
+| Project / person | Published contact |
+| --- | --- |
+| Tau-Argus (historical project address) | argus@cbs.nl |
+| CRP / Juan José Salazar González (historical header address) | jjsalaza@ull.es |
+| rtauargus / Julien Jamme (package maintainer) | julien.jamme@insee.fr |
+| rtauargus / Pierre-Yves Berrard | pierre-yves.berrard@insee.fr |
+| rtauargus / Nathanaël Rastout | nathanael.rastout@insee.fr |
+| rtauargus / Clara Baudry | clara.baudry@insee.fr |
+| PiArgus / Laurent Verweijen | lauwerund@gmail.com |
+- Verified identical sections, one expression of gratitude, all named
+  contributors and project links retained, seven contacts archived, unchanged
+  surrounding README content, and clean `git diff --check`.
