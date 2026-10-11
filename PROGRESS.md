@@ -18,7 +18,7 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI.
 - [x] Legacy `ErrorStrings.txt` restored + embedded at build time (hitas
   `d3e5b91`); `error_string()` returns real messages.
 - [x] Acknowledgements: Tau-Argus/native/HiGHS + wrapper authors/contacts;
-  shared open-source foundations highlighted (`docs/acknowledgements`).
+  Peter-Paul credited without role qualifier (`docs/acknowledgements`).
 
 ## Next (priority order)
 1. **GHCR rename → `tauargus-engine`** — 0.2.1 verified. Delete old

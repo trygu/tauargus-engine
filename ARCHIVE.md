@@ -476,3 +476,9 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   table focuses on the five inherited Tau-Argus modules.
 - Verified matching README sections, five native credits, retained contacts,
   and unchanged content outside acknowledgements; `git diff --check` passed.
+
+## Peter-Paul acknowledgement wording (2026-10-11)
+
+- Removed the manual-derived `(Modular)` qualifier after Peter-Paul de Wolf
+  in both READMEs. The user clarified his broader role as the main Tau-Argus
+  author; the acknowledgement should not narrow his contribution to one method.

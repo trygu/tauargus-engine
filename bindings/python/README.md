@@ -332,7 +332,7 @@ methods and tools so that others can inspect, use, and build on them.
 ### Original Tau-Argus and native libraries
 
 Thank you to **Statistics Netherlands (CBS)** and the original Tau-Argus
-contributors: **Peter-Paul de Wolf** (Modular),
+contributors: **Peter-Paul de Wolf**,
 **Anco Hundepool**, **Sarah Giessing** (GHMITER and audit),
 **Juan José Salazar González** (optimisation methods), and **Jordi Castro**
 (network solutions and CTA). Historical project contact:
