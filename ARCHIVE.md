@@ -452,3 +452,26 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   wheel keeps a second csp copy in the hidden `.dylibs/` dir that hitas loads
   via `@loader_path/.dylibs/…`) → both tables: OPT#1 ok, OPT#2 raises
   `BatchError: FullJJ failed (code 5008)`, no crash.
+
+## Error strings + core sync (2026-10-11, hitas d3e5b91)
+
+- `GetErrorString` (HiTaSCtrl) looked up a global `StringTable` that was only
+  ever populated by `LoadErrorStrings` from `ErrorStrings.txt` in the CWD —
+  a call that was commented out in the port, so every error surfaced with an
+  empty message (e.g. "FullJJ failed (code 5008): ").
+- The txt file was never checked into any repo (shipped next to the legacy
+  jar/exe). Found verbatim upstream:
+  `raw.githubusercontent.com/sdcTools/tauargus/refs/heads/master/ErrorStrings.txt`
+  (35 lines, `NAME = code = text`, codes match `resource.h` exactly).
+- Fix: file restored to `engine/native/hitas/ErrorStrings.txt`; CMakeLists
+  generates `ErrorStrings_generated.inc` at configure time (note: CMake's
+  regex engine does not support `[[:space:]]` — use ` *`); `HiTaSCtrl.cpp`
+  initializes the table from the embedded array; `LoadErrorStrings` kept as
+  optional runtime override.
+- Core submodule: worktree had drifted to `e7ecb98` (ancestor of the pin
+  `ab37b03`), which broke `uv build --wheel` (bind_core.cpp needs
+  `GetTableCellBufferSizes` from `5f913c9`/`ab37b03`). Restored the pin —
+  plain fast-forward, nothing lost; wheel build now passes.
+- Verification with the freshly built cp313 wheel in the TUI venv:
+  `error_string(5008)` → "Couldn't load JJ-routines"; OPT×2 repro →
+  `BatchError: FullJJ failed (code 5008): Couldn't load JJ-routines`, no crash.

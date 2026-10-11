@@ -8,6 +8,10 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
   `protect()`, cp310–cp313).
 - [x] 2nd-OPT SIGABRT fixed (csp `3007826`): counters reset at loadprob entry
   + freeprob exit; `m` cells still → 5008 (legacy behavior, no longer a crash).
+- [x] Legacy `ErrorStrings.txt` restored + embedded at build time (hitas
+  `d3e5b91`); `error_string()` now returns real messages (5008 verified).
+- [x] Core submodule worktree realigned to pin `ab37b03` (was stale at
+  ancestor `e7ecb98`, which broke the wheel build: `GetTableCellBufferSizes`).
 
 ## In flight — TUI (branch `tui`, `bindings/tui/`, pkg `pytauargus-tui`)
 - [x] `model.py` + `app.py` (navigator, grid, detail, log; j/k s r a o).
