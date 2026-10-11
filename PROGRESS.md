@@ -14,10 +14,9 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI + TUI.
   s/r preview, cell instructions u/p/S, undo/redo, audit ownership, workspace save, GIL-freeze
   fix, preview-in-grid. 67 tests. `tui` branch merged + deleted.
 - [x] README acknowledgements + release-following install guidance (PR #6).
+- [x] **Release 0.3.1** (tag `py-v0.3.1`): in-tree engine fixes (csp/hitas) + TUI → PyPI/GHCR.
 
 ## In flight
-- [ ] **Release 0.3.1** (tag `py-v0.3.1`): ships the in-tree engine fixes (csp/hitas) + TUI
-  onto PyPI/GHCR. Bump version → tests → tag.
 - [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
 
 ## Feature branches
