@@ -504,3 +504,19 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Verified identical sections, one expression of gratitude, all named
   contributors and project links retained, seven contacts archived, unchanged
   surrounding README content, and clean `git diff --check`.
+
+## Release-independent installation guidance (2026-10-11)
+
+- Verified that wheels.yml already publishes both the release version and
+  `latest` for the Docker image; no workflow changes are needed.
+- Both READMEs now explicitly use `:latest` with `--pull=always`, preventing
+  a cached image from silently keeping the default example on an older release.
+- Replaced the fixed Docker release example with a generic version placeholder
+  and a Releases link. Added Python version-pinning guidance linked to PyPI;
+  pip examples use `--upgrade` for installations that already have the package.
+- Retained `>=0.3.0` as the DataFrame feature's historical minimum, rather than
+  a moving current-release number. Fixed the stale root README statement that
+  `protect()` was unreleased and aligned it with the binding README.
+- Verified consistent Docker command arguments and version-pinning guidance,
+  existing version/latest publication tags, unchanged acknowledgements, and
+  clean `git diff --check`; PROGRESS.md remains under 35 lines.

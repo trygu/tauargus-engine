@@ -39,10 +39,13 @@ This is the original Tau-Argus solver code, not a reimplementation:
 From [PyPI](https://pypi.org/project/pytauargus/):
 
 ```bash
-pip install pytauargus          # into the current environment
-uv tool install pytauargus      # or: pipx install pytauargus (isolated, puts `tauargus` on PATH)
+pip install --upgrade pytauargus          # into the current environment
+uv tool install --upgrade pytauargus      # or: pipx install pytauargus (isolated, puts `tauargus` on PATH)
 tauargus --version
 ```
+
+These commands install the current release. To keep a specific version, use
+`pytauargus==<version>` from [PyPI](https://pypi.org/project/pytauargus/#history).
 
 Use it from Python as well:
 
@@ -85,10 +88,15 @@ A ready-made image is published to GitHub Container Registry with each release
 (linux/amd64 and linux/arm64):
 
 ```bash
-docker run --rm -v "$PWD":/work ghcr.io/trygu/tauargus-engine run batch.arb
+docker run --pull=always --rm -v "$PWD":/work ghcr.io/trygu/tauargus-engine:latest run batch.arb
 ```
 
-Pin a version with `ghcr.io/trygu/tauargus-engine:0.3.0`. To build your own image:
+`latest` is updated with each release; `--pull=always` checks for an updated image
+before running. To keep a specific release, choose a version from
+[Releases](https://github.com/trygu/tauargus-engine/releases) and use
+`ghcr.io/trygu/tauargus-engine:<version>` (without the release tag's `py-v` prefix).
+
+To build your own image:
 
 ```dockerfile
 FROM python:3.12-slim
@@ -101,9 +109,10 @@ ENTRYPOINT ["tauargus"]
 
 ### From a DataFrame
 
-The new `protect()` API is on the development branch and awaits the next
-release. [Build from source](#building-from-source), then install pandas support
-with `uv sync --extra dataframe` from `bindings/python/`.
+`protect()` is available from version 0.3.0. Install with
+`pip install --upgrade "pytauargus[dataframe]>=0.3.0"` to include pandas support.
+For a source checkout, follow the [source-build instructions](#building-from-source),
+then run `uv sync --extra dataframe` from `bindings/python/`.
 
 ```python
 import pandas as pd
