@@ -462,9 +462,16 @@ class Session:
         return type(self)(eng, self._arb_path)
 
     # -- pass-through actions (mutate -> invalidate) -------------------------
+    def _invalidate_audit(self) -> None:
+        """Drop cached audit rows after a mutation (design §B.5: audit is
+        owned by the result it was computed on, so a changed result has no
+        stale audit). Called by in-place mutations, not by ``audit`` itself."""
+        self._audit_rows.clear()
+
     def suppress(self, cmd) -> None:
         self._eng.suppress(cmd)
         self.invalidate()
+        self._invalidate_audit()
 
     def audit(self, i: int) -> List[dict]:
         rows = self._eng.audit(i)
@@ -479,6 +486,7 @@ class Session:
     def apply_apriori(self, cmd) -> Dict[str, int]:
         res = self._eng.apply_apriori(cmd)
         self.invalidate()
+        self._invalidate_audit()
         return res
 
     def write_intermediate_table(self, i: int, path: str, **kw) -> None:
