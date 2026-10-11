@@ -60,6 +60,11 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Verification: `cd bindings/python && uv run pytest` | `uv build --wheel`
 - Surgical edits: Use targeted search/replace or patches. Avoid full-file rewrites.
 - Commit cadence: Submodule commit first -> parent submodule bump + `PROGRESS.md` update.
+- Conventional Commits for all new history (adopted at the 0.3.2 release;
+  older history predates it): lowercase type `feat|fix|docs|refactor|perf|test|build|ci|chore`
+  + optional scope, imperative subject — `fix: status line off-screen`,
+  `docs: tui guide`, `build(csp): 3007826 ...`. Release commits:
+  `chore(release): X.Y.Z`. Auto-generated merge commits are exempt.
 - Never stage build artifacts (`.venv/`, `build/`, `dist/`, `*.so`, `*.dylib`, `engine/build/`, `engine/native/build/`).
 - No Windows registry APIs: Use environment variables, config files, or `tempfile`.
 - Commits are authored as the user only: no `Co-authored-by` trailer.
@@ -73,7 +78,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   1. Bump `version` in `bindings/python/pyproject.toml` (semver: patch = fixes,
      minor = features, major = breaking).
   2. `cd bindings/python && uv lock && uv run pytest` must pass.
-  3. Commit (`Release X.Y.Z`) and push the branch.
+  3. Commit (`chore(release): X.Y.Z`) and push the branch.
   4. `git tag py-vX.Y.Z && git push origin py-vX.Y.Z`.
   5. Watch the run: `gh run list --workflow wheels --limit 1`.
 - Wheels: macOS arm64, Linux x86_64+aarch64 (manylinux_2_28), Windows x64; Python 3.10-3.13.
