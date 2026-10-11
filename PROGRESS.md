@@ -6,7 +6,7 @@ Branches: `master` (mainline, 0.3.0) + `tui` (TUI). Goal: HiGHS solvers, headles
 - [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
 - [x] Headless CLI; wheel + CI → PyPI + GHCR; Release 0.3.0 (DataFrame `protect()`, cp310–cp313).
 - [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`) + legacy `ErrorStrings.txt`
-  embedded (hitas `d3e5b91`); re-OPT → 5008 (legacy behavior).
+  embedded (hitas `d3e5b91`) + FullJJ streams closed on solver errors (`caf7528`); re-OPT → 5008.
 - [x] Dev loop: `scripts/sync-venv.sh` (drift gate → engine → wheel → install); venvs run
   local wheels, not PyPI. `references/` + Java frontend cleaned up.
 
