@@ -442,15 +442,15 @@ async def test_contextual_hint_by_cell_status(app):
         unsafe = find_cell("U")
         assert unsafe is not None, "expected an unsafe (red) cell in table 0"
         g.move_cursor(row=unsafe[0], column=unsafe[1])
-        await wait_for(pilot, lambda: "u=hide this cell" in app.status_text,
+        await wait_for(pilot, lambda: "red=sensitive value" in app.status_text,
                        what="U hint")
 
-        # Safe (green) cell -> back to the base hint.
+        # Safe (green) cell -> the u=flag-as-unsafe hint.
         safe = find_cell("S")
         assert safe is not None, "expected a safe (green) cell in table 0"
         g.move_cursor(row=safe[0], column=safe[1])
-        await wait_for(pilot, lambda: "u/p/S=mark" in app.status_text,
-                       what="base hint")
+        await wait_for(pilot, lambda: "u=flag as unsafe" in app.status_text,
+                       what="S hint")
 
         # Secondary (yellow) cell -> the hint points at p. Accept an OPT first
         # so the session has suppressed (yellow) cells.
@@ -470,7 +470,7 @@ async def test_contextual_hint_by_cell_status(app):
         secondary = find_secondary()
         assert secondary is not None, "expected a yellow cell after OPT"
         g.move_cursor(row=secondary[0], column=secondary[1])
-        await wait_for(pilot, lambda: "p=protect this cell" in app.status_text,
+        await wait_for(pilot, lambda: "p=keep this cell" in app.status_text,
                        what="M hint")
 
 
