@@ -79,14 +79,18 @@ _STATUS_COLOR = {
 # Contextual keymap hints for the status line (design §B.1: one-line keymap
 # hint). The base hint is the default; the pending hint replaces it while a
 # preview awaits confirm/cancel (the only time y/n are live). When the cursor
-# sits on a cell that begs for an action, a per-status hint replaces the vague
-# "u/p/S=mark" so the operator sees exactly what to press *there*:
-#   - unsafe (red)   -> u hides this cell (require suppression)
-#   - secondary (yellow) -> p protects this cell (keep it out of suppression)
+# sits on a cell, a per-status hint replaces the vague "u/p/S=mark" with the
+# mark that is actually useful *on that kind of cell* (legacy §5.6: the
+# apriori status letters are u=unsafe, p=protected, s=safe):
+#   - unsafe (red)   -> it is a sensitive value; s (OPT) protects it by
+#                       hiding the other cells that would reconstruct it
+#   - secondary (yellow) -> this cell is hidden; p keeps it (do not suppress)
+#   - safe (green)   -> u flags it as a risk the standard rules missed
 _HINT_BASE = "u/p/S=mark s=OPT table r=round a=audit o=export w=save ?=help"
 _HINT_PENDING = "y=accept  n=cancel  ?=help"
-_HINT_UNSAFE = "u=hide this cell s=OPT table r=round a=audit o=export w=save ?=help"
-_HINT_SECONDARY = "p=protect this cell s=OPT table r=round a=audit o=export w=save ?=help"
+_HINT_UNSAFE = "red=sensitive value s=OPT table r=round a=audit o=export w=save ?=help"
+_HINT_SECONDARY = "p=keep this cell s=OPT table r=round a=audit o=export w=save ?=help"
+_HINT_SAFE = "u=flag as unsafe s=OPT table r=round a=audit o=export w=save ?=help"
 
 # Help overlay body (press ? or F1). Plain explanation of the workflow, the
 # keys, and the cell-status colours — the TUI has no other on-screen legend.
@@ -96,7 +100,9 @@ _HELP_TEXT = """
 [bold]Workflow:[/bold] mark cells → preview a method → accept or cancel
 
   1. [bold]Mark[/bold] a cell (instant draft edit, no solve, nothing changes yet):
-       u = U require suppression    p = P protect    S = safe (override)
+       u = U mark as unsafe (sensitive value)
+       p = P protect (keep this cell; do not suppress it)
+       S = safe (override a false positive)
      press the same mark again on that cell to remove it.
      ctrl+z / ctrl+y undo / redo your marks (a new mark clears the redo list).
   2. [bold]Preview[/bold] a method (runs on a throwaway copy; the live table is
@@ -105,8 +111,8 @@ _HELP_TEXT = """
      [bold]s runs OPT on the whole table[/bold], not the cell under the cursor:
      the solver chooses the minimum set of cells to hide so that no unsafe
      (red) cell can be reconstructed from the others. Hidden cells turn
-     [yellow]yellow[/yellow]. Use u/p/S marks to tell the solver which cells
-     must / must not be hidden before you run it.
+     [yellow]yellow[/yellow]. Mark cells [red]u[/red] (unsafe) and [cyan]p[/cyan]
+     (protect) before you run it so the solver knows which values to guard.
   3. [bold]Decide:[/bold]  y = accept (adopt this preview)    n = cancel (discard)
 
 [bold]Cell status colours[/bold] (the number's colour is its status):
@@ -953,14 +959,18 @@ class TauArgusApp(App):
         if self._pending is not None:
             hint = _HINT_PENDING
         else:
-            # Contextual hint: on an unsafe (red) cell, point at u (hide it);
-            # on a secondary (yellow) cell, point at p (protect it).
+            # Contextual hint: show the mark that is useful on this kind of
+            # cell (legacy §5.6). A red cell is a sensitive value that s
+            # protects; a hidden (yellow) cell can be kept with p; a green
+            # cell can be flagged as a risk with u.
             cell = self._current_cell()
             sym = cell.symbol if cell is not None else None
             if sym == "U":
                 hint = _HINT_UNSAFE
             elif sym == "M":
                 hint = _HINT_SECONDARY
+            elif sym == "S":
+                hint = _HINT_SAFE
             else:
                 hint = _HINT_BASE
         state = (f"draft r{self._draft_revision} · {edits} edit(s) · "
