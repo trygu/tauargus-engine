@@ -175,6 +175,47 @@ async def test_cancel_keeps_live(app):
         assert app.last_action == "OPT preview cancelled"
 
 
+async def test_preview_result_shown_in_grid(app):
+    """While a preview is pending the grid shows the *preview's* result so the
+    operator can inspect its secondary suppressions; cancel restores the
+    accepted grid (design §B.5: "the operator inspects its secondary
+    suppressions"). Suppressed cells carry status M (secondary) = yellow."""
+    from rich.text import Text
+
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+
+        def secondary_count(sess, tab=0):
+            g = sess.grid(tab)
+            return sum(1 for row in g.cells for c in row if c.status in (11, 12))
+
+        def yellow_cells(g):
+            n = 0
+            for r in range(g.row_count):
+                for c in range(1, len(g.columns)):
+                    t = g.get_cell(f"r{r}", f"c{c - 1}")
+                    if isinstance(t, Text) and t.style == "yellow":
+                        n += 1
+            return n
+
+        g = grid(app)
+        accepted_sec = secondary_count(app.session)
+        before_yellow = yellow_cells(g)
+        assert before_yellow == accepted_sec  # grid reflects the accepted run
+
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        preview_sec = secondary_count(app.preview)
+        assert preview_sec != accepted_sec  # OPT actually suppressed cells
+        # The grid now renders the preview's secondary suppressions.
+        assert yellow_cells(g) == preview_sec
+
+        await pilot.press("n")
+        assert app.preview is None and app.pending is None
+        # Cancelling restores the accepted grid.
+        assert yellow_cells(g) == accepted_sec == before_yellow
+
+
 async def test_second_opt_preview_surfaces_5008(app):
     """A second OPT on an already-optimised table fails with legacy code
     5008; the TUI surfaces it as an error (no crash) and drops the pending
@@ -333,6 +374,9 @@ async def test_status_line_shows_state_and_hint(app):
         assert "draft r1" in line
         assert "preview —" in line
         assert "acc —" in line
+        # The hint makes clear that s runs OPT on the whole table, not the
+        # cell under the cursor (the exact confusion this wording fixes).
+        assert "s=OPT table" in line
         assert "?=help" in line
         # the widget content is the composed string the app reports
         assert line == app.status_text
@@ -379,6 +423,58 @@ async def test_status_line_accepted_revision_after_confirm(app):
         assert f"acc r{app.draft_revision}" in line
 
 
+async def test_contextual_hint_by_cell_status(app):
+    """The status-line hint adapts to the cell under the cursor (design §B.1):
+    on an unsafe (red) cell it points at u (hide it); on a secondary (yellow)
+    cell it points at p (protect it); elsewhere it shows the base hint."""
+    async with app.run_test(size=(200, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        sess_grid = app.session.grid(0)
+
+        def find_cell(symbol):
+            for r in range(g.row_count):
+                for c in range(1, len(g.columns)):
+                    if sess_grid.cells[r][c - 1].symbol == symbol:
+                        return (r, c)
+            return None
+
+        # Unsafe (red) cell -> the hint points at u.
+        unsafe = find_cell("U")
+        assert unsafe is not None, "expected an unsafe (red) cell in table 0"
+        g.move_cursor(row=unsafe[0], column=unsafe[1])
+        await wait_for(pilot, lambda: "u=hide this cell" in app.status_text,
+                       what="U hint")
+
+        # Safe (green) cell -> back to the base hint.
+        safe = find_cell("S")
+        assert safe is not None, "expected a safe (green) cell in table 0"
+        g.move_cursor(row=safe[0], column=safe[1])
+        await wait_for(pilot, lambda: "u/p/S=mark" in app.status_text,
+                       what="base hint")
+
+        # Secondary (yellow) cell -> the hint points at p. Accept an OPT first
+        # so the session has suppressed (yellow) cells.
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")  # accept -> yellow (M) cells now in the session
+        await wait_for(pilot, lambda: app.preview is None, what="accepted")
+        sess_grid = app.session.grid(0)
+
+        def find_secondary():
+            for r in range(g.row_count):
+                for c in range(1, len(g.columns)):
+                    if sess_grid.cells[r][c - 1].symbol == "M":
+                        return (r, c)
+            return None
+
+        secondary = find_secondary()
+        assert secondary is not None, "expected a yellow cell after OPT"
+        g.move_cursor(row=secondary[0], column=secondary[1])
+        await wait_for(pilot, lambda: "p=protect this cell" in app.status_text,
+                       what="M hint")
+
+
 async def test_help_overlay_opens_and_closes(app):
     """? opens the help overlay; esc closes it. No engine involvement."""
     async with app.run_test(size=(200, 40)) as pilot:
@@ -389,6 +485,8 @@ async def test_help_overlay_opens_and_closes(app):
         body = str(app.screen.query_one("#help", Static).content)
         assert "how it works" in body
         assert "s = suppress" in body
+        # The help explains that s runs OPT on the whole table, not one cell.
+        assert "whole table" in body
         assert "safe" in body and "unsafe" in body
         await pilot.press("escape")
         await wait_for(pilot, lambda: not isinstance(app.screen, _HelpScreen),

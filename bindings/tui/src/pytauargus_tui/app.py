@@ -77,10 +77,16 @@ _STATUS_COLOR = {
 }
 
 # Contextual keymap hints for the status line (design §B.1: one-line keymap
-# hint). The base hint is always shown; the pending hint replaces it while a
-# preview awaits confirm/cancel (the only time y/n are live).
-_HINT_BASE = "u/p/S=mark s=preview r=round a=audit o=export w=save ?=help"
+# hint). The base hint is the default; the pending hint replaces it while a
+# preview awaits confirm/cancel (the only time y/n are live). When the cursor
+# sits on a cell that begs for an action, a per-status hint replaces the vague
+# "u/p/S=mark" so the operator sees exactly what to press *there*:
+#   - unsafe (red)   -> u hides this cell (require suppression)
+#   - secondary (yellow) -> p protects this cell (keep it out of suppression)
+_HINT_BASE = "u/p/S=mark s=OPT table r=round a=audit o=export w=save ?=help"
 _HINT_PENDING = "y=accept  n=cancel  ?=help"
+_HINT_UNSAFE = "u=hide this cell s=OPT table r=round a=audit o=export w=save ?=help"
+_HINT_SECONDARY = "p=protect this cell s=OPT table r=round a=audit o=export w=save ?=help"
 
 # Help overlay body (press ? or F1). Plain explanation of the workflow, the
 # keys, and the cell-status colours — the TUI has no other on-screen legend.
@@ -96,6 +102,11 @@ _HELP_TEXT = """
   2. [bold]Preview[/bold] a method (runs on a throwaway copy; the live table is
      untouched until you accept):
        s = suppress (OPT)    r = round (RND)
+     [bold]s runs OPT on the whole table[/bold], not the cell under the cursor:
+     the solver chooses the minimum set of cells to hide so that no unsafe
+     (red) cell can be reconstructed from the others. Hidden cells turn
+     [yellow]yellow[/yellow]. Use u/p/S marks to tell the solver which cells
+     must / must not be hidden before you run it.
   3. [bold]Decide:[/bold]  y = accept (adopt this preview)    n = cancel (discard)
 
 [bold]Cell status colours[/bold] (the number's colour is its status):
@@ -276,7 +287,7 @@ class TauArgusApp(App):
                 show=False),
         Binding("p", "mark_protect", "Mark P (protect)", show=False),
         Binding("shift+s", "mark_safe", "Mark S (override safe)", show=False),
-        Binding("s", "suppress", "Suppress (OPT)"),
+        Binding("s", "suppress", "Run OPT on this table"),
         Binding("r", "round", "Round (RND)"),
         Binding("a", "audit", "Audit"),
         Binding("o", "save", "Export table (.tab)"),
@@ -587,6 +598,34 @@ class TauArgusApp(App):
         if reset_cursor:
             grid.move_cursor(row=0, column=1)
 
+    def _repopulate_preserving_cursor(self) -> None:
+        """Re-render the grid without moving the cursor off the cell the
+        operator is inspecting. Used when swapping the grid between the
+        accepted session and a pending preview (design §B.5: the operator
+        inspects the preview's secondary suppressions in place)."""
+        saved = self._cursor
+        self._populate_grid(reset_cursor=False)
+        if saved is not None:
+            self.query_one("#grid", DataTable).move_cursor(
+                row=saved[0], column=saved[1])
+
+    def _current_cell(self) -> Optional[Cell]:
+        """The cell under the cursor, for the contextual status-line hint.
+
+        Returns None when there is no grid, no cursor yet, or the cursor is on
+        the row-label column / out of range (the hint then falls back to base).
+        """
+        if self._grid is None or self._cursor is None:
+            return None
+        r, c = self._cursor
+        if r < 0 or r >= len(self._grid.cells):
+            return None
+        row = self._grid.cells[r]
+        ci = c - 1  # column 0 of the DataTable is the row label
+        if ci < 0 or ci >= len(row):
+            return None
+        return row[ci]
+
     def on_data_table_cell_selected(self, event) -> None:
         self._on_cell_coordinate(event.coordinate)
 
@@ -603,8 +642,10 @@ class TauArgusApp(App):
         self._cursor = (r, c)
         row = self._grid.cells[r]
         if c < 1 or c - 1 >= len(row):
+            self._refresh_status()  # hint may fall back to base (label column)
             return
         self._set_cell_detail(r, c - 1)
+        self._refresh_status()  # the contextual hint depends on this cell
 
     # -- detail pane -----------------------------------------------------------------------
     def _table_detail(self, meta: TableMeta) -> str:
@@ -761,6 +802,11 @@ class TauArgusApp(App):
         self._preview = None
         self._preview_revision = None  # the preview is discarded
         self._last_action = f"{op.kind} preview cancelled"
+        # The preview's grid was shown for inspection only; restore the live
+        # (accepted) grid. It is a cache read — the table's grid was built on
+        # selection and the session is untouched while a preview is pending.
+        self._grid = self._session.grid(self._tab)
+        self._repopulate_preserving_cursor()
         self._set_detail(self._table_detail(self._session.table(self._tab)))
         self._set_log(f"table {op.tab}: preview cancelled")
 
@@ -904,7 +950,19 @@ class TauArgusApp(App):
         edits = len(self._pending_instr)
         acc = ("—" if self._accepted_revision == 0
                else f"r{self._accepted_revision}")
-        hint = (_HINT_PENDING if self._pending is not None else _HINT_BASE)
+        if self._pending is not None:
+            hint = _HINT_PENDING
+        else:
+            # Contextual hint: on an unsafe (red) cell, point at u (hide it);
+            # on a secondary (yellow) cell, point at p (protect it).
+            cell = self._current_cell()
+            sym = cell.symbol if cell is not None else None
+            if sym == "U":
+                hint = _HINT_UNSAFE
+            elif sym == "M":
+                hint = _HINT_SECONDARY
+            else:
+                hint = _HINT_BASE
         state = (f"draft r{self._draft_revision} · {edits} edit(s) · "
                  f"preview {self.preview_freshness} · acc {acc}")
         self._status_line = f"{state}   ·   {self._log}   ·   {hint}"
@@ -931,6 +989,14 @@ class TauArgusApp(App):
     def _show_preview_pending(self) -> None:
         op = self._pending
         assert op is not None
+        # Show the preview's result in the grid so the operator can inspect the
+        # secondary suppressions before deciding (design §B.5: "the operator
+        # inspects its secondary suppressions"). The preview worker already
+        # built this table's grid (it computed the status delta from it), so
+        # this is a pure cache read, not an engine call.
+        if self._preview is not None:
+            self._grid = self._preview.grid(op.tab - 1)
+            self._repopulate_preserving_cursor()
         self._detail = (f"preview {op.kind} on table {op.tab}:\n"
                         f"{self._delta}\n"
                         f"y=confirm (adopt this run)   n=cancel")

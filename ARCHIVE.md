@@ -32,6 +32,9 @@
   returns (HiTaS `0305330`, isolated native branch). After rebuilding, the
   leak regression, GIL test and 65 TUI tests all pass (67 total). The release
   pair matrix also runs these native tests. Default HiTaS branch is unchanged.
+- Synced current TUI `7b97cab` (preview grid, OPT wording, cursor hints);
+  app/model source remains exactly upstream. Installed the rebuilt TUI wheel
+  with the fixed engine: all 69 current engine/TUI tests pass locally.
 
 ## Separate TUI distribution (2026-10-11)
 
