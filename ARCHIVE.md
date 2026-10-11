@@ -422,3 +422,33 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   Native `cell_buffer_sizes` CTest passed; notebook sources match the generator.
 - The first fresh-environment sync was stopped after stalled downloads; the
   existing environment was synced with test extras and rebuilt as 0.3.0.
+
+## 2nd-OPT SIGABRT fix (2026-10-11, csp submodule 3007826)
+
+- Symptom: `run_batch` + `suppress(OPT)` twice on the same table → SIGABRT in
+  `remove_row` ← `PPCSPfreeprob` ← `FullJJ` catch (HiTaSCtrl.cpp:521). Reproduced
+  deterministically with the plain PyPI 0.3.0 wheel (both TestRecode tables) and
+  with a C++ ASan driver (`/tmp/fj_seq.cpp`: FullJJ normal-JJ then
+  secondary-JJ in one process; `rows[k]` = 0xbebebe… stale pool read).
+- Chain: `PPCSPfreeprob` never reset global counters, so after a successful run
+  `nrows` etc. stayed stale. A 2nd OPT writes a JJ file with `m` (secondary)
+  cells; `change_status` (Cspmain.c) has no `'m'` case → loadprob fails with
+  HITAS_JJNOTLOADED (5008) *after* the `rows` realloc but *before* `nrows=0`
+  → the catch's `CSPfreeprob` walks a garbage row pool → abort.
+- Legacy check: the pre-port csp history and the original `HiTaSCtrl.cpp`
+  (initial commit) contain the identical missing-`'m'` + unreset counters +
+  same catch path, and legacy Java `RunOptimal` has no pre-check for existing
+  secondary suppression (it calls native `WriteJJFormat` + `FullJJ` and throws
+  on result > 1). So τ-ARGUS 4.1 had the same latent crash; the TUI's s-s
+  workflow just triggers it directly.
+- Fix (csp `3007826`): `PPCSPloadprob` resets all global problem counters at
+  entry (failed load leaves a consistent empty problem → freeprob free loops
+  are no-ops); `PPCSPfreeprob` resets the same counters on exit (idempotent).
+  `change_status` documented: `'m'` intentionally rejected (legacy behavior) —
+  re-running OPT on a table with existing secondary suppression returns 5008
+  gracefully instead of crashing.
+- Verification: ASan driver run1→1, run2→5008, clean exit, no ASan report;
+  Python E2E (fixed dylib swapped into the 0.3.0 wheel package — note the
+  wheel keeps a second csp copy in the hidden `.dylibs/` dir that hitas loads
+  via `@loader_path/.dylibs/…`) → both tables: OPT#1 ok, OPT#2 raises
+  `BatchError: FullJJ failed (code 5008)`, no crash.
