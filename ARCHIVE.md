@@ -455,3 +455,14 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Documentation checks passed: matching sections, resolved Markdown references,
   public contacts and header credits match upstream; `git diff --check` clean.
   Runtime tests were not needed for this documentation-only change.
+
+## Acknowledgements presentation (2026-10-11)
+
+- Removed the source column, citations and metadata references from both
+  README acknowledgement sections; kept author credits and public contacts.
+- User confirmed that the header names `pwof` and `Peter-Paul` refer to
+  Peter-Paul de Wolf. All three native module credits now use his full name.
+- Combined J. J. Salazar with Juan José Salazar González in the CSP credit.
+- Verified matching README sections, retained contacts, unified names,
+  no remaining source references, and unchanged content outside acknowledgements;
+  `git diff --check` passed and PROGRESS.md remains under 35 lines.
