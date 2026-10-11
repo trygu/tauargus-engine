@@ -10,7 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from pytauargus_tui.model import Session
+from pytauargus_tui.model import (
+    Session,
+    SuppressionOp,
+    arb_with_ops,
+    format_status_delta,
+)
 
 DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
 ARB = DATA / "TestRecode.arb"
@@ -71,3 +76,61 @@ def test_rule_display(session):
     t0 = session.table(0)
     # The batch declares NK(2,75) for table 1 (0-based index 0).
     assert any("NK" in r and "2" in r and "75" in r for r in t0.rules)
+
+
+# ===========================================================================
+# Staged suppression + preview (design §B.3)
+# ===========================================================================
+def test_suppression_op_arb_lines():
+    assert SuppressionOp("OPT", 2).arb_line() == "<SUPPRESS> OPT(2)"
+    assert SuppressionOp("MOD", 1).arb_line() == "<SUPPRESS> MOD(1)"
+    assert (SuppressionOp("RND", 3, rnd_base=1000000).arb_line()
+            == "<SUPPRESS> RND(3,1000000)")
+
+
+def test_arb_with_ops_appends():
+    # No <WRITETABLE> in the spec: lines are appended at the end.
+    out = arb_with_ops("a\nb\n", [SuppressionOp("OPT", 1)])
+    assert out == "a\nb\n<SUPPRESS> OPT(1)\n"
+
+
+def test_arb_with_ops_before_writetable():
+    out = arb_with_ops('a\n<WRITETABLE> (1,1,0,"x")\n',
+                       [SuppressionOp("RND", 2, 10)])
+    assert out == 'a\n<SUPPRESS> RND(2,10)\n<WRITETABLE> (1,1,0,"x")\n'
+
+
+def test_format_status_delta():
+    d = format_status_delta({1: 104, 3: 1}, {1: 101, 3: 1, 11: 3})
+    assert "safe 104→101" in d
+    assert "unsafe_rule 1→1" in d
+    assert "secondary_unsafe 0→3" in d
+    # Stable ordering: ascending status code.
+    assert d.index("safe") < d.index("unsafe_rule") < d.index("secondary_unsafe")
+
+
+def test_status_counts(session):
+    counts = session.status_counts(0)
+    assert sum(counts.values()) == 126
+    assert all(1 <= k <= 14 for k in counts)
+    # The pre-suppression sample batch has safe cells.
+    assert counts.get(1, 0) + counts.get(2, 0) > 0
+
+
+@pytest.fixture(scope="module")
+def preview_session(session):
+    """Throwaway run of the same .arb with OPT(1) appended (design §B.3)."""
+    return session.preview([SuppressionOp("OPT", 1)])
+
+
+def test_preview_is_a_full_session(preview_session):
+    assert preview_session.n_tables == 2
+    assert preview_session.table(0).n_cells == 126
+
+
+def test_preview_changes_table_statuses(session, preview_session):
+    before = session.status_counts(0)
+    after = preview_session.status_counts(0)
+    assert sum(after.values()) == 126
+    # The previewed OPT(1) changes table 1's cell statuses.
+    assert after != before

@@ -18,6 +18,13 @@ Layout (design §B.1)::
 
 Keymap: ``j``/``k`` or the navigator select a table; ``s``=OPT suppress,
 ``r``=RND round, ``a``=audit, ``o``=save intermediate ``.tab``, ``q``=quit.
+
+Suppress/round are **staged, preview before committing** (design §B.3):
+``s``/``r`` run a throwaway ``run_batch`` of the same ``.arb`` with the
+suppression appended and show the per-status delta. ``y`` adopts the
+previewed run as the working session; ``n`` cancels it. Confirmed ops are
+materialised into the spec, so every later preview re-runs the spec plus
+all confirmed ops plus the staged one.
 """
 
 from __future__ import annotations
@@ -25,7 +32,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -35,7 +42,14 @@ from textual.widgets import DataTable, Footer, Label, ListView, Static
 from textual.widgets._list_view import ListItem
 from textual.worker import WorkerState
 
-from .model import Cell, Session, TableGrid, TableMeta
+from .model import (
+    Cell,
+    Session,
+    SuppressionOp,
+    TableGrid,
+    TableMeta,
+    format_status_delta,
+)
 
 # Status symbol → colour (design §B.1).
 _STATUS_COLOR = {
@@ -47,7 +61,7 @@ _STATUS_COLOR = {
     "?": "default",
 }
 
-_HINT = "j/k=table  s=suppress  r=round  a=audit  o=save  q=quit"
+_HINT = "j/k=table  s=suppress  r=round  a=audit  o=save  y/n=preview  q=quit"
 
 
 def _fmt(value: float) -> str:
@@ -72,6 +86,40 @@ class _EngineLogHandler(logging.Handler):
             pass
 
 
+class _BusySpinner(Static):
+    """Self-animating spinner shown while an engine call runs.
+
+    textual 8.x ships no built-in ``Spinner`` widget, so the TUI carries
+    this stand-in. Pure UI decoration — no engine logic.
+    """
+
+    _FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._frame = 0
+        self._timer = None
+
+    def start(self) -> None:
+        self.visible = True
+        if self._timer is None:
+            self._frame = 0
+            self._timer = self.set_interval(0.1, self._tick)
+            self._tick()
+
+    def stop(self) -> None:
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+        self._frame = 0
+        self.update("")
+        self.visible = False
+
+    def _tick(self) -> None:
+        self._frame += 1
+        self.update(self._FRAMES[self._frame % len(self._FRAMES)])
+
+
 class TauArgusApp(App):
     """Tau-Argus TUI: navigator + grid + detail + log over one Engine."""
 
@@ -82,7 +130,9 @@ class TauArgusApp(App):
     #nav { width: 30; border: round $primary; }
     #grid { width: 1fr; border: round $primary; }
     #detail { height: 3; border: round $primary; }
-    #logline { height: 1; }
+    #logline { height: 1; layout: horizontal; align-vertical: middle; }
+    #logline #spin { margin-right: 1; }
+    #logtext { width: 1fr; }
     """
 
     BINDINGS = [
@@ -93,6 +143,8 @@ class TauArgusApp(App):
         Binding("r", "round", "Round (RND)"),
         Binding("a", "audit", "Audit"),
         Binding("o", "save", "Save .tab"),
+        Binding("y", "confirm", "Confirm preview", show=False),
+        Binding("n", "cancel", "Cancel preview", show=False),
     ]
 
     def __init__(self, arb_path: Path) -> None:
@@ -104,6 +156,15 @@ class TauArgusApp(App):
         self._detail = ""
         self._log = "ready"
         self._log_handler: Optional[_EngineLogHandler] = None
+        # Staged preview state (design §B.3): _pending is the staged op,
+        # _preview the throwaway session it produced, _confirmed the ops
+        # already adopted (re-run into every later preview).
+        self._pending: Optional[SuppressionOp] = None
+        self._preview: Optional[Session] = None
+        self._delta: str = ""
+        self._confirmed: List[SuppressionOp] = []
+        self._busy: bool = False
+        self._last_action: str = ""
 
     # -- inspection surface (used by tests / embedders) ----------------------
     @property
@@ -122,13 +183,45 @@ class TauArgusApp(App):
     def log_text(self) -> str:
         return self._log
 
+    @property
+    def preview(self) -> Optional[Session]:
+        """The throwaway session of the pending preview (None if none)."""
+        return self._preview
+
+    @property
+    def pending(self) -> Optional[SuppressionOp]:
+        """The staged suppression awaiting confirm/cancel (None if none)."""
+        return self._pending
+
+    @property
+    def preview_delta(self) -> str:
+        """Formatted per-status delta of the pending preview ("" if none)."""
+        return self._delta
+
+    @property
+    def busy(self) -> bool:
+        """True while an engine worker runs (spinner visible)."""
+        return self._busy
+
+    @property
+    def last_action(self) -> str:
+        """Human-readable outcome of the last preview/confirm/cancel."""
+        return self._last_action
+
+    @property
+    def confirmed_ops(self) -> Tuple[SuppressionOp, ...]:
+        """Suppressions confirmed so far, in order (feed later previews)."""
+        return tuple(self._confirmed)
+
     # -- compose ---------------------------------------------------------------
     def compose(self) -> ComposeResult:
         with Horizontal(id="body"):
             yield ListView(id="nav")
             yield DataTable(id="grid", cursor_type="cell")
         yield Static("", id="detail")
-        yield Static("", id="logline")
+        with Horizontal(id="logline"):
+            yield _BusySpinner(id="spin")
+            yield Static("", id="logtext")
         yield Footer()
 
     # -- lifecycle ---------------------------------------------------------------
@@ -137,8 +230,11 @@ class TauArgusApp(App):
         self._log_handler.setFormatter(logging.Formatter("%(message)s"))
         logging.getLogger("pytauargus").addHandler(self._log_handler)
         self._set_log(f"loading {self._arb.name} ...")
+        self._set_busy(True)
+        # exit_on_error=False: engine errors are expected, displayable
+        # conditions (e.g. legacy 5008 on re-OPT) — log them, don't panic.
         self.run_worker(self._load, group="engine", exclusive=True, thread=True,
-                        description="load")
+                        description="load", exit_on_error=False)
 
     def on_unmount(self) -> None:
         if self._log_handler is not None:
@@ -167,8 +263,24 @@ class TauArgusApp(App):
                 self._grid = self._session.grid(self._tab)
                 self._populate_grid()
                 self._set_log(w.result)
+            elif w.description == "preview":
+                if self._pending is not None:
+                    self._preview, self._delta = w.result
+                    self._last_action = (f"{self._pending.kind} previewed "
+                                          f"on table {self._pending.tab}")
+                    self._show_preview_pending()
         elif w.state is WorkerState.ERROR:
+            if w.description == "preview" and self._pending is not None:
+                # A failed preview (e.g. legacy 5008 on re-OPT) is dropped;
+                # the live session is untouched.
+                self._pending = None
+                self._preview = None
+                self._set_detail(self._table_detail(
+                    self._session.table(self._tab)))
             self._set_log(f"error: {w.error}")
+        if w.state in (WorkerState.SUCCESS, WorkerState.ERROR,
+                       WorkerState.CANCELLED):
+            self._set_busy(False)
 
     # -- navigator --------------------------------------------------------------------
     def _populate_nav(self) -> None:
@@ -189,13 +301,17 @@ class TauArgusApp(App):
             self._select_table(self._tab - 1)
 
     def _select_table(self, i: int) -> None:
+        if self._pending is not None:
+            return  # table switching is locked while a preview is pending
         self._tab = i
         meta = self._session.table(i)
         self.query_one("#grid", DataTable).clear(columns=True)
         self._set_detail(self._table_detail(meta))
         self._set_log(f"table {i + 1}: loading grid ...")
+        self._set_busy(True)
         self.run_worker(lambda: self._session.grid(i), group="engine",
-                        exclusive=True, thread=True, description="grid")
+                        exclusive=True, thread=True, description="grid",
+                        exit_on_error=False)
 
     # -- grid --------------------------------------------------------------------------
     @staticmethod
@@ -267,10 +383,10 @@ class TauArgusApp(App):
 
     # -- actions ---------------------------------------------------------------------------
     def action_suppress(self) -> None:
-        self._run_action("OPT")
+        self._stage("OPT")
 
     def action_round(self) -> None:
-        self._run_action("RND")
+        self._stage("RND")
 
     def action_audit(self) -> None:
         self._run_action("AUDIT")
@@ -278,25 +394,76 @@ class TauArgusApp(App):
     def action_save(self) -> None:
         self._run_action("SAVE")
 
+    def action_confirm(self) -> None:
+        """Adopt the pending preview as the working session (design §B.3)."""
+        if self._pending is None or self._preview is None:
+            return
+        op = self._pending
+        self._session = self._preview
+        # The adopted session was run from a temp spec (now deleted); bind
+        # it back to the original .arb so later previews re-run the spec
+        # plus the (now longer) confirmed-ops list.
+        self._session.adopt_spec(self._arb)
+        self._confirmed.append(op)
+        self._pending = None
+        self._preview = None
+        self._last_action = f"{op.kind} confirmed on table {op.tab}"
+        # The preview worker already cached this table's grid (it computed
+        # the status counts from it), so the refresh is a pure cache read.
+        self._grid = self._session.grid(self._tab)
+        self._populate_grid()
+        self._set_log(f"table {op.tab}: {op.kind} confirmed — grid updated")
+
+    def action_cancel(self) -> None:
+        """Discard the pending preview; the live session is untouched."""
+        if self._pending is None:
+            return
+        op = self._pending
+        self._pending = None
+        self._preview = None
+        self._last_action = f"{op.kind} preview cancelled"
+        self._set_detail(self._table_detail(self._session.table(self._tab)))
+        self._set_log(f"table {op.tab}: preview cancelled")
+
+    def _stage(self, kind: str) -> None:
+        """Stage a suppression: preview it on a throwaway run, show the
+        per-status delta, wait for confirm (y) / cancel (n)."""
+        if self._session is None or self._pending is not None:
+            return
+        tab = self._tab
+        base = 0
+        if kind == "RND":
+            base = self._session.engine._min_round_base(tab)
+        op = SuppressionOp(kind=kind, tab=tab + 1, rnd_base=base)
+        self._pending = op
+        self._set_log(f"table {tab + 1}: previewing {kind} ...")
+        self._set_busy(True)
+        self.run_worker(lambda: self._run_preview(op), group="engine",
+                        exclusive=True, thread=True, description="preview",
+                        exit_on_error=False)
+
+    def _run_preview(self, op: SuppressionOp) -> Tuple[Session, str]:
+        """Worker body: throwaway run of the spec + confirmed ops + staged
+        op, and the per-status delta of the staged table (design §B.3)."""
+        s = self._session
+        tab = op.tab - 1
+        prev = s.preview(list(self._confirmed) + [op])
+        delta = format_status_delta(s.status_counts(tab),
+                                    prev.status_counts(tab))
+        return prev, delta
+
     def _run_action(self, what: str) -> None:
-        if self._session is None:
+        if self._session is None or self._pending is not None:
             return
         self._set_log(f"table {self._tab + 1}: {what.lower()} ...")
+        self._set_busy(True)
         self.run_worker(lambda: self._action(what), group="engine",
-                        exclusive=True, thread=True, description="action")
+                        exclusive=True, thread=True, description="action",
+                        exit_on_error=False)
 
     def _action(self, what: str) -> str:
-        from pytauargus.batch import Suppress
-
         s = self._session
         tab = self._tab
-        if what == "OPT":
-            s.suppress(Suppress(kind="OPT", tab_no=tab + 1))
-            return f"table {tab + 1}: OPT applied"
-        if what == "RND":
-            base = s.engine._min_round_base(tab)
-            s.suppress(Suppress(kind="RND", tab_no=tab + 1, rnd_base=base))
-            return f"table {tab + 1}: rounded (base {base})"
         if what == "AUDIT":
             rows = s.audit(tab)
             return f"table {tab + 1}: audited {len(rows)} cell(s)"
@@ -316,11 +483,32 @@ class TauArgusApp(App):
 
     def _set_log(self, text: str) -> None:
         self._log = text
-        self.query_one("#logline", Static).update(
+        self.query_one("#logtext", Static).update(
             f"▸ log: {text}   ▸ hint: {_HINT}")
 
     def push_log(self, msg: str) -> None:
         self._set_log(msg)
+
+    def _set_busy(self, busy: bool) -> None:
+        """Track engine-worker activity; the spinner mirrors the flag."""
+        self._busy = busy
+        try:
+            spin = self.query_one("#spin", _BusySpinner)
+        except Exception:
+            return  # widget not composed yet
+        if busy:
+            spin.start()
+        else:
+            spin.stop()
+
+    def _show_preview_pending(self) -> None:
+        op = self._pending
+        assert op is not None
+        self._detail = (f"preview {op.kind} on table {op.tab}:\n"
+                        f"{self._delta}\n"
+                        f"y=confirm (adopt this run)   n=cancel")
+        self.query_one("#detail", Static).update(self._detail)
+        self._set_log(f"table {op.tab}: {op.kind} previewed — confirm? (y/n)")
 
 
 def main(argv: Optional[List[str]] = None) -> int:

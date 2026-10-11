@@ -13,9 +13,11 @@ invalidated on any mutating action.
 
 from __future__ import annotations
 
+import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from pytauargus.engine import Engine, _status_symbol, run_batch
 from pytauargus import cli as _cli
@@ -76,6 +78,58 @@ class TableGrid:
 
 
 # ===========================================================================
+# Staged suppression (design §B.3)
+# ===========================================================================
+@dataclass(frozen=True)
+class SuppressionOp:
+    """One staged suppression, materialised as a batch ``<SUPPRESS>`` line.
+
+    The batch grammar is the legacy source of truth (``batch.py``):
+    ``OPT(n)``, ``MOD(n)``, ``RND(n,base)`` — table numbers are 1-based.
+    """
+
+    kind: str  # "OPT" | "MOD" | "RND"
+    tab: int  # 1-based table number
+    rnd_base: int = 0
+
+    def arb_line(self) -> str:
+        if self.kind == "RND":
+            return f"<SUPPRESS> RND({self.tab},{self.rnd_base})"
+        return f"<SUPPRESS> {self.kind}({self.tab})"
+
+
+def arb_with_ops(arb_text: str, ops: Sequence[SuppressionOp]) -> str:
+    """The batch text with one ``<SUPPRESS>`` line per op.
+
+    Suppression is inserted before the first ``<WRITETABLE>`` (the legacy
+    order: suppress, then write) or appended when the spec has no
+    ``<WRITETABLE>``.
+    """
+    lines = arb_text.splitlines()
+    insert_at = len(lines)
+    for i, ln in enumerate(lines):
+        if ln.lstrip().startswith("<WRITETABLE>"):
+            insert_at = i
+            break
+    extra = [op.arb_line() for op in ops]
+    return "\n".join(lines[:insert_at] + extra + lines[insert_at:]) + "\n"
+
+
+def format_status_delta(before: Dict[int, int],
+                        after: Dict[int, int]) -> str:
+    """Per-status ``name before→after`` pairs, ascending status code.
+
+    The delta the preview shows (design §B.3 step 3), e.g.
+    ``safe 104→101  secondary_unsafe 0→3``.
+    """
+    codes = sorted(set(before) | set(after))
+    return "  ".join(
+        f"{_STATUS_NAMES.get(c, str(c))} {before.get(c, 0)}→{after.get(c, 0)}"
+        for c in codes
+    )
+
+
+# ===========================================================================
 # Safety-rule display
 # ===========================================================================
 def _rules_display(srs) -> Tuple[str, ...]:
@@ -109,8 +163,10 @@ def _rules_display(srs) -> Tuple[str, ...]:
 class Session:
     """One open Tau-Argus session: a view over a single computed ``Engine``."""
 
-    def __init__(self, eng: Engine) -> None:
+    def __init__(self, eng: Engine,
+                 arb_path: Optional[Union[str, Path]] = None) -> None:
         self._eng = eng
+        self._arb_path = Path(arb_path) if arb_path else None
         self._grid_cache: Dict[int, TableGrid] = {}
         self._audit_rows: Dict[int, List[dict]] = {}
 
@@ -118,7 +174,7 @@ class Session:
     @classmethod
     def from_arb(cls, arb_path: Union[str, Path]) -> "Session":
         """Run a ``.arb`` batch in a fresh engine and wrap it."""
-        return cls(run_batch(Path(arb_path)))
+        return cls(run_batch(Path(arb_path)), arb_path)
 
     @property
     def engine(self) -> Engine:
@@ -213,6 +269,47 @@ class Session:
     def invalidate(self) -> None:
         """Drop cached grids after any mutation of the running tables."""
         self._grid_cache.clear()
+
+    # -- per-status cell counts (preview delta, design §B.3) ------------------
+    def status_counts(self, i: int) -> Dict[int, int]:
+        """Count of cells per status code for table ``i`` (via the grid)."""
+        counts: Dict[int, int] = {}
+        for row in self.grid(i).cells:
+            for cell in row:
+                counts[cell.status] = counts.get(cell.status, 0) + 1
+        return counts
+
+    # -- throwaway preview (design §B.3) --------------------------------------
+    def adopt_spec(self, arb_path: Union[str, Path]) -> None:
+        """Re-bind this session to a spec file so later previews can re-run
+        it. Called when a previewed session is adopted as the working
+        session: the preview's own temp spec is gone, but the original
+        ``.arb`` plus the app's confirmed ops re-materialize the same state
+        (design §B.3 step 4)."""
+        self._arb_path = Path(arb_path)
+
+    def preview(self, ops: Sequence[SuppressionOp]) -> "Session":
+        """Fresh, throwaway run of this session's ``.arb`` with ``ops``
+        appended (or inserted before its ``<WRITETABLE>``).
+
+        The engine is stateful with no in-place undo, so a "preview" is a
+        fresh ``run_batch`` of the same spec plus the suppression — the same
+        mechanism the CLI and notebooks use. The returned session is for
+        inspection/diffing only; it is not meant to be re-previewed.
+        """
+        if self._arb_path is None or not self._arb_path.is_file():
+            raise RuntimeError("this session has no .arb file to re-run")
+        text = arb_with_ops(self._arb_path.read_text(), ops)
+        # The temp arb must sit next to the original one: the batch resolves
+        # data files relative to the arb's directory.
+        fd, tmp = tempfile.mkstemp(prefix=".preview-", suffix=".arb",
+                                   dir=str(self._arb_path.parent))
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(text)
+            return type(self)(run_batch(tmp), tmp)
+        finally:
+            Path(tmp).unlink(missing_ok=True)
 
     # -- pass-through actions (mutate -> invalidate) -------------------------
     def suppress(self, cmd) -> None:
