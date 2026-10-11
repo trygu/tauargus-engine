@@ -475,3 +475,15 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Verification with the freshly built cp313 wheel in the TUI venv:
   `error_string(5008)` → "Couldn't load JJ-routines"; OPT×2 repro →
   `BatchError: FullJJ failed (code 5008): Couldn't load JJ-routines`, no crash.
+
+## CI: push submodule commits before the parent (2026-10-11)
+
+- Pushing a parent that pins not-yet-pushed submodule commits breaks every
+  runner checkout with "fatal: remote error: upload-pack: not our ref
+  <sha>" (happened for csp 3007826 / hitas d3e5b91 after the 2nd-OPT
+  segfault fix).
+- Cadence: commit in submodule -> **push submodule** -> bump + commit
+  parent -> push parent.
+- Side note: tests.yml uses `concurrency: cancel-in-progress`; a
+  `gh run rerun` queued behind a newer run on the same branch cancels
+  the in-flight one.
