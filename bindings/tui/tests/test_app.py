@@ -381,6 +381,26 @@ async def test_status_line_shows_state_and_hint(app):
         assert line == app.status_text
 
 
+async def test_status_line_widget_is_on_screen(app):
+    """Regression: the status line must actually *render* on-screen (§B.1).
+
+    Previously #logtext was squeezed to width 1 and pushed off-screen by
+    the sibling spinner (a Textual 8.x auto-width quirk in horizontal
+    layouts), so the state facts and contextual hint were never visible
+    even though the widget's ``content`` string (asserted above) was right.
+    """
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        lt = app.query_one("#logtext", Static)
+        # One row, near the left edge, spanning (almost) the terminal width.
+        assert lt.region.height == 1
+        assert lt.region.x <= 2
+        assert lt.region.width >= 100
+        # The composed line is present in the widget that is on screen.
+        assert lt.content == app.status_text
+        assert app.status_text.startswith("draft r1")
+
+
 async def test_status_line_marks_bump_revision_and_edits(app):
     """A draft mark advances the revision and the pending edit count."""
     async with app.run_test(size=(200, 35)) as pilot:

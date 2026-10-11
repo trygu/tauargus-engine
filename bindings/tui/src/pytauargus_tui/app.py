@@ -167,6 +167,7 @@ class _BusySpinner(Static):
         self._timer = None
 
     def start(self) -> None:
+        self.styles.display = "block"
         self.visible = True
         if self._timer is None:
             self._frame = 0
@@ -179,6 +180,9 @@ class _BusySpinner(Static):
             self._timer = None
         self._frame = 0
         self.update("")
+        # display:none removes the (idle) spinner from the layout entirely,
+        # so the status line starts at column 0.
+        self.styles.display = "none"
         self.visible = False
 
     def _tick(self) -> None:
@@ -281,7 +285,7 @@ class TauArgusApp(App):
     #grid { width: 1fr; border: round $primary; }
     #detail { height: 3; border: round $primary; }
     #logline { height: 1; layout: horizontal; align-vertical: middle; }
-    #logline #spin { margin-right: 1; }
+    #logline #spin { width: 1; margin-right: 1; }
     #logtext { width: 1fr; }
     """
 
@@ -462,6 +466,11 @@ class TauArgusApp(App):
             # No batch: show the picker; it calls back with the choice.
             self._set_log("no batch given — choose a .arb file (or q to quit)")
             self.push_screen(_FileBrowser(start=Path.cwd()))
+
+    def on_resize(self, event) -> None:
+        # The status line is composed to the terminal width; re-compose on
+        # resize so it never wraps.
+        self._refresh_status()
 
     def _start_load(self) -> None:
         """Kick off the (exclusive) load worker for the chosen batch file."""
@@ -975,7 +984,22 @@ class TauArgusApp(App):
                 hint = _HINT_BASE
         state = (f"draft r{self._draft_revision} · {edits} edit(s) · "
                  f"preview {self.preview_freshness} · acc {acc}")
-        self._status_line = f"{state}   ·   {self._log}   ·   {hint}"
+        # One line, always (§B.1: the status line must never wrap): the
+        # state facts are left-anchored, the contextual hint right-anchored,
+        # and the transient log takes the middle — truncated when the
+        # terminal is narrow. The finished line is clipped to the terminal
+        # width as a final safety.
+        sep = "   ·   "
+        width = max(self.size.width, 10)
+        log = self._log
+        budget = width - len(state) - len(hint) - 2 * len(sep)
+        if log and budget >= 2:
+            if len(log) > budget:
+                log = log[: budget - 1] + "…"
+            line = f"{state}{sep}{log}{sep}{hint}"
+        else:
+            line = f"{state}{sep}{hint}"
+        self._status_line = line[:width]
         try:
             self.query_one("#logtext", Static).update(self._status_line)
         except Exception:
