@@ -25,6 +25,9 @@ tauargus-tui path/to/batch.arb
 Load a `.arb` batch, browse the computed tables, inspect cells, preview
 suppression/rounding, audit feasibility intervals, and save outputs.
 
+**Full user guide (screenshots, key reference, implemented vs
+outstanding):** [`docs/tui.md`](../../docs/tui.md).
+
 ## Layout
 
 - **Left** — table navigator (one row per `specify_table`) with its
@@ -39,9 +42,11 @@ suppression/rounding, audit feasibility intervals, and save outputs.
 
 ```bash
 cd bindings/tui
-# 0.3.0 wheels on PyPI cover CPython 3.10-3.13 (no cp314 yet):
-uv venv --python 3.13 .venv
-uv pip install -p .venv "pytauargus==0.3.0" textual pytest pytest-asyncio
-uv pip install -p .venv -e .
+uv sync --extra test        # resolves pytauargus from the sibling package
 .venv/bin/python -m pytest
 ```
+
+The `[tool.uv.sources]` override in `pyproject.toml` points `pytauargus` at
+`../python` (editable) so the TUI follows the in-tree engine; it never
+leaks into the published wheel metadata. The superbuild output
+(`engine/build/lib`) must exist — `scripts/sync-venv.sh` builds it if needed.

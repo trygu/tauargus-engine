@@ -5,22 +5,33 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI + TUI.
 
 ## Verified checkpoints (details in ARCHIVE.md)
 - [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
-- [x] Headless CLI; wheel + CI → PyPI + GHCR; Release 0.3.0 (DataFrame `protect()`, cp310–cp313).
-- [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`) + legacy `ErrorStrings.txt`
-  embedded (hitas `d3e5b91`) + FullJJ streams closed on solver errors (`caf7528`); re-OPT → 5008.
-- [x] Dev loop: `scripts/sync-venv.sh` (drift gate → engine → wheel → install); venvs run
-  local wheels, not PyPI. `references/` + legacy Java frontend removed from mainline.
-- [x] TUI on mainline (`bindings/tui/`, pkg `pytauargus-tui`): nav/grid/detail/log, staged
-  s/r preview, cell instructions u/p/S, undo/redo, audit ownership, workspace save, GIL-freeze
-  fix, preview-in-grid. 67 tests. `tui` branch merged + deleted.
-- [x] README acknowledgements + release-following install guidance (PR #6).
-- [x] **Release 0.3.1** (tag `py-v0.3.1`): in-tree engine fixes (csp/hitas) + TUI → PyPI/GHCR.
+- [x] Headless CLI; wheel + CI → PyPI + GHCR; Releases 0.3.0 / 0.3.1 shipped.
+- [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`), `ErrorStrings.txt`
+  (hitas `d3e5b91`), FullJJ streams (`caf7528`); re-OPT → 5008.
+- [x] Dev loop: `scripts/sync-venv.sh`; venvs run local wheels, not PyPI.
+- [x] TUI on mainline (`bindings/tui/`, pkg `pytauargus-tui`): staged s/r
+  preview, marks u/p/S + undo/redo, audit, workspace save, preview-in-grid.
+- [x] `fix/u-hint`: corrected u/p status hints + help text (merged into
+  `feature/tui-release`).
+- [x] **Status-line bug**: line rendered off-screen (Textual 8.x auto-width
+  Static squeezed the `1fr` sibling to width 1); pinned spinner width,
+  `display:none` when idle, line composed to terminal width (never wraps).
+  Regression test asserts the on-screen region. TUI suite now 68 tests.
+- [x] TUI user guide: `docs/tui.md` + 7 screenshots (`docs/tui-images/`),
+  implemented vs outstanding (§B.7/§B.8 gaps listed).
 
 ## In flight
+- [ ] **Release 0.3.2** on `feature/tui-release` (ready, unmerged): TUI
+  published in **lockstep** with pytauargus — same `py-v*` trigger,
+  `build-tui` job, tag==py==tui version check, per-project PyPI publish,
+  GH Release carries all wheels, container image installs engine + TUI.
+  `pytauargus[tui]` extra. Suites green (py 259/3 skip; TUI 68).
+  Next: merge → master, tag `py-v0.3.2`.
 - [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
 
 ## Feature branches
-- `fix/u-hint`: correct the misleading u/p status hints + help text (green, ready to merge).
+- `feature/tui-release`: the 0.3.2 release above (see In flight).
+- `feature/example-tables`: `data/examples/ex1` fixture (pushed, unmerged).
 
 ## Watch items
 - 5008 on re-OPT w/ secondary suppression is a legacy limitation.
