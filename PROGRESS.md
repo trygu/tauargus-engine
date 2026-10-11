@@ -1,24 +1,26 @@
 # Tau-Argus Rewrite — Progress
 
 Branches: `master` (mainline) + `tui` (TUI). DataFrame work merged to
-`master` in PR #5; preparing release 0.3.0 on the mainline.
+`master` in PR #5; **Release 0.3.0** published (tag `py-v0.3.0`).
 Goal: HiGHS solvers, portable cloud-native build, headless Python CLI.
 
 ## Verified checkpoints (details in ARCHIVE.md)
 - [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
 - [x] Task 4 headless CLI; rename to `pytauargus`; self-contained wheel +
   CI → GH Release + PyPI + GHCR. **Release 0.2.0**; example notebooks.
-- [x] **High-level API — DataFrame `protect()`** (2026-10-10, PR #5):
-  DataFrame/dict -> native batch -> type-5 `TableResult`; optional pandas.
-- [x] Positive OPT/MOD time-limit regressions + corrected audit docs (PR #3).
-- [x] macOS `protect()` score-buffer overflow + public import fixed (PR #4).
-- [x] DataFrame examples in all three notebooks and both READMEs refreshed.
-  37 executed code cells; relative-workdir regression fixed; 219 tests pass.
-
-## Current release — 0.3.0 on `master`
-- PR #5 merged; all eight review findings resolved and six CI checks green.
-- Version/lock and release docs updated; full Python suite (three notebooks)
-  and native CTest pass. Ready to tag and publish.
+- [x] **High-level API — DataFrame `protect()`** (PR #5): DataFrame/dict ->
+  native batch -> type-5 `TableResult`; optional pandas.
+- [x] OPT/MOD time-limit regressions + audit docs (PR #3); `protect()`
+  score-buffer overflow + import (PR #4); 219 tests + 37 executed cells.
+- [x] **Release 0.3.0** (tag `py-v0.3.0`): cp310–cp313 wheels + GHCR image.
+- [x] 2nd-OPT SIGABRT fixed (csp `3007826`): counters reset at loadprob
+  entry + freeprob exit; re-OPT with secondary cells → 5008, no crash.
+- [x] Legacy `ErrorStrings.txt` restored + embedded at build time (hitas
+  `d3e5b91`); `error_string()` returns real messages.
+- [x] Dev loop: `scripts/sync-venv.sh <venv>` (drift gate → engine → wheel →
+  install); dev venvs run local wheels, not PyPI.
+- [x] Mainline cleanup: `references/` + legacy Java frontend removed
+  (Java kept on `tui` as porting reference).
 
 ## Next (priority order)
 1. **GHCR rename → `tauargus-engine`** — 0.2.1 verified. Delete old
@@ -28,7 +30,7 @@ Goal: HiGHS solvers, portable cloud-native build, headless Python CLI.
 4. **ANSI-TUI** (`textual`, own `pytauargus-tui`) on `tui` branch.
 
 ## Watch items
+- Ship the 2nd-OPT fix + ErrorStrings as **0.3.1** (in-tree since 0.3.0).
 - OPT/MOD deadline expiry needs separate coverage; positive limits pass.
 - `open_microdata` calls `clean_all` — safe only because tables finalize after.
 - Parquet as the microdata dataframe backend (not started).
-- Ref: `piargus` (`references/piargus`, transient) — compare API/flow, drop after.
