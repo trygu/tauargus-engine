@@ -19,4 +19,9 @@ bindings/python/build-make/
 bindings/python/dist/
 engine/native/build/
 engine/build/
+engine/build-asan/
 *.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc
