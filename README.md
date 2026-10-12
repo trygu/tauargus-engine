@@ -171,15 +171,18 @@ tauargus run data/TestRecode.arb
 An optional interactive terminal UI (`tauargus-tui`) sits on top of the same
 engine: it runs your `.arb` batch and shows every computed table as a coloured
 status grid, with per-cell detail, draft marks, and staged suppression or
-rounding previews you accept or discard. It re-implements no engine behaviour
-— every action is a call the headless CLI already makes.
+rounding previews you accept or discard. Your work can be saved as a
+workspace and reopened later, and the accepted recipe can be written out as a
+replayable headless batch. It re-implements no engine behaviour — every
+action is a call the headless CLI already makes.
 
 ![tauargus-tui: a table after an accepted suppression run — green safe, orange suppressed, red still flagged](https://raw.githubusercontent.com/trygu/tauargus-engine/master/docs/tui-images/05-accepted.png)
 
 ```bash
-pip install "pytauargus[tui]"     # or: pip install pytauargus-tui
-tauargus-tui                       # opens a file browser
-tauargus-tui path/to/batch.arb     # or start on a batch directly
+pip install "pytauargus[tui]"                  # or: pip install pytauargus-tui
+tauargus-tui                                   # opens a file browser
+tauargus-tui path/to/batch.arb                 # or start on a batch directly
+tauargus-tui path/to/batch.workspace.json      # or reopen a saved workspace
 ```
 
 What it does (and what it can't do yet):
