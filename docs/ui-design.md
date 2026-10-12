@@ -9,7 +9,8 @@ owns architecture, state contracts and the prioritised roadmap (§5).
 
 Sections B.4–B.8 define the target contract, not a claim of complete parity.
 The implementation gaps are explicit in §5.2. Changes use feature branches
-and PRs; the historical `tui` branch is a Java porting reference.
+and PRs. The canonical local Java reference is the parent of removal commit
+`307b977`: `307b977^` (`0082a02`), preserved in Git history.
 
 **State decision (2026-10-11): immediate draft edits → explicit solver
 preview → accept result → export.** Saving a workspace is a separate action.
@@ -17,8 +18,11 @@ preview → accept result → export.** Saving a workspace is a separate action.
 ## 1. Background
 
 - The legacy product is a Java/Swing desktop app (`src/tauargus/gui/*`,
-  `nbproject/`, SWIG bindings). It has been removed from `master`; the `tui`
-  branch retains it as a read-only reference for porting behaviour.
+  `nbproject/`, SWIG bindings). It was removed from mainline by `307b977`;
+  [its parent `0082a02`](https://github.com/trygu/tauargus-engine/tree/0082a02718a9b8afa66599bb323477513789b09b/src/tauargus)
+  preserves the source for read-only porting reference. For example,
+  `git show 307b977^:src/tauargus/gui/PanelTable.java` reads it without
+  restoring Java to the working tree.
 - Task 8 was **BLOCKED** on the assumption that an interactive frontend must
   replace Swing first. That assumption is dropped: **deleting Swing does not
   require a 1:1 replacement to exist yet.**
@@ -336,7 +340,8 @@ accepted result or its audit evidence.
    before expanding authoring or specialist methods. §5 defines priorities;
    B.8 defines the state acceptance contract.
 3. **Keep the engine independent.** Swing is already removed from `master`;
-   the TUI branch's reference copy can be dropped when porting is complete.
+   the source remains available at `307b977^` in Git history, independently
+   of any retained branch.
 
 ## 4. Split-out requirement (Option B)
 
@@ -506,6 +511,11 @@ and coordinated engine/TUI releases. Screenshot updates are outside this task.
 All Java links below pin the reviewed upstream revision. Generated Swing
 layout was used to identify controls; handlers/model code established what
 they do. The manual is authoritative for 4.1 formats and SDC meaning.
+
+The repository also preserves its pre-removal Java source at `307b977^`
+(`0082a02`, linked in §1). Use that immutable local-history reference for
+follow-up porting work; the upstream revision reviewed here is a separate
+source snapshot and is not assumed identical.
 
 - [J1: FrameMain menus](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/FrameMain.java#L564-L744): input, specification, linked tables, output/report, apriori and batch actions.
 - [J2: PanelTable](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/PanelTable.java#L473-L557) and [cell indexing](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/PanelTable.java#L830-L865): row/column permutation, hierarchy levels and remaining-dimension selectors. [Action handlers](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/PanelTable.java#L1581-L1870): marks/cost, recoding, output view, summary, audit and method selection; `DialogSelectRowColumn` chooses axes.

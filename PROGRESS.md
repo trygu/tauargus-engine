@@ -25,6 +25,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## In flight
 - TUI architecture/plans: `docs/ui-design.md` §5; Java review in ARCHIVE.
+- Java porting reference: `307b977^` (`0082a02`), preserved in Git history.
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record
   the written revision).
 

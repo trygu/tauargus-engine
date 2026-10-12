@@ -35,8 +35,9 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Solver backend: Pure HiGHS (`<highs/interfaces/highs_c_api.h>`). No CPLEX, XPRESS, or legacy SCIP.
 - Python layer: `bindings/python/` (pybind11 bindings + `pytauargus` package, `tauargus` CLI).
   Target product is headless `.arb` batch CLI. A future R binding lives under `bindings/r/`.
-- Legacy Java frontend `src/tauargus/`: removed from `master`; kept on the `tui`
-  branch as the TUI porting reference (read-only; restorable from history).
+- Legacy Java frontend `src/tauargus/`: removed from mainline by `307b977`.
+  The canonical preserved source is `307b977^` (`0082a02`); inspect it with
+  `git show 307b977^:src/tauargus/<path>` without restoring Java to mainline.
 - For TUI work, read `docs/ui-design.md` (architecture, state contracts and
   prioritised plans) and `docs/tui.md` (shipped behaviour and current limits).
   Update both when implementing a planned capability; plans are not shipped features.

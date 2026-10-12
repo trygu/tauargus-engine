@@ -19,6 +19,10 @@ Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
   optional authoring or specialist methods. No application code changed.
 - User guide distinguishes current diagnostic export/reopen limits from plans;
   AGENTS now directs TUI work to both design and shipped-behaviour documents.
+- Confirmed the user's history reference: `307b977` removes Java; its parent
+  `0082a02718a9b8afa66599bb323477513789b09b` retains `src/tauargus/`.
+  AGENTS/design now use that immutable porting reference, independently of
+  the `tui` branch; the reviewed upstream snapshot remains separately identified.
 - Verification: 17 pinned Java links match the inspected revision, source
   paths and line bounds; local document/image links resolve in Git; PROGRESS
   remains under 35 lines and `git diff --check` passes. Runtime tests were not
