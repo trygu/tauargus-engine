@@ -2,7 +2,7 @@
 
 ## GHMITER reference assessment (2026-10-12)
 
-- Added `trygu/hypercube` as `references/hypercube` (`5b61311`) as the GH/GHMITER reference.
+- Forked `sdcTools/hypercube` to `trygu/hypercube` (`5b61311`) and assessed it as the GH/GHMITER reference. The submodule was removed after the assessment; no retained dependency.
 - Verdict: not worth a native port now. The source is a 2004-era Fortran executable with fixed 64 MB arrays and 7-dimension limits. gfortran only builds and runs it after removing DOS Ctrl-Z bytes, fixing scratch-file opens, and ignoring an `INQUIRE(RECL=)` check. One common-block size warning remains unresolved.
 - Smoke result: after temporary patches it completed `TestRecode` table 1 and marked 3 secondary suppressions, so the existing core GHMITER file bridge is viable for an optional external compatibility runner.
 - Decision: keep GH rejected in the headless engine. Revisit only if a real GH workload appears, and then prefer a user-supplied `ghmiter` executable over bundling or porting it.
