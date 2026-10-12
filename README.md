@@ -10,7 +10,7 @@ worked on in on-and-off sprints: the C/C++ solver engine is rebuilt to a modern
 toolchain on an open-source solver, and the Java/Swing desktop front-end is
 replaced by a headless Python CLI.
 
-The project has two parts:
+The project has three parts:
 
 - **tauargus-engine** (`engine/`): the C/C++ libraries that do the work, built
   against the open-source [HiGHS](https://github.com/ERGO-Code/HiGHS) solver.
@@ -18,6 +18,9 @@ The project has two parts:
 - **pytauargus** (`bindings/python/`): a DataFrame API (`protect()`), batch
   API and `tauargus` command-line tool that link those libraries. Wheels
   bundle HiGHS and the engine.
+- **pytauargus-tui** (`bindings/tui/`): an optional interactive terminal UI
+  over the same engine — browse the computed tables as a coloured status
+  grid, mark cells, preview and accept suppression or rounding.
 
 ## Relationship to the original Tau-Argus
 
@@ -69,6 +72,9 @@ distribution; on those platforms see [Building from source](#building-from-sourc
 The same wheels are attached to each
 [GitHub Release](https://github.com/trygu/tauargus-engine/releases).
 
+An optional interactive terminal UI is available as the `pytauargus[tui]`
+extra — see [Terminal UI](#terminal-ui).
+
 ## Cloud native
 
 Built to run unattended in containers, CI and batch services:
@@ -85,10 +91,17 @@ Built to run unattended in containers, CI and batch services:
   as `python:3.x-slim`), macOS arm64 and Windows x64.
 
 A ready-made image is published to GitHub Container Registry with each release
-(linux/amd64 and linux/arm64):
+(linux/amd64 and linux/arm64). It contains both the headless `tauargus` CLI
+and the interactive `tauargus-tui`, works on any volume mounted at `/work`,
+and runs as a non-root user:
 
 ```bash
+# headless batch run
 docker run --pull=always --rm -v "$PWD":/work ghcr.io/trygu/tauargus-engine:latest run batch.arb
+
+# interactive TUI (needs a TTY, so add -it)
+docker run --pull=always --rm -it -v "$PWD":/work \
+  --entrypoint tauargus-tui ghcr.io/trygu/tauargus-engine:latest
 ```
 
 `latest` is updated with each release; `--pull=always` checks for an updated image
@@ -100,7 +113,7 @@ To build your own image:
 
 ```dockerfile
 FROM python:3.12-slim
-RUN pip install --no-cache-dir pytauargus
+RUN pip install --no-cache-dir "pytauargus[tui]"
 WORKDIR /work
 ENTRYPOINT ["tauargus"]
 ```
@@ -152,6 +165,27 @@ result accessors, per-table options and audit/export details.
 ```bash
 tauargus run data/TestRecode.arb
 ```
+
+## Terminal UI
+
+An optional interactive terminal UI (`tauargus-tui`) sits on top of the same
+engine: it runs your `.arb` batch and shows every computed table as a coloured
+status grid, with per-cell detail, draft marks, and staged suppression or
+rounding previews you accept or discard. It re-implements no engine behaviour
+— every action is a call the headless CLI already makes.
+
+![tauargus-tui: a computed table with every cell coloured by its safety status](https://raw.githubusercontent.com/trygu/tauargus-engine/master/docs/tui-images/02-table0-unsafe.png)
+
+```bash
+pip install "pytauargus[tui]"     # or: pip install pytauargus-tui
+tauargus-tui                       # opens a file browser
+tauargus-tui path/to/batch.arb     # or start on a batch directly
+```
+
+What it does (and what it can't do yet):
+[bindings/tui/README.md](bindings/tui/README.md). Full user guide with every
+key and every status code:
+[docs/tui.md](docs/tui.md).
 
 ## Command-line usage
 
@@ -270,7 +304,7 @@ nothing external. Use it three ways:
 ## Architecture
 
 ```
-.arb batch  ->  tauargus CLI  ->  pytauargus  ->  tauargus-engine (C/C++)  ->  HiGHS
+.arb batch  ->  tauargus CLI / tauargus-tui  ->  pytauargus  ->  tauargus-engine (C/C++)  ->  HiGHS
 ```
 
 The engine is C++11, built from five git submodules under `engine/native/`:
@@ -287,10 +321,10 @@ The engine is C++11, built from five git submodules under `engine/native/`:
 .
 ├── engine/      C/C++ engine; CMakeLists.txt is a superbuild of the 5 submodules
 ├── bindings/
-│   └── python/  pybind11 bindings (cpp/), pytauargus package (src/), tests/
+│   ├── python/  pybind11 bindings (cpp/), pytauargus package (src/), tests/
+│   └── tui/     pytauargus-tui, the interactive Textual terminal UI
 ├── data/        sample .arb batches and tabular fixtures
-├── docs/        legacy Tau-Argus 4.1 manual and design notes
-└── src/         legacy Java/Swing front-end (read-only, pending removal)
+└── docs/        legacy Tau-Argus 4.1 manual, design notes, TUI user guide
 ```
 
 ## Building from source
@@ -330,6 +364,10 @@ bundle it; see [wheels.yml](.github/workflows/wheels.yml).
 
 ```bash
 cd bindings/python
+uv sync --extra test
+uv run pytest
+
+cd ../tui        # the TUI suite (Textual headless tests)
 uv sync --extra test
 uv run pytest
 ```
