@@ -48,7 +48,7 @@ Windows x64. Other platforms: build from source (see the repository).
 
 ## Cloud native
 
-Built to run unattended in containers, CI and batch services:
+It runs unattended in containers, CI and batch services:
 
 - **Headless:** no GUI, no display, no interactive prompts.
 - **Self-contained:** one `pip install`; the solver (HiGHS) and native libraries
@@ -196,13 +196,13 @@ so it fits into scripts and pipelines.
 ## Audit (Intervalle)
 
 A suppressed cell has a range of values it could take while staying consistent
-with the published totals — its **realized lower/upper bounds**, the
+with the published totals, its **realized lower/upper bounds**, the
 *feasibility interval*. Protection requires sufficient uncertainty to meet the
 configured protection requirements. A narrow interval can reveal the original
 value or constrain it too closely; interval width alone does not establish
 protection. The audit checks for insufficient protection.
 
-In legacy Tau-Argus this ran in a **separate** `intervalle.exe` (standalone
+In legacy Tau-Argus this ran in a separate `intervalle.exe` (standalone
 Delphi/Pascal executable); Tau-Argus wrote a `.JJ` file, launched it externally
 and read the intervals back. The rewrite ports that logic into the engine
 (`TauAuditJj` in the `csp` module), so it runs in-process over a temporary
@@ -301,7 +301,7 @@ command list, and `pytauargus.engine.Engine` executes commands one at a time.
 
 ## Generating batch inputs
 
-`pytauargus` also *writes* the batch inputs, as a port of
+`pytauargus` also generates the batch inputs. The generator is a port of
 [rtauargus](https://github.com/InseeFrLab/rtauargus), so it emits the exact
 formats the engine reads:
 
@@ -328,12 +328,12 @@ generated pipeline without running it.
 
 ## Example notebooks
 
-`notebooks/` contains three **executed, output-saved** notebooks that double
+`notebooks/` contains three executed, output-saved notebooks that double
 as API documentation (every code cell runs against the verified public API):
 
 | Notebook | Covers |
 |----------|--------|
-| [`01_quickstart`](notebooks/01_quickstart.ipynb) | DataFrame → `protect()` → `TableResult` → masked CSV, then metadata and existing batches |
+| [`01_quickstart`](notebooks/01_quickstart.ipynb) | A DataFrame through `protect()` to a `TableResult`, a masked CSV, then metadata and existing batches |
 | [`02_protection_and_audit`](notebooks/02_protection_and_audit.ipynb) | OPT/MOD DataFrame protection, explicit audit and masked export; batch OPT/MOD/RND |
 | [`03_generators`](notebooks/03_generators.ipynb) | `run=False` file preview, multiple tables, individual writers and custom batch round-trip |
 
@@ -355,20 +355,16 @@ default `uv run pytest` gate stays dependency-free).
 
 ## Acknowledgements
 
-This project stands on the shoulders of the people who developed Tau-Argus,
-its statistical methods and native libraries, and the R and Python tools
-around it. Their work is the foundation for everything built here. We are
-grateful to the authors, maintainers, and contributors behind this work.
-
-This is what open source makes possible in official statistics: sharing
-methods and tools so that others can inspect, use, and build on them.
+This project builds on Tau-Argus, its statistical methods and native
+libraries, and the R and Python tools around it, developed by the people
+named below.
 
 ### Original Tau-Argus and native libraries
 
-The original Tau-Argus authors and contributors include **Statistics
-Netherlands (CBS)**, **Peter-Paul de Wolf**, **Anco Hundepool**,
-**Sarah Giessing** (GHMITER and audit), **Juan José Salazar González**
-(optimisation methods), and **Jordi Castro** (network solutions and CTA).
+The original Tau-Argus authors and contributors include Statistics
+Netherlands (CBS), Peter-Paul de Wolf, Anco Hundepool, Sarah Giessing
+(GHMITER and audit), Juan José Salazar González (optimisation methods),
+and Jordi Castro (network solutions and CTA).
 
 | Component | Authors and contributors |
 | --- | --- |
@@ -383,16 +379,16 @@ The engine uses [HiGHS](https://highs.dev/) as its open-source LP/MIP solver.
 ### R and Python interfaces
 
 [rtauargus](https://github.com/InseeFrLab/rtauargus) is developed at
-**INSEE / InseeFrLab** by **Pierre-Yves Berrard**, **Julien Jamme**,
-**Nathanaël Rastout**, **Jeanne Pointet**, **Félix Beroud**,
-**André-Raymond Socard**, **Wistan Pomel**, **Clara Baudry**, and contributors.
+INSEE / InseeFrLab by Pierre-Yves Berrard, Julien Jamme, Nathanaël Rastout,
+Jeanne Pointet, Félix Beroud, André-Raymond Socard, Wistan Pomel,
+Clara Baudry, and contributors.
 Its metadata, batch and hierarchy generation logic was ported to
 `pytauargus`; its `micro_rtauargus()` workflow also informed the high-level
 `protect()` pipeline.
 
-[PiArgus (`piargus`)](https://github.com/lverweijen/piargus),
-by **[Laurent Verweijen (`lverweijen`)](https://github.com/lverweijen)**
-and contributors, inspired the DataFrame-to-table workflow and `TableResult`
+[PiArgus (`piargus`)](https://github.com/lverweijen/piargus), by
+[Laurent Verweijen (`lverweijen`)](https://github.com/lverweijen) and
+contributors, inspired the DataFrame-to-table workflow and `TableResult`
 with its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
 
 ## License

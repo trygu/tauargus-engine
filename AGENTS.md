@@ -1,4 +1,4 @@
-# Tau-Argus Rewrite — Agent Rules
+# Tau-Argus Rewrite: Agent Rules
 
 Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python CLI (replacing Java/Swing).
 
@@ -19,7 +19,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - **State format:** Keep `PROGRESS.md` strictly under 35 lines. Completed items are moved to `ARCHIVE.md` immediately.
 
 ## 3. Source of Truth for Legacy Behavior (READ FIRST)
-- **`docs/tau-argus-4.1-markdown-bundle/`** — the legacy τ-ARGUS 4.1 manual (PDF + 10.8k-line
+- **`docs/tau-argus-4.1-markdown-bundle/`**: the legacy τ-ARGUS 4.1 manual (PDF + 10.8k-line
   agent reference + 77 figure assets). This is the **source of truth** for legacy behavior:
   file formats, `.arb` batch grammar, parameters, and SDC mathematics. The rewrite must be a
   **drop-in replacement** for legacy τ-ARGUS: match its observable behavior, file I/O, and outputs.
@@ -42,17 +42,18 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   Update both when implementing a planned capability; plans are not shipped features.
 
 ## 5. Build Commands (macOS / Apple Silicon)
-- **Sync a venv with the current tree — the single dev-loop command, run after
-  ANY change under `engine/` or `bindings/python/`:**
-  `scripts/sync-venv.sh <venv>` — submodule-drift gate → release engine →
-  wheel for the venv's Python → force-install. Dev venvs must run a locally
+- **Sync a venv with the current tree.** The single dev-loop command; run it
+  after ANY change under `engine/` or `bindings/python/`:
+  `scripts/sync-venv.sh <venv>`: submodule-drift gate, release engine,
+  wheel for the venv's Python, force-install. Dev venvs must run a locally
   built wheel, never PyPI (PyPI lags in-tree engine fixes by a release).
 - Highs Brew prefix: `-DHighs_DIR=$(brew --prefix)/lib/cmake/Highs`
 - Submodule build:
   `cmake -S engine/native/<mod> -B engine/native/<mod>/build -DHighs_DIR=$(brew --prefix)/lib/cmake/Highs && cmake --build engine/native/<mod>/build`
 - Superbuild (all 5):
   `cmake -S engine -B engine/build -DHighs_DIR=$(brew --prefix)/lib/cmake/Highs && cmake --build engine/build`
-- ASan build (native debugging) — use separate dir to preserve release build:
+- ASan build (native debugging). Use a separate dir to preserve the release
+  build:
   `cmake -S engine -B engine/build-asan -DHighs_DIR=$(brew --prefix)/lib/cmake/Highs -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" && cmake --build engine/build-asan`
   (Preload runtime for Python: `DYLD_INSERT_LIBRARIES="$(clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" uv run ...`)
 
@@ -65,7 +66,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Commit cadence: Submodule commit first -> parent submodule bump + `PROGRESS.md` update.
 - Conventional Commits for all new history (adopted at the 0.3.2 release;
   older history predates it): lowercase type `feat|fix|docs|refactor|perf|test|build|ci|chore`
-  + optional scope, imperative subject — `fix: status line off-screen`,
+  + optional scope, imperative subject, e.g. `fix: status line off-screen`,
   `docs: tui guide`, `build(csp): 3007826 ...`. Release commits:
   `chore(release): X.Y.Z`. Auto-generated merge commits are exempt.
 - Never stage build artifacts (`.venv/`, `build/`, `dist/`, `*.so`, `*.dylib`, `engine/build/`, `engine/native/build/`).
@@ -90,3 +91,23 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 ## 8. Communication
 - Always respond in English, regardless of the language the user writes in
   (the user often writes Norwegian; keep replies in English).
+
+## 9. Documentation style
+- Plain prose: active voice, short declarative sentences, common words. No
+  filler or promotional vocabulary (e.g. additionally, crucial, delve,
+  enhance, pivotal, showcase, testament, underscore, "serves as",
+  "not just X but Y") and no grand generic conclusions.
+- No em dashes or en dashes in prose. Use periods, commas or semicolons;
+  hyphens stay for compounds and numeric ranges. Do not quote or reproduce
+  em dashes from older sources.
+- Colons introduce lists, examples or quoted output, not mid-sentence
+  clauses.
+- Bold is for list and section lead-in labels and the first definition of a
+  key term. Do not bold names, acronyms or single words for emphasis.
+- No arrow chains in prose (X -> Y -> Z); use verbs or commas ("returns",
+  "then"). Arrows inside code identifiers or command examples are fine.
+- User-facing docs (READMEs, `docs/`) state shipped, verified behaviour
+  only. Internal tooling notes (screenshot capture recipes, local build
+  steps) do not belong there.
+- Verify claims against the code before writing them; when in doubt, read
+  the source or the test suite.

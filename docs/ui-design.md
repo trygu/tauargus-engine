@@ -1,33 +1,34 @@
-# UI Design — replacing the Java/Swing frontend
+# UI Design: replacing the Java/Swing frontend
 
-Status (2026-10-12): **The headless CLI and TUI are shipped on `master` in
-release 0.4.0.** The TUI has draft marks/history, scratch previews,
+Status (2026-10-12): The headless CLI and TUI are shipped on `master` in
+release 0.4.0. The TUI has draft marks/history, scratch previews,
 accept/discard, audit, workspace save/reopen and replay batches. Reopen
 recomputes the recipe; exact accepted artifacts and export provenance remain
 unfinished. The [user guide](tui.md) records shipped behaviour; this document
 owns architecture, state contracts and the prioritised roadmap (§5).
 
-Sections B.4–B.8 define the target contract, not a claim of complete parity.
+Sections B.4 to B.8 define the target contract, not a claim of complete parity.
 The implementation gaps are explicit in §5.2. Changes use feature branches
 and PRs; the historical `tui` branch is a Java porting reference.
 
-**State decision (2026-10-11): immediate draft edits → explicit solver
-preview → accept result → export.** Saving a workspace is a separate action.
+State decision (2026-10-11): the workflow is immediate draft edits, then an
+explicit solver preview, then accept result, then export. Saving a workspace
+is a separate action.
 
 ## 1. Background
 
 - The legacy product is a Java/Swing desktop app (`src/tauargus/gui/*`,
   `nbproject/`, SWIG bindings). It has been removed from `master`; the `tui`
   branch retains it as a read-only reference for porting behaviour.
-- Task 8 was **BLOCKED** on the assumption that an interactive frontend must
-  replace Swing first. That assumption is dropped: **deleting Swing does not
-  require a 1:1 replacement to exist yet.**
-- The rewrite's *product* is a **headless `.arb` batch CLI**
+- Task 8 was blocked on the assumption that an interactive frontend must
+  replace Swing first. That assumption is dropped. Deleting Swing does not
+  require a 1:1 replacement to exist yet.
+- The rewrite's product is a headless `.arb` batch CLI
   (`bindings/python/`, entry point `tauargus`). The `Engine`
   (`pytauargus.engine.Engine`) is a clean, importable Python library over the
   pybind11 native core, and `pytauargus.cli` already exposes the full verb
-  surface. The TUI is a **thin presentation layer over that same library** —
-  it does not reimplement any engine behavior.
+  surface. The TUI is a thin presentation layer over that same library. It
+  does not reimplement any engine behavior.
 
 ## 2. Decision
 
@@ -35,7 +36,7 @@ The headless CLI remains usable independently (Option A).
 Option B is the chosen interactive companion: a separate package released
 in lockstep with the engine.
 
-### Option A — Headless CLI (the shipped product)
+### Option A: headless CLI (the shipped product)
 
 The product is the headless CLI + batch runner. Interactive needs (spec
 authoring, table inspection, suppression tuning) are served by:
@@ -50,24 +51,24 @@ risk, nothing to keep in sync with the engine.
 **Cons:** interactive table inspection and suppression tuning require CLI
 round-trips or another presentation layer.
 
-### Option B — Lightweight ANSI terminal UI
+### Option B: lightweight ANSI terminal UI
 
 A TUI in the OpenCode terminal aesthetic: monospace, minimal chrome,
-keyboard-driven, **panes not modal dialogs**. A thin interactive layer over the
-`Engine` — not a rewrite.
+keyboard-driven, panes not modal dialogs. A thin interactive layer over the
+`Engine`, not a rewrite.
 
 **Library: `textual`** (decided). It is a pure-Python TUI framework with
-widgets, panes, key handling, and live updates — the closest fit to the
+widgets, panes, key handling, and live updates, the closest fit to the
 OpenCode feel, and it ships a virtualized `DataTable` (so wide tables do not
 break the terminal, the main risk with a home-rolled `rich` grid).
 `rich` + `prompt_toolkit` is the fallback if we want fewer moving parts, but
 it forces us to hand-wire pane layout and focus; `textual` gives that for free.
 
 **Distribution: its own PyPI package, `pytauargus-tui`** (decided). It is a
-separate project — its own `pyproject.toml` and wheel — but **lives in this
-monorepo** (`bindings/tui/`, sibling to `bindings/python/`). Related work uses
+separate project with its own `pyproject.toml` and wheel, but it lives in
+this monorepo (`bindings/tui/`, sibling to `bindings/python/`). Related work uses
 short-lived feature branches; both packages ship from the same `py-v*` tag:
-- the core `pytauargus` wheel stays minimal — `textual` is never a dependency
+- the core `pytauargus` wheel stays minimal; `textual` is never a dependency
   of its base installation; `pytauargus[tui]` is an optional convenience extra,
   and `tauargus-tui` is a separate command;
 - the release workflow checks matching engine, TUI and tag versions and
@@ -97,24 +98,24 @@ short-lived feature branches; both packages ship from the same `py-v*` tag:
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Left pane** — table navigator (one row per `specify_table`) + the
+- **Left pane.** Table navigator (one row per `specify_table`) + the
   explanatory/response vars and active safety rules for the selected table.
-- **Center pane** — the computed table as a `DataTable`: rows = one
+- **Center pane.** The computed table as a `DataTable`: rows = one
   explanatory var's codes, columns = another's. Remaining dimensions select
   a slice. Each cell shows the value and is colored by status category;
   pending edits have a separate marker rather than a solver-result colour.
-- **Detail pane** (bottom) — the selected cell's value, full status name, and
-  — when the table has been audited — its realized feasibility interval.
-- **Log/status line** (bottom) — the engine's `logger` stream + a one-line
+- **Detail pane** (bottom). The selected cell's value, full status name, and,
+  when the table has been audited, its realized feasibility interval.
+- **Log/status line** (bottom). The engine's `logger` stream + a one-line
   keymap hint, draft revision, pending edit count, preview freshness and
   accepted revision. Busy state remains visible during engine work.
 
 Status color = the `_status_symbol` category from `pytauargus.engine`
 (`S` safe=green, `U` unsafe=red, `P` protect_manual=cyan, `M`
 secondary_unsafe=yellow, `E` empty=dim). Full status names come from
-`pytauargus.cli._STATUS_NAMES` (1–14).
+`pytauargus.cli._STATUS_NAMES` (1-14).
 
-### B.2 Feature → API map
+### B.2 Feature to API map
 
 Native operations use the existing Python engine and batch semantics. Draft
 editing, history, revisions and workspace persistence belong to the TUI;
@@ -124,8 +125,8 @@ they do not require a solver or batch-parser implementation in the widgets.
 |---------------|---------------------------|
 | Open data | `open_microdata(data_file, Metadata)` (or `run_batch(arb)` for a ready batch) |
 | Table navigator | `eng._n_tables`, `eng._tables[i]` (`spec.exp_vars`, `spec.resp_var`, safety rules) |
-| Grid cell value + status | `eng._tau.get_table_cell(tab, dim, 0)` → `res[1]`=value, `res[10]`=status; size via `get_total_table_size`, bounds via `get_minimum_cell_value` |
-| Detail: feasibility interval | `eng.audit(tab)` → rows `{cell,min,max,value,status,unsafe}` |
+| Grid cell value + status | `eng._tau.get_table_cell(tab, dim, 0)`, returns `res[1]`=value, `res[10]`=status; size via `get_total_table_size`, bounds via `get_minimum_cell_value` |
+| Detail: feasibility interval | `eng.audit(tab)`, returns rows `{cell,min,max,value,status,unsafe}` |
 | Preview suppress / round | On the scratch run: `eng.suppress(Suppress(kind="OPT"/"MOD"/"RND", tab_no=…, rnd_base=…))` |
 | Apply draft cell instructions | On the scratch run: `eng.apply_apriori(Apriory(…))`; preserve engine validation and trivial-level expansion |
 | Accept result | TUI promotes an eligible preview; no solver call or file export |
@@ -340,16 +341,17 @@ accepted result or its audit evidence.
 
 ## 4. Split-out requirement (Option B)
 
-The UI is **its own PyPI package** (`pytauargus-tui`) with a separate code
+The UI is its own PyPI package (`pytauargus-tui`) with a separate code
 boundary and coordinated engine/TUI releases:
 - Source: `bindings/tui/` on mainline; changes use feature branches and PRs.
-- Distribution: `pytauargus-tui` — its own `pyproject.toml`/version/**wheel**;
-  depends on `pytauargus>=<min>` + `textual`; console script `tauargus-tui`.
+- Distribution: `pytauargus-tui` with its own `pyproject.toml`, version and
+  wheel; depends on `pytauargus>=<min>` + `textual`; console script
+  `tauargus-tui`.
 - Does not touch: `engine/native/*`, the batch parser, or solver backends.
   The core `pytauargus` wheel and CLI are unchanged by the TUI.
-- Acceptance: drives a real `.arb` end-to-end in the terminal —
-  compute → edit draft → preview suppress/round → accept → export — and
-  preserves the state contracts in B.8. Workspace saving is independent.
+- Acceptance: drives a real `.arb` end-to-end in the terminal (compute, edit
+  draft, preview suppress/round, accept, export) and preserves the state
+  contracts in B.8. Workspace saving is independent.
   Runs use the same engine semantics as headless replay; compare recipe,
   constraints and valid outcomes, retaining exact accepted artifacts for export.
 
@@ -361,7 +363,7 @@ coordinated release checks.
 ### 5.1 Product direction: keep the table at the centre
 
 Keep the navigator, grid, detail pane and status line as the everyday screen.
-The primary loop stays **inspect → mark → preview → accept → export**.
+The primary loop stays inspect, mark, preview, accept, export.
 Add depth through a contextual command menu and small, dismissible panes for
 view selection, method settings, diagnostics and output. Existing shortcuts
 remain fast paths; new features do not each need a permanent button or key.
