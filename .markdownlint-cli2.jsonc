@@ -1,0 +1,10 @@
+{
+  "globs": ["**/*.md"],
+  "ignores": [
+    "**/.venv/**",
+    "**/.pytest_cache/**",
+    "**/build/**",
+    "**/node_modules/**",
+    "docs/tau-argus-4.1-markdown-bundle/**"
+  ]
+}
