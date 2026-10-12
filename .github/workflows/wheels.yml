@@ -284,7 +284,7 @@ jobs:
       - name: Download reference engine wheel (this run)
         uses: actions/download-artifact@v4
         with:
-          name: pytauargus-manylinux-x86_64-py-cp312-cp312
+          name: pytauargus-manylinux-x86_64-pycp312-cp312
           path: refengine
 
       - name: Build wheel
