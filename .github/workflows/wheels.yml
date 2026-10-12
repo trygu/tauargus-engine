@@ -312,7 +312,11 @@ jobs:
           WANTED="$(python3 -c "import tomllib;print(tomllib.load(open('bindings/tui/pyproject.toml','rb'))['project']['version'])")"
           [ "$RESOLVED" = "$WANTED" ] || { echo "::error::resolved pytauargus $RESOLVED, expected $WANTED"; exit 1; }
           "$RUNNER_TEMP/smoke/bin/python" -c "import pytauargus, pytauargus_tui; print('import ok, pytauargus', pytauargus.__version__)"
-          test -x "$RUNNER_TEMP/smoke/bin/tauargus-tui" && echo "entry point ok"
+          # Both entry points: tauargus-tui (human command) and the
+          # package-named alias that `uvx pytauargus-tui` resolves.
+          test -x "$RUNNER_TEMP/smoke/bin/tauargus-tui" \
+            && test -x "$RUNNER_TEMP/smoke/bin/pytauargus-tui" \
+            && echo "entry points ok"
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
