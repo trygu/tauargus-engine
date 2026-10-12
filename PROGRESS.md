@@ -18,11 +18,9 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
   fresh, bad version refused) + **replay batch** (`R`). TUI 82 / py 262 green.
 - [x] **Release 0.4.0 shipped**: workspace reopen + replay + APRIORI fix;
   verified on PyPI/GH Release/GHCR.
-- [x] Release pipeline: TUI smoke test now installs the engine wheel built
-  in the same run (`build-tui` needs `build-linux`) — floors may track the
-  release version instead of the last published one.
 
 ## In flight
+- TUI architecture/plans: `docs/ui-design.md` §5; Java review in ARCHIVE.
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record
   the written revision).
 

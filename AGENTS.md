@@ -37,6 +37,9 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   Target product is headless `.arb` batch CLI. A future R binding lives under `bindings/r/`.
 - Legacy Java frontend `src/tauargus/`: removed from `master`; kept on the `tui`
   branch as the TUI porting reference (read-only; restorable from history).
+- For TUI work, read `docs/ui-design.md` (architecture, state contracts and
+  prioritised plans) and `docs/tui.md` (shipped behaviour and current limits).
+  Update both when implementing a planned capability; plans are not shipped features.
 
 ## 5. Build Commands (macOS / Apple Silicon)
 - **Sync a venv with the current tree — the single dev-loop command, run after
