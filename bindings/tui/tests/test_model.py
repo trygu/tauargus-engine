@@ -6,10 +6,12 @@ produce for ``TestRecode.arb``. The model layer must expose them as plain
 Python so the textual widgets never touch the native bindings directly.
 """
 
+import shutil
 from pathlib import Path
 
 import pytest
 
+from pytauargus_tui import workspace as ws
 from pytauargus_tui.model import (
     CellEdit,
     CellInstruction,
@@ -19,6 +21,7 @@ from pytauargus_tui.model import (
     apriory_lines,
     arb_with_ops,
     format_status_delta,
+    replay_batch,
 )
 
 DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
@@ -304,3 +307,117 @@ def test_inplace_mutation_invalidates_audit():
     # An in-place mutation: the result is now different, the audit is stale.
     s.suppress(SuppressionOp("OPT", 1).suppress_cmd())
     assert s.audit_rows(0) == []
+
+
+# ===========================================================================
+# Workspace reopen — Session.from_workspace + replay (design §B.7)
+# ===========================================================================
+# The batch's input files (tests that mutate/replay need an isolated copy).
+# ``region2.hrc`` is referenced unquoted by the numeric ``RECODE 1, Region, 2``.
+ARB_INPUTS = ("tau_testW.asc", "tau_testW.rda", "GK.grc", "IndCode2.grc",
+              "region2.hrc")
+
+
+@pytest.fixture
+def tmp_arb(tmp_path) -> Path:
+    """A working copy of the batch + its input files in an isolated dir."""
+    for name in ("TestRecode.arb", *ARB_INPUTS):
+        shutil.copy(DATA / name, tmp_path / name)
+    return tmp_path / "TestRecode.arb"
+
+
+def _first_data_dim(s: Session, i: int = 0):
+    """A non-total (row, col) code label pair of table ``i``."""
+    g = s.grid(i)
+    return next((g.rows[r], g.cols[c])
+                for r in range(len(g.rows)) for c in range(len(g.cols))
+                if not s.is_total(i, (g.rows[r], g.cols[c])))
+
+
+def test_from_workspace_replays_recipe(tmp_arb):
+    """Reopening rebuilds the accepted result by re-running the recorded
+    recipe (spec + confirmed instructions + confirmed ops) on a fresh engine
+    (design §B.7: 'rebuild native execution state when needed')."""
+    s = Session.from_arb(tmp_arb)
+    dim = _first_data_dim(s)
+    instrs = [CellInstruction(1, dim, "U")]
+    ops = [SuppressionOp("OPT", 1)]
+    m = ws.build_manifest(tmp_arb, draft_revision=2, accepted_revision=2,
+                          confirmed_ops=ops, confirmed_instructions=instrs)
+    target = tmp_arb.parent / "t.workspace.json"
+    ws.save_workspace(m, target)
+    restored = Session.from_workspace(target)
+    expected = s.preview(ops, instrs)
+    assert restored.status_counts(0) == expected.status_counts(0)
+    assert restored.status_counts(1) == expected.status_counts(1)
+    assert restored.arb_path == tmp_arb  # re-previewable from the same .arb
+
+
+def test_from_workspace_empty_recipe_is_fresh(tmp_arb):
+    """A workspace with no confirmed recipe restores a bare spec session."""
+    m = ws.build_manifest(tmp_arb, draft_revision=1, accepted_revision=0)
+    target = tmp_arb.parent / "t.workspace.json"
+    ws.save_workspace(m, target)
+    restored = Session.from_workspace(target)
+    fresh = Session.from_arb(tmp_arb)
+    assert restored.status_counts(0) == fresh.status_counts(0)
+
+
+def test_from_workspace_stale_input(tmp_arb):
+    """A changed input raises WorkspaceStale — the saved outcome must not be
+    treated as current (design §B.7: explicit reconciliation)."""
+    m = ws.build_manifest(tmp_arb, draft_revision=1, accepted_revision=0)
+    target = tmp_arb.parent / "t.workspace.json"
+    ws.save_workspace(m, target)
+    tmp_arb.write_text("// operator edit\n" + tmp_arb.read_text())
+    with pytest.raises(ws.WorkspaceStale):
+        Session.from_workspace(target)
+
+
+def test_from_workspace_missing_input(tmp_arb):
+    """A missing input raises WorkspaceStale (it cannot be reconciled)."""
+    m = ws.build_manifest(tmp_arb, draft_revision=1, accepted_revision=0)
+    target = tmp_arb.parent / "t.workspace.json"
+    ws.save_workspace(m, target)
+    tmp_arb.unlink()
+    with pytest.raises(ws.WorkspaceStale):
+        Session.from_workspace(target)
+
+
+def test_from_workspace_unknown_version(tmp_arb):
+    """An incompatible manifest version is refused (design §B.7)."""
+    m = ws.build_manifest(tmp_arb, draft_revision=1, accepted_revision=0)
+    m.version = 99
+    target = tmp_arb.parent / "t.workspace.json"
+    ws.save_workspace(m, target)
+    with pytest.raises(ws.WorkspaceError):
+        Session.from_workspace(target)
+
+
+def test_replay_batch_writes_runnable_recipe(tmp_arb):
+    """The replay batch materialises the accepted recipe as a headless-
+    runnable .arb next to the input (design §B.7): one <SUPPRESS> line per
+    confirmed op, one apriori file per table of confirmed instructions.
+    Running it reproduces the accepted outcome."""
+    s = Session.from_arb(tmp_arb)
+    dim = _first_data_dim(s)
+    instrs = [CellInstruction(1, dim, "U")]
+    ops = [SuppressionOp("OPT", 1)]
+    path = replay_batch(tmp_arb, ops, instrs)
+    assert path == tmp_arb.parent / "TestRecode.replay.arb"
+    text = path.read_text()
+    assert "<SUPPRESS> OPT(1)" in text
+    # Full legacy APRIORI form, strict (ignore_error=0) like the TUI preview.
+    assert '<APRIORI> "TestRecode.tab1.apri",1,";",0,0' in text
+    apri = (tmp_arb.parent / "TestRecode.tab1.apri").read_text()
+    assert apri == f"{dim[0]};{dim[1]};U\n"
+    replayed = Session.from_arb(path)
+    expected = s.preview(ops, instrs)
+    assert replayed.status_counts(0) == expected.status_counts(0)
+
+
+def test_replay_batch_empty_recipe(tmp_arb):
+    """With no confirmed ops or marks the replay is a verbatim copy of the
+    spec (an empty recipe is a valid workspace)."""
+    path = replay_batch(tmp_arb, (), ())
+    assert path.read_text() == tmp_arb.read_text()

@@ -26,6 +26,16 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 WORKSPACE_VERSION = 1
 
 
+class WorkspaceError(Exception):
+    """A workspace manifest cannot be used (design §B.7)."""
+
+
+class WorkspaceStale(WorkspaceError):
+    """The input ``.arb`` is missing or differs from the fingerprint recorded
+    at save time. The saved outcome must not be treated as current: explicit
+    reconciliation is required before reopening restores it (design §B.7)."""
+
+
 @dataclass(frozen=True)
 class InstructionRef:
     """A cell instruction recorded in the manifest (stable cell identity)."""

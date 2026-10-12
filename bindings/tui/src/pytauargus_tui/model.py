@@ -23,6 +23,8 @@ from pytauargus.batch import Apriory, Suppress
 from pytauargus.engine import Engine, _status_symbol, run_batch
 from pytauargus import cli as _cli
 
+from pytauargus_tui import workspace as _ws
+
 # Full status names (1-14) live in the CLI module (design §B.1 references them).
 _STATUS_NAMES: Dict[int, str] = dict(_cli._STATUS_NAMES)
 
@@ -231,6 +233,45 @@ def arb_with_ops(arb_text: str, ops: Sequence[SuppressionOp]) -> str:
     return "\n".join(lines[:insert_at] + extra + lines[insert_at:]) + "\n"
 
 
+def replay_batch(arb_path: Union[str, Path],
+                 ops: Sequence[SuppressionOp],
+                 instructions: Sequence[CellInstruction]) -> Path:
+    """Materialise the accepted recipe as a headless-runnable batch
+    (design §B.7: "generated .arb + apriori files should replay the recorded
+    operator intent through the headless engine").
+
+    Writes ``<stem>.replay.arb`` next to the input: the original batch with
+    one ``<APRIORI>`` line per table of cell instructions (each pointing at a
+    sibling ``<stem>.tab<n>.apri`` file) and one ``<SUPPRESS>`` line per op.
+    ``tauargus run <stem>.replay.arb`` then reproduces the recorded intent —
+    without promising identical optimiser tie-breaking, and without
+    substituting for the saved accepted result.
+    """
+    arb_path = Path(arb_path)
+    lines = arb_path.read_text().splitlines()
+    insert_at = len(lines)
+    for i, ln in enumerate(lines):
+        if ln.lstrip().startswith("<WRITETABLE>"):
+            insert_at = i
+            break
+    extra: List[str] = []
+    by_table: Dict[int, List[CellInstruction]] = {}
+    for instr in instructions:
+        by_table.setdefault(instr.table, []).append(instr)
+    for tab_no in sorted(by_table):
+        name = f"{arb_path.stem}.tab{tab_no}.apri"
+        (arb_path.parent / name).write_text(apriory_lines(by_table[tab_no]))
+        # Full legacy form with explicit flags: strict (ignore_error=0, the
+        # TUI preview applies marks with errors surfaced) and no
+        # expand-trivial.
+        extra.append(f'<APRIORI> "{name}",{tab_no},";",0,0')
+    extra.extend(op.arb_line() for op in ops)
+    replay = arb_path.with_name(arb_path.stem + ".replay.arb")
+    replay.write_text("\n".join(lines[:insert_at] + extra
+                                 + lines[insert_at:]) + "\n")
+    return replay
+
+
 def format_status_delta(before: Dict[int, int],
                         after: Dict[int, int]) -> str:
     """Per-status ``name before→after`` pairs, ascending status code.
@@ -292,9 +333,44 @@ class Session:
         """Run a ``.arb`` batch in a fresh engine and wrap it."""
         return cls(run_batch(Path(arb_path)), arb_path)
 
+    @classmethod
+    def from_workspace(cls, ws_path: Union[str, Path]) -> "Session":
+        """Rebuild the working session from a saved workspace (design §B.7).
+
+        The saved outcome is not loaded from disk: the recorded recipe is
+        re-run on a fresh engine — the original spec, then the confirmed
+        cell instructions (apriori), then the confirmed method ops — which
+        is the design's "rebuild native execution state when needed". A
+        replayable recipe does not promise identical optimiser tie-breaking.
+        Raises :class:`workspace.WorkspaceError` for an incompatible
+        manifest version and :class:`workspace.WorkspaceStale` when the
+        input is missing or changed (explicit reconciliation required).
+        """
+        m = _ws.load_workspace(ws_path)
+        if m.version != _ws.WORKSPACE_VERSION:
+            raise _ws.WorkspaceError(
+                f"unsupported workspace version {m.version} "
+                f"(this build reads {_ws.WORKSPACE_VERSION})")
+        if _ws.input_changed(m, m.arb):
+            raise _ws.WorkspaceStale(m.arb)
+        base = cls.from_arb(m.arb)
+        if not m.confirmed_ops and not m.confirmed_instructions:
+            return base  # empty recipe: the bare spec session
+        ops = [SuppressionOp(kind=o.kind, tab=o.tab, rnd_base=o.rnd_base)
+               for o in m.confirmed_ops]
+        instrs = [CellInstruction(table=i.table, dim=i.dim, kind=i.kind)
+                  for i in m.confirmed_instructions]
+        return base.preview(ops, instrs)
+
     @property
     def engine(self) -> Engine:
         return self._eng
+
+    @property
+    def arb_path(self) -> Optional[Path]:
+        """The ``.arb`` this session is bound to (None when constructed
+        ad hoc). Re-previewing and workspace save/restore use it."""
+        return self._arb_path
 
     # -- navigator -----------------------------------------------------------
     @property

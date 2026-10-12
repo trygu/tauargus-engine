@@ -19,7 +19,9 @@ Layout (design §B.1)::
 Keymap: ``j``/``k`` or the navigator select a table; ``u``/``p``/``S`` mark
 the cursor cell (require suppression / protect / override safe — immediate
 draft edits, design §B.4); ``s``=OPT suppress, ``r``=RND round, ``a``=audit,
-``o``=save intermediate ``.tab``, ``q``=quit.
+``o``=save intermediate ``.tab``, ``w``=save workspace, ``R``=write replay
+batch, ``q``=quit. Launching on a ``.workspace.json`` restores a saved
+session (design §B.7).
 
 Cell marks update the pending instruction set with a visible marker and run
 no solver. Suppress/round are **staged, preview before committing**
@@ -35,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -64,6 +67,7 @@ from .model import (
     TableGrid,
     TableMeta,
     format_status_delta,
+    replay_batch,
 )
 
 # Status symbol → colour (design §B.1).
@@ -122,11 +126,16 @@ _HELP_TEXT = """
 
 [bold]Keys:[/bold]  j/k next/prev table · arrows move the cursor ·
   a = audit · o = export the accepted table (.tab) · w = save workspace
+  R = write replay batch (headless .arb of the accepted recipe)
   ? = help · q = quit · ctrl+z = undo edit · ctrl+y = redo edit
 
 [bold]Workspace:[/bold]  w saves a versioned manifest (the recipe, revisions
-  and the accepted outcome) next to the .arb — no solver run. Reopening it
-  restores the draft; export (o) writes the accepted table only.
+  and the accepted outcome) next to the .arb — no solver run. Reopen it
+  later: launch tauargus-tui on the .workspace.json (or pick it in the
+  file browser) — the accepted result is rebuilt through the engine and the
+  pending draft is restored (undoable). If the .arb changed since the save,
+  the old outcome is NOT treated as current: the current input opens fresh
+  instead. Export (o) writes the accepted table only.
 """
 
 
@@ -217,15 +226,17 @@ class _HelpScreen(ModalScreen[None]):
 
 
 class _ArbDirectoryTree(DirectoryTree):
-    """A DirectoryTree that lists only subdirectories and ``.arb`` files —
-    i.e. only files that make sense to open (design §B.7)."""
+    """A DirectoryTree that lists only subdirectories, ``.arb`` files and
+    saved ``.workspace.json`` files — i.e. only files that make sense to
+    open (design §B.7)."""
 
     def filter_paths(self, paths):
         for path in paths:
             name = path.name
             if name.startswith("."):
                 continue
-            if path.is_dir() or path.suffix.lower() == ".arb":
+            if (path.is_dir() or path.suffix.lower() == ".arb"
+                    or name.endswith(".workspace.json")):
                 yield path
 
 
@@ -256,22 +267,38 @@ class _FileBrowser(ModalScreen[Path]):
     def compose(self) -> ComposeResult:
         with Vertical(id="fb"):
             yield _ArbDirectoryTree(self._start, id="fbtree")
-            yield Static("choose a .arb batch file — Enter opens · q cancels",
-                         id="fbhint")
+            yield Static("choose a .arb batch or .workspace.json — "
+                         "Enter opens · q cancels", id="fbhint")
 
     def on_mount(self) -> None:
         self.query_one("#fbtree", DirectoryTree).focus()
 
     def on_directory_tree_file_selected(self, event) -> None:
-        # The tree is filtered to .arb files; this guard makes Enter open a
-        # real batch file (and ignore anything unexpected).
-        if event.path is not None and event.path.suffix.lower() == ".arb":
+        # The tree is filtered to .arb / .workspace.json files; this guard
+        # makes Enter open a real openable file (and ignore anything
+        # unexpected).
+        if (event.path is not None
+                and (event.path.suffix.lower() == ".arb"
+                     or event.path.name.endswith(".workspace.json"))):
             self.app._on_arb_chosen(event.path)
             self.dismiss()
 
     def action_cancel(self) -> None:
         self.app._on_arb_cancelled()
         self.dismiss()
+
+
+@dataclass(frozen=True)
+class _Restored:
+    """The rebuilt state returned by the restore worker (design §B.7)."""
+
+    session: Session
+    confirmed_ops: Tuple[SuppressionOp, ...]
+    confirmed_instructions: Tuple[CellInstruction, ...]
+    pending_instructions: Tuple[CellInstruction, ...]
+    accepted_revision: int
+    draft_revision: int
+    tab: int
 
 
 class TauArgusApp(App):
@@ -302,6 +329,7 @@ class TauArgusApp(App):
         Binding("a", "audit", "Audit"),
         Binding("o", "save", "Export table (.tab)"),
         Binding("w", "workspace_save", "Save workspace"),
+        Binding("shift+r", "replay", "Write replay batch", show=False),
         Binding("y", "confirm", "Confirm preview", show=False),
         Binding("n", "cancel", "Cancel preview", show=False),
         Binding("ctrl+z", "undo", "Undo edit", show=False),
@@ -310,10 +338,16 @@ class TauArgusApp(App):
         Binding("f1", "help", "Help", show=False),
     ]
 
-    def __init__(self, arb_path: Optional[Path] = None) -> None:
+    def __init__(self, arb_path: Optional[Path] = None,
+                 workspace_path: Optional[Path] = None) -> None:
         super().__init__()
         # None => no-arg launch: show the file browser first (design §B.7).
         self._arb: Optional[Path] = Path(arb_path) if arb_path is not None else None
+        # A saved workspace to restore on startup (design §B.7). Mutually
+        # exclusive with arb_path; the manifest's .arb wins if both given.
+        self._ws_path: Optional[Path] = (Path(workspace_path)
+                                         if workspace_path is not None
+                                         else None)
         self._session: Optional[Session] = None
         self._tab: int = 0
         self._grid: Optional[TableGrid] = None
@@ -388,7 +422,8 @@ class TauArgusApp(App):
 
     @property
     def last_action(self) -> str:
-        """Human-readable outcome of the last preview/confirm/cancel."""
+        """Human-readable outcome of the last preview/confirm/cancel or
+        workspace restore/stale reconciliation."""
         return self._last_action
 
     @property
@@ -460,7 +495,9 @@ class TauArgusApp(App):
         self._log_handler = _EngineLogHandler(self)
         self._log_handler.setFormatter(logging.Formatter("%(message)s"))
         logging.getLogger("pytauargus").addHandler(self._log_handler)
-        if self._arb is not None:
+        if self._ws_path is not None:
+            self._start_restore()
+        elif self._arb is not None:
             self._start_load()
         else:
             # No batch: show the picker; it calls back with the choice.
@@ -482,9 +519,14 @@ class TauArgusApp(App):
                         description="load", exit_on_error=False)
 
     def _on_arb_chosen(self, path: Path) -> None:
-        """The file browser returned a batch file: load it (design §B.7)."""
-        self._arb = Path(path)
-        self._start_load()
+        """The file browser returned a file: load a ``.arb`` batch, or
+        restore a ``.workspace.json`` (design §B.7)."""
+        if path.name.endswith(".workspace.json"):
+            self._ws_path = Path(path)
+            self._start_restore()
+        else:
+            self._arb = Path(path)
+            self._start_load()
 
     def _on_arb_cancelled(self) -> None:
         """The file browser was cancelled: quit (nothing to load)."""
@@ -498,6 +540,94 @@ class TauArgusApp(App):
     def _load(self) -> Session:
         return Session.from_arb(self._arb)
 
+    # -- workspace restore (design §B.7) ------------------------------------
+    def _start_restore(self) -> None:
+        """Kick off the (exclusive) restore worker for a saved workspace."""
+        self._set_log(f"restoring {self._ws_path.name} ...")
+        self._set_busy(True)
+        self.run_worker(self._restore, group="engine", exclusive=True,
+                        thread=True, description="restore", exit_on_error=False)
+
+    def _restore(self) -> "_Restored":
+        """Worker body: rebuild the session from the saved workspace.
+
+        The saved outcome is not read from disk: the recorded recipe is
+        re-run on a fresh engine (spec + confirmed instructions + confirmed
+        ops), and the manifest's revisions/draft are returned for the UI to
+        re-adopt. Raises ``WorkspaceError``/``WorkspaceStale`` — the app
+        reconciles explicitly (design §B.7).
+        """
+        m = _ws.load_workspace(self._ws_path)
+        if m.version != _ws.WORKSPACE_VERSION:
+            raise _ws.WorkspaceError(
+                f"unsupported workspace version {m.version} "
+                f"(this build reads {_ws.WORKSPACE_VERSION})")
+        if _ws.input_changed(m, m.arb):
+            raise _ws.WorkspaceStale(m.arb)
+        session = Session.from_workspace(self._ws_path)
+        return _Restored(
+            session=session,
+            confirmed_ops=tuple(SuppressionOp(kind=o.kind, tab=o.tab,
+                                               rnd_base=o.rnd_base)
+                                 for o in m.confirmed_ops),
+            confirmed_instructions=tuple(
+                CellInstruction(table=i.table, dim=i.dim, kind=i.kind)
+                for i in m.confirmed_instructions),
+            pending_instructions=tuple(
+                CellInstruction(table=i.table, dim=i.dim, kind=i.kind)
+                for i in m.pending_instructions),
+            accepted_revision=m.accepted_revision,
+            draft_revision=m.draft_revision,
+            tab=m.tab,
+        )
+
+    def _apply_restore(self, st: "_Restored") -> None:
+        """Adopt the rebuilt session and re-adopt its logical state
+        (design §B.7/§B.8): confirmed ops/instructions, the pending draft
+        (each restored mark is an undoable edit), and the saved revisions."""
+        self._session = st.session
+        self._arb = st.session.arb_path
+        self._ws_path = None  # restored; further saves go next to the .arb
+        self._confirmed = list(st.confirmed_ops)
+        self._confirmed_instr = list(st.confirmed_instructions)
+        self._pending = None
+        self._preview = None
+        self._preview_revision = None
+        self._history.reset()
+        for instr in st.pending_instructions:
+            self._record_edit((instr.table - 1, instr.dim), None, instr.kind)
+        # The saved revision is authoritative (it counts every edit made
+        # since the spec, including ones whose marks were later cleared).
+        self._draft_revision = st.draft_revision
+        self._accepted_revision = st.accepted_revision
+        self._populate_nav()
+        self._select_table(min(st.tab, self._session.n_tables - 1))
+        note = (f", {len(st.confirmed_ops)} confirmed op(s)"
+                if st.confirmed_ops else "")
+        self._set_log(f"restored workspace: {st.session.n_tables} "
+                      f"table(s){note}")
+        self._last_action = "workspace restored"
+
+    def _on_restore_failed(self, err: Exception) -> None:
+        """Restore failed (design §B.7). A stale/missing input is reconciled
+        explicitly: the saved outcome is NOT treated as current, and the
+        current input is opened fresh when it still exists. Anything else
+        (bad version, corrupt file) is reported and the user is sent back to
+        the file browser."""
+        if isinstance(err, _ws.WorkspaceStale):
+            arb = Path(err.args[0]) if err.args else None
+            if arb is not None and arb.is_file():
+                self._last_action = (f"workspace stale: {arb.name} changed "
+                                     f"since save — current input opened fresh")
+                self._arb = arb
+                self._ws_path = None
+                self._start_load()
+                return
+        self._set_busy(False)
+        self._last_action = f"workspace restore failed: {err}"
+        start = self._ws_path.parent if self._ws_path is not None else Path.cwd()
+        self.push_screen(_FileBrowser(start=start))
+
     # -- worker events --------------------------------------------------------------
     def on_worker_state_changed(self, event) -> None:
         w = event.worker
@@ -509,6 +639,8 @@ class TauArgusApp(App):
                 self._populate_nav()
                 self._set_log(f"loaded {self._session.n_tables} table(s)")
                 self._select_table(0)
+            elif w.description == "restore":
+                self._apply_restore(w.result)
             elif w.description == "grid":
                 self._grid = w.result
                 self._populate_grid()
@@ -525,6 +657,9 @@ class TauArgusApp(App):
                                           f"on table {self._pending.tab}")
                     self._show_preview_pending()
         elif w.state is WorkerState.ERROR:
+            if w.description == "restore":
+                self._on_restore_failed(w.error)
+                return  # busy + log handled by the reconciliation
             if w.description == "preview" and self._pending is not None:
                 # A failed preview (e.g. legacy 5008 on re-OPT) is dropped;
                 # the live session is untouched.
@@ -774,6 +909,26 @@ class TauArgusApp(App):
             self._set_log(f"workspace saved: {path.name}")
         except OSError as e:
             self._set_log(f"workspace save failed: {e}")
+
+    def action_replay(self) -> None:
+        """Write the accepted recipe as a replayable headless batch next to
+        the input (design §B.7): a ``<stem>.replay.arb`` with the confirmed
+        ops' ``<SUPPRESS>`` lines and the confirmed marks' apriori files.
+        Pure file I/O — no solver run. The pending draft is NOT included:
+        the replay encodes the accepted recipe only (a different outcome
+        needs a new preview and acceptance)."""
+        if self._session is None or self._arb is None:
+            return
+        if self._pending is not None:
+            return  # locked while a preview is pending
+        try:
+            path = replay_batch(self._arb, self._confirmed,
+                                self._confirmed_instr)
+            note = (f" — {len(self._pending_instr)} draft edit(s) not included"
+                    if self._pending_instr else "")
+            self._set_log(f"replay batch written: {path.name}{note}")
+        except OSError as e:
+            self._set_log(f"replay write failed: {e}")
 
     def action_help(self) -> None:
         """Show the on-screen explanation of keys, colours and workflow."""
@@ -1039,14 +1194,21 @@ class TauArgusApp(App):
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Console entry point: ``tauargus-tui [batch.arb]`` (browse if omitted)."""
+    """Console entry point: ``tauargus-tui [batch.arb | x.workspace.json]``
+    (browse if omitted). A ``.workspace.json`` reopens a saved session
+    (design §B.7)."""
     p = argparse.ArgumentParser(
         prog="tauargus-tui",
         description="Tau-Argus terminal UI over the pytauargus engine")
-    p.add_argument("arb", nargs="?", default=None,
-                   help="path to a .arb batch file (omit to browse)")
+    p.add_argument("path", nargs="?", default=None,
+                   help="path to a .arb batch file or a saved "
+                        ".workspace.json (omit to browse)")
     args = p.parse_args(argv)
-    app = TauArgusApp(Path(args.arb) if args.arb else None)
+    path = Path(args.path) if args.path else None
+    if path is not None and path.name.endswith(".workspace.json"):
+        app = TauArgusApp(workspace_path=path)
+    else:
+        app = TauArgusApp(path)
     app.run()
     return 0
 

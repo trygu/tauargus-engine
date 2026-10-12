@@ -4,6 +4,8 @@ Drive the real app against ``data/TestRecode.arb``: load, navigator,
 grid shape, cell detail, table switching, and the action keys.
 """
 
+import json
+import shutil
 import time
 from pathlib import Path
 
@@ -727,3 +729,200 @@ async def test_workspace_save_before_any_preview(app, tmp_path):
         assert m.confirmed_ops == []
         # A pre-preview save records no accepted revision yet.
         assert m.accepted_revision == app.accepted_revision
+
+
+# ===========================================================================
+# Workspace reopen — restore (design §B.7 / §B.8)
+# ===========================================================================
+# The batch's input files (restore tests work on an isolated copy so they
+# may mutate the input without touching data/).
+# ``region2.hrc`` is referenced unquoted by the numeric ``RECODE 1, Region, 2``.
+ARB_INPUTS = ("tau_testW.asc", "tau_testW.rda", "GK.grc", "IndCode2.grc",
+              "region2.hrc")
+
+
+@pytest.fixture
+def tmp_arb(tmp_path) -> Path:
+    """A working copy of the batch + its input files in an isolated dir."""
+    for name in ("TestRecode.arb", *ARB_INPUTS):
+        shutil.copy(DATA / name, tmp_path / name)
+    return tmp_path / "TestRecode.arb"
+
+
+async def test_restore_rebuilds_accepted_and_draft(tmp_arb):
+    """Save (accepted OPT + a pending draft mark) in one session; a new app
+    opened on the .workspace.json rebuilds the same accepted result and
+    restores the pending draft (design §B.7/§B.8: 'save/reopen preserves
+    pending intent and the exact accepted outcome')."""
+    target = tmp_arb.parent / "t.workspace.json"
+    app = TauArgusApp(tmp_arb)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor 1")
+        await pilot.press("u")
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")                       # accept OPT (commits mark)
+        g.move_cursor(row=2, column=3)
+        await wait_for(pilot, lambda: app.cursor == (2, 3), what="cursor 2")
+        await pilot.press("u")                       # a pending draft mark
+        app._workspace_path = lambda: target
+        await pilot.press("w")
+        await wait_for(pilot, lambda: target.exists(), what="workspace file")
+        final_counts = app.session.status_counts(0)
+        pending = [(i.table, i.dim, i.kind)
+                   for i in app.pending_instructions]
+        draft_rev = app.draft_revision
+        acc_rev = app.accepted_revision
+        n_confirmed = len(app.confirmed_ops)
+
+    app2 = TauArgusApp(workspace_path=target)
+    async with app2.run_test(size=(120, 35)) as pilot2:
+        await wait_for(pilot2, lambda: app2.session is not None, what="restore")
+        # The exact accepted outcome, rebuilt through the engine.
+        assert app2.session.status_counts(0) == final_counts
+        # The pending intent is restored, and the recipe is re-adopted.
+        assert [(i.table, i.dim, i.kind)
+                for i in app2.pending_instructions] == pending
+        assert len(app2.confirmed_ops) == n_confirmed
+        assert app2.accepted_revision == acc_rev
+        assert app2.draft_revision == draft_rev
+        assert app2._arb == tmp_arb  # bound to the manifest's input
+
+
+async def test_restore_pending_mark_is_undoable(tmp_arb):
+    """A restored draft mark is a real draft edit: undo clears it and the
+    undo is itself a semantic edit (design §B.5/§B.8)."""
+    target = tmp_arb.parent / "t.workspace.json"
+    app = TauArgusApp(tmp_arb)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        app._workspace_path = lambda: target
+        await pilot.press("w")
+        await wait_for(pilot, lambda: target.exists(), what="workspace file")
+        saved_rev = app.draft_revision
+
+    app2 = TauArgusApp(workspace_path=target)
+    async with app2.run_test(size=(120, 35)) as pilot2:
+        await wait_for(pilot2, lambda: app2.session is not None, what="restore")
+        assert len(app2.pending_instructions) == 1
+        await pilot2.press("ctrl+z")
+        assert app2.pending_instructions == ()
+        assert app2.draft_revision == saved_rev + 1  # undo advances the draft
+
+
+async def test_restore_stale_input_opens_fresh(tmp_arb):
+    """Changed input requires explicit reconciliation (design §B.7): the
+    saved outcome is not treated as current — the current input is opened
+    fresh, with no recipe or draft restored."""
+    target = tmp_arb.parent / "t.workspace.json"
+    app = TauArgusApp(tmp_arb)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor")
+        await pilot.press("u")
+        app._workspace_path = lambda: target
+        await pilot.press("w")
+        await wait_for(pilot, lambda: target.exists(), what="workspace file")
+    # The operator edits the input after the save.
+    tmp_arb.write_text("// operator edit\n" + tmp_arb.read_text())
+
+    app2 = TauArgusApp(workspace_path=target)
+    async with app2.run_test(size=(120, 35)) as pilot2:
+        await wait_for(pilot2, lambda: app2.session is not None,
+                       what="fresh session of the current input")
+        assert app2.pending_instructions == ()
+        assert app2.confirmed_ops == ()
+        assert app2.accepted_revision == 0
+        assert app2._arb == tmp_arb
+        assert app2.last_action.startswith("workspace stale")
+
+
+def test_arb_directory_tree_lists_workspace_files(tmp_path):
+    """Saved workspaces are openable from the startup browser (design §B.7);
+    other .json files are not."""
+    (tmp_path / "t.workspace.json").write_text("{}")
+    (tmp_path / "other.json").write_text("{}")
+    tree = _ArbDirectoryTree(tmp_path)
+    shown = {p.name for p in tree.filter_paths(list(tmp_path.iterdir()))}
+    assert "t.workspace.json" in shown
+    assert "other.json" not in shown
+
+
+async def test_filebrowser_pick_workspace_restores(app_none, tmp_arb):
+    """Picking a .workspace.json in the startup browser restores it (the
+    same callback path as picking a .arb)."""
+    target = tmp_arb.parent / "t.workspace.json"
+    app = TauArgusApp(tmp_arb)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        app._workspace_path = lambda: target
+        await pilot.press("w")
+        await wait_for(pilot, lambda: target.exists(), what="workspace file")
+
+    async with app_none.run_test(size=(100, 35)) as pilot:
+        await wait_for(pilot, lambda: isinstance(app_none.screen, _FileBrowser),
+                       what="file browser")
+        app_none._on_arb_chosen(target)  # what the browser does on Enter
+        await wait_for(pilot, lambda: app_none.session is not None,
+                       what="restore after pick")
+        assert app_none._arb == tmp_arb
+
+
+async def test_restore_unknown_version_refused(tmp_arb):
+    """An incompatible manifest version is refused explicitly (design §B.7):
+    no session, no crash — back to the file browser to pick something else."""
+    target = tmp_arb.parent / "t.workspace.json"
+    app = TauArgusApp(tmp_arb)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        app._workspace_path = lambda: target
+        await pilot.press("w")
+        await wait_for(pilot, lambda: target.exists(), what="workspace file")
+    d = json.loads(target.read_text())
+    d["version"] = 99
+    target.write_text(json.dumps(d))
+
+    app2 = TauArgusApp(workspace_path=target)
+    async with app2.run_test(size=(100, 35)) as pilot2:
+        await wait_for(pilot2,
+                       lambda: isinstance(app2.screen, _FileBrowser),
+                       what="file browser after refused restore")
+        assert app2.session is None
+        assert "restore failed" in app2.last_action
+
+
+async def test_replay_writes_runnable_batch(tmp_arb):
+    """R materialises the accepted recipe as a headless-runnable batch next
+    to the input (design §B.7): the confirmed op and the committed mark are
+    encoded; the still-pending draft mark is not included."""
+    app = TauArgusApp(tmp_arb)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await _loaded(pilot, app)
+        g = grid(app)
+        g.move_cursor(row=1, column=2)
+        await wait_for(pilot, lambda: app.cursor == (1, 2), what="cursor 1")
+        await pilot.press("u")
+        await pilot.press("s")
+        await wait_for(pilot, lambda: app.preview is not None, what="preview")
+        await pilot.press("y")                       # commits the mark
+        g.move_cursor(row=2, column=3)
+        await wait_for(pilot, lambda: app.cursor == (2, 3), what="cursor 2")
+        await pilot.press("u")                       # pending: not replayed
+        await pilot.press("shift+r")
+        replay = tmp_arb.parent / "TestRecode.replay.arb"
+        assert replay.exists()
+        assert "<SUPPRESS> OPT(1)" in replay.read_text()
+        apri_lines = [ln for ln in
+                      (tmp_arb.parent / "TestRecode.tab1.apri").read_text()
+                      .splitlines() if ln.endswith(";U")]
+        assert len(apri_lines) == 1  # only the committed mark
+        assert "replay batch written" in app.log_text
