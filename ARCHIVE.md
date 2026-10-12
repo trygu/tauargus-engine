@@ -734,3 +734,15 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Verification: TUI suite 82 passed (was 68); Python suite 262 passed /
   3 skipped (was 259). TDD throughout (red → green). Release 0.4.0
   (lockstep) pending user go-ahead — PyPI versions are immutable.
+
+## Release 0.5.1: uvx-runnable TUI alias (2026-10-12)
+
+- `uvx pytauargus-tui` failed: uvx resolves an executable named after the
+  package, but the wheel only shipped `tauargus-tui`.
+- Fix: alias console script `pytauargus-tui` to the same
+  `pytauargus_tui.app:main` (bindings/tui/pyproject.toml); contract locked by
+  tests/test_packaging.py (TDD, red then green).
+- CI: wheels.yml TUI smoke test now asserts both executables exist in a
+  clean venv (`4c7725e`).
+- Lockstep bump + `chore(release): 0.5.1` (`e9f413d`), tag `py-v0.5.1`.
+  Verified on PyPI: published wheel lists both entry points.

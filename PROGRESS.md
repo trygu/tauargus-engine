@@ -20,11 +20,10 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
   paths/URLs, `TableResult.to_parquet`, CLI `protect`; pyarrow `parquet` extra.
 - [x] Markdown lint: `.markdownlint.json` (MD013 off), legacy bundle excluded;
   repo `.md` files clean under `markdownlint-cli2`.
+- [x] 0.5.1: `pytauargus-tui` console alias, `uvx pytauargus-tui` works.
 
 ## In flight
 
-- [ ] TUI: `pytauargus-tui` console alias so `uvx pytauargus-tui` works
-  (test_packaging.py, wheel verified); needs 0.5.1 release.
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts;
   record the written revision).
 
