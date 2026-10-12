@@ -5,8 +5,6 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 ## Verified checkpoints (details in ARCHIVE.md)
 - [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
 - [x] Headless CLI; wheel + CI → PyPI + GHCR; Releases 0.3.0 / 0.3.1 shipped.
-- [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`), `ErrorStrings.txt`
-  (hitas `d3e5b91`), FullJJ streams (`caf7528`).
 - [x] Dev loop: `scripts/sync-venv.sh`; venvs run local wheels, not PyPI.
 - [x] TUI on mainline: staged s/r preview, marks u/p/S + undo/redo, audit,
   workspace save, preview-in-grid; guide `docs/tui.md`.
@@ -18,10 +16,13 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] TUI §B.7: workspace **reopen/restore** (CLI arg + file browser; recipe
   re-run on a fresh engine, draft restored undoable, stale input reconciled
   fresh, bad version refused) + **replay batch** (`R`). TUI 82 / py 262 green.
+- [x] **Release 0.4.0 shipped**: workspace reopen + replay + APRIORI fix;
+  verified on PyPI/GH Release/GHCR.
+- [x] Release pipeline: TUI smoke test now installs the engine wheel built
+  in the same run (`build-tui` needs `build-linux`) — floors may track the
+  release version instead of the last published one.
 
 ## In flight
-- [ ] Release 0.4.0 (lockstep) to publish the §B.7 feature on PyPI —
-  pending user go-ahead (immutable version).
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record
   the written revision).
 
