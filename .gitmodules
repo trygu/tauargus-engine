@@ -18,3 +18,6 @@
 	path = engine/native/core
 	url = https://github.com/trygu/libtauargus.git
 	branch = rewrite
+[submodule "references/hypercube"]
+	path = references/hypercube
+	url = https://github.com/trygu/hypercube.git
