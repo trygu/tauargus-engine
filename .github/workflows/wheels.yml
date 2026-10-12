@@ -270,12 +270,22 @@ jobs:
   build-tui:
     name: build pytauargus-tui wheel
     runs-on: ubuntu-24.04
+    # The smoke test verifies the TUI wheel against the pytauargus wheel
+    # built in THIS run (not the last published one on PyPI), so this job
+    # waits for the linux build to produce the reference wheel.
+    needs: [build-linux]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Download reference engine wheel (this run)
+        uses: actions/download-artifact@v4
+        with:
+          name: pytauargus-manylinux-x86_64-py-cp312-cp312
+          path: refengine
 
       - name: Build wheel
         run: |
@@ -291,9 +301,16 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/smoke"
           "$RUNNER_TEMP/smoke/bin/pip" install --upgrade pip
-          "$RUNNER_TEMP/smoke/bin/pip" install dist/*.whl
+          # Install the pytauargus wheel built in this run alongside the TUI
+          # wheel, so the dependency resolves against the engine that ships
+          # with this release (PyPI may not have that version yet).
+          "$RUNNER_TEMP/smoke/bin/pip" install refengine/*.whl dist/*.whl
           echo "--- resolved pytauargus ---"
           "$RUNNER_TEMP/smoke/bin/pip" show pytauargus | grep -E '^(Name|Version):'
+          # Guard: the resolved engine must be this run's build, not PyPI's.
+          RESOLVED="$("$RUNNER_TEMP/smoke/bin/pip" show pytauargus | sed -n 's/^Version: //p')"
+          WANTED="$(python3 -c "import tomllib;print(tomllib.load(open('bindings/tui/pyproject.toml','rb'))['project']['version'])")"
+          [ "$RESOLVED" = "$WANTED" ] || { echo "::error::resolved pytauargus $RESOLVED, expected $WANTED"; exit 1; }
           "$RUNNER_TEMP/smoke/bin/python" -c "import pytauargus, pytauargus_tui; print('import ok, pytauargus', pytauargus.__version__)"
           test -x "$RUNNER_TEMP/smoke/bin/tauargus-tui" && echo "entry point ok"
 
