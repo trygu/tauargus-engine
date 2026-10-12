@@ -68,11 +68,11 @@ run_batch("mybatch.arb")
 Wheels bundle HiGHS and the engine libraries, so nothing else needs installing.
 They are built for Python 3.10-3.13 on:
 
-| Platform | Architecture |
-|----------|--------------|
-| macOS    | arm64 (Apple Silicon) |
-| Linux (manylinux_2_28) | x86_64, aarch64 |
-| Windows  | x64 |
+| Platform               | Architecture          |
+|------------------------|-----------------------|
+| macOS                  | arm64 (Apple Silicon) |
+| Linux (manylinux_2_28) | x86_64, aarch64       |
+| Windows                | x64                   |
 
 Intel Macs and Windows ARM are not built, and there is no source
 distribution; on those platforms see [Building from source](#building-from-source).
@@ -359,21 +359,19 @@ needs nothing external. Use it three ways:
 
 ## Architecture
 
-```
+```text
 .arb batch  ->  tauargus CLI / tauargus-tui  ->  pytauargus  ->  tauargus-engine (C/C++)  ->  HiGHS
 ```
 
 The engine is C++11, built from five git submodules under `engine/native/`:
 
-| Module   | Role |
-|----------|------|
-| `core`   | Data model, Argus/JJ file I/O, SDC engine entry points |
-| `csp`    | Cell-suppression LP (branch-and-price) and feasibility audit |
-| `hitas`  | Hierarchical table suppression (HiTaS); links `csp` |
-| `crp`    | Controlled rounding (iterative rounding, audit) |
-| `rounder`| Dispatch layer over `crp` |
+- `core`: Data model, Argus/JJ file I/O, SDC engine entry points
+- `csp`: Cell-suppression LP (branch-and-price) and feasibility audit
+- `hitas`: Hierarchical table suppression (HiTaS); links `csp`
+- `crp`: Controlled rounding (iterative rounding, audit)
+- `rounder`: Dispatch layer over `crp`
 
-```
+```text
 .
 ├── engine/      C/C++ engine; CMakeLists.txt is a superbuild of the 5 submodules
 ├── bindings/

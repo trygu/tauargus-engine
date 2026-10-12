@@ -3,6 +3,7 @@
 Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python CLI (replacing Java/Swing).
 
 ## 1. Context & Token Preservation (CRITICAL)
+
 - **Terminal output discipline:** NEVER run tests or build commands that print unbounded raw logs into chat context.
   - Redirect verbose output: `<cmd> > /tmp/run.log 2>&1`
   - Inspect ONLY relevant lines: `tail -n 25 /tmp/run.log` or `grep -E "ERROR|CRASH|===|FAIL" /tmp/run.log`
@@ -11,6 +12,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - **No speculative code edits:** When debugging crashes, do not add arbitrary debug prints across multiple files. Run under ASan, get the exact stack trace, fix the flagged site, and verify.
 
 ## 2. Checkpoint & Progress Discipline
+
 - **Micro-checkpoints:** You MUST update `PROGRESS.md` at every significant discovery or phase transition, NOT just when a task is 100% finished:
   1. When a hypothesis is confirmed or invalidated (e.g. "Invalidated: matsz buffer overflow").
   2. When an ASan stack trace is captured and root cause is identified.
@@ -19,6 +21,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - **State format:** Keep `PROGRESS.md` strictly under 35 lines. Completed items are moved to `ARCHIVE.md` immediately.
 
 ## 3. Source of Truth for Legacy Behavior (READ FIRST)
+
 - **`docs/tau-argus-4.1-markdown-bundle/`**: the legacy τ-ARGUS 4.1 manual (PDF + 10.8k-line
   agent reference + 77 figure assets). This is the **source of truth** for legacy behavior:
   file formats, `.arb` batch grammar, parameters, and SDC mathematics. The rewrite must be a
@@ -26,6 +29,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   Part I (agent reference) is task-oriented; Part II is the page-by-page transcription.
 
 ## 4. Architecture & Boundaries
+
 - Layout: `engine/` (C/C++ core) + `bindings/` (per-language front-ends).
   The engine is language-agnostic; each binding links the five engine libs.
 - Native C/C++ engine: 5 git submodules under `engine/native/`:
@@ -42,6 +46,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   Update both when implementing a planned capability; plans are not shipped features.
 
 ## 5. Build Commands (macOS / Apple Silicon)
+
 - **Sync a venv with the current tree.** The single dev-loop command; run it
   after ANY change under `engine/` or `bindings/python/`:
   `scripts/sync-venv.sh <venv>`: submodule-drift gate, release engine,
@@ -58,6 +63,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   (Preload runtime for Python: `DYLD_INSERT_LIBRARIES="$(clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" uv run ...`)
 
 ## 6. Verification & Commits
+
 - **TDD:** The agent is an avid TDD fan. For every feature/port, write the test
   *first* (it encodes the legacy contract), watch it fail for the right reason,
   then implement until green. A feature is not done until its test passes.
@@ -66,7 +72,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Commit cadence: Submodule commit first -> parent submodule bump + `PROGRESS.md` update.
 - Conventional Commits for all new history (adopted at the 0.3.2 release;
   older history predates it): lowercase type `feat|fix|docs|refactor|perf|test|build|ci|chore`
-  + optional scope, imperative subject, e.g. `fix: status line off-screen`,
+  with optional scope and an imperative subject, e.g. `fix: status line off-screen`,
   `docs: tui guide`, `build(csp): 3007826 ...`. Release commits:
   `chore(release): X.Y.Z`. Auto-generated merge commits are exempt.
 - Never stage build artifacts (`.venv/`, `build/`, `dist/`, `*.so`, `*.dylib`, `engine/build/`, `engine/native/build/`).
@@ -74,6 +80,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Commits are authored as the user only: no `Co-authored-by` trailer.
 
 ## 7. Releasing (PyPI + GHCR image)
+
 - Releases are tag-driven: tag `py-v<version>` runs `.github/workflows/wheels.yml`
   (wheels -> GitHub Release -> PyPI via trusted publishing -> GHCR image).
 - PyPI versions are immutable and the workflow fails if the tag differs from the
@@ -89,10 +96,12 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - The image is `ghcr.io/trygu/tauargus-engine:<version>` and `:latest`.
 
 ## 8. Communication
+
 - Always respond in English, regardless of the language the user writes in
   (the user often writes Norwegian; keep replies in English).
 
 ## 9. Documentation style
+
 - Plain prose: active voice, short declarative sentences, common words. No
   filler or promotional vocabulary (e.g. additionally, crucial, delve,
   enhance, pivotal, showcase, testament, underscore, "serves as",

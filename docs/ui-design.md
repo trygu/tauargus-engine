@@ -40,6 +40,7 @@ in lockstep with the engine.
 
 The product is the headless CLI + batch runner. Interactive needs (spec
 authoring, table inspection, suppression tuning) are served by:
+
 - the CLI verbs: `run`, `explore`, `specify`, `compute`, `suppress`, `round`,
   `apriori`, `audit`, `save`, `tables`, `version`;
 - machine-readable outputs (CSV, INTERMEDIATE `.tab`, audit rows) that feed
@@ -68,6 +69,7 @@ it forces us to hand-wire pane layout and focus; `textual` gives that for free.
 separate project with its own `pyproject.toml` and wheel, but it lives in
 this monorepo (`bindings/tui/`, sibling to `bindings/python/`). Related work uses
 short-lived feature branches; both packages ship from the same `py-v*` tag:
+
 - the core `pytauargus` wheel stays minimal; `textual` is never a dependency
   of its base installation; `pytauargus[tui]` is an optional convenience extra,
   and `tauargus-tui` is a separate command;
@@ -84,7 +86,7 @@ short-lived feature branches; both packages ship from the same `py-v*` tag:
 
 ### B.1 Layout
 
-```
+```text
 ┌ tables & vars ┬──────────────────────── grid ────────────────────────┐
 │ 1 REGION|CA ▸ │ REGION\CA  R1    R2    R3    TOTAL                   │
 │ 2 SEXE  |CA   │  R1        S     U     S     S                       │
@@ -122,7 +124,7 @@ editing, history, revisions and workspace persistence belong to the TUI;
 they do not require a solver or batch-parser implementation in the widgets.
 
 | Pane / action | Real `pytauargus` surface |
-|---------------|---------------------------|
+| --------------- | --------------------------- |
 | Open data | `open_microdata(data_file, Metadata)` (or `run_batch(arb)` for a ready batch) |
 | Table navigator | `eng._n_tables`, `eng._tables[i]` (`spec.exp_vars`, `spec.resp_var`, safety rules) |
 | Grid cell value + status | `eng._tau.get_table_cell(tab, dim, 0)`, returns `res[1]`=value, `res[10]`=status; size via `get_total_table_size`, bounds via `get_minimum_cell_value` |
@@ -343,6 +345,7 @@ accepted result or its audit evidence.
 
 The UI is its own PyPI package (`pytauargus-tui`) with a separate code
 boundary and coordinated engine/TUI releases:
+
 - Source: `bindings/tui/` on mainline; changes use feature branches and PRs.
 - Distribution: `pytauargus-tui` with its own `pyproject.toml`, version and
   wheel; depends on `pytauargus>=<min>` + `textual`; console script

@@ -4,11 +4,9 @@ Three executed, output-saved notebooks that double as API documentation. Every
 code cell runs against the verified public API; the markdown explains the
 surface it exercises.
 
-| # | Notebook | What it covers |
-|---|----------|----------------|
-| 1 | [`01_quickstart.ipynb`](01_quickstart.ipynb) | DataFrame → `protect()` → `TableResult` → masked CSV/Parquet; existing batches and native cell inspection |
-| 2 | [`02_protection_and_audit.ipynb`](02_protection_and_audit.ipynb) | OPT/MOD DataFrame protection, explicit audit and masked export; batch OPT/MOD/RND |
-| 3 | [`03_generators.ipynb`](03_generators.ipynb) | `protect(run=False)` file preview, multiple tables, custom writers and batch round-trip |
+1. [`01_quickstart.ipynb`](01_quickstart.ipynb): DataFrame → `protect()` → `TableResult` → masked CSV/Parquet; existing batches and native cell inspection
+2. [`02_protection_and_audit.ipynb`](02_protection_and_audit.ipynb): OPT/MOD DataFrame protection, explicit audit and masked export; batch OPT/MOD/RND
+3. [`03_generators.ipynb`](03_generators.ipynb): `protect(run=False)` file preview, multiple tables, custom writers and batch round-trip
 
 All three use twelve synthetic respondents to demonstrate the new DataFrame
 API. `dataframe()` and `unsafe()` expose original values for analysis; the

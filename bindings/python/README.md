@@ -194,7 +194,7 @@ The sample inputs are in the repository's
 ## Batch file commands
 
 | Command | Purpose |
-|---------|---------|
+| --------- | --------- |
 | `<OPENMICRODATA>` / `<OPENTABLEDATA>` | Input data file (microdata or a ready table) |
 | `<OPENMETADATA>` | `.rda` metadata describing the file layout and variables |
 | `<SPECIFYTABLE>` | Explanatory variables, response, shadow and cost variables |
@@ -284,7 +284,7 @@ assert all(isinstance(table, TableResult) for table in result.tables)
 ```
 
 | Argument | Meaning |
-|----------|---------|
+| ---------- | --------- |
 | `tables` | A flat list of explanatory names for one table; a nested list for several |
 | `response` | Required numeric response column; a scalar or one name per table |
 | `safety_rules` | A rule string or per-table list; `None` supplies no rules |
@@ -310,7 +310,7 @@ created by that call. Files persist so callers can inspect them and choose
 when to remove them.
 
 | `TableResult` accessor | Returns |
-|------------------------|---------|
+| ------------------------ | --------- |
 | `safe(unsafe_marker="x")` | Response values with primary `U` and secondary `M` cells masked |
 | `status()` | One `S`, `U`, `P`, `M` or `E` symbol per cell |
 | `unsafe()` | Original, unmasked responses for analysis |
@@ -380,7 +380,7 @@ generated pipeline without running it.
 as API documentation (every code cell runs against the verified public API):
 
 | Notebook | Covers |
-|----------|--------|
+| ---------- | -------- |
 | [`01_quickstart`](notebooks/01_quickstart.ipynb) | A DataFrame through `protect()` to a `TableResult`, a masked CSV, then metadata and existing batches |
 | [`02_protection_and_audit`](notebooks/02_protection_and_audit.ipynb) | OPT/MOD DataFrame protection, explicit audit and masked export; batch OPT/MOD/RND |
 | [`03_generators`](notebooks/03_generators.ipynb) | `run=False` file preview, multiple tables, individual writers and custom batch round-trip |

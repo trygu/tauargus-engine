@@ -6,6 +6,7 @@ the *real* interpreter run. Written from the 2026-10-06 CSP/HiGHS teardown
 segfault session; the **method** is the reusable part.
 
 ## Symptom that points to heap corruption
+
 - A crash whose **faulting frame changes between runs** (one run dies in
   `Highs_destroy`/`HighsOptions::~`, the next in `operator new` inside core's
   `FillTables`/`AddTableCells`). One corruption, many crash sites.
@@ -18,6 +19,7 @@ segfault session; the **method** is the reusable part.
   global state is leaking between calls.
 
 ## The one tool that actually works here: macOS crash reports
+
 `lldb` does **not** reproduce it (Heisenbug: changing timing hides the crash).
 macOS writes a full native backtrace to a `.ips` file on every fatal signal —
 use those instead of the debugger.
@@ -36,30 +38,36 @@ for f in d['threads'][ft]['frames'][:16]:
     print(f"  {imgs[f['imageIndex']]['name']} +{f['imageOffset']} {f.get('symbol','')}")
 PY
 ```
+
 The `.ips` backtrace (with `libtauargus_*.dylib` frames) is the ground truth.
 Collect **several** reports — different crash sites reveal the shared root
 cause. A frame like `libsystem_malloc … freelist_outlined` means **heap
 corruption** (freelist clobbered by an earlier OOB write), not a null deref.
 
 ## ASan (AddressSanitizer) — what works and what doesn't
+
 ASan flags the *first* OOB write, which is exactly what you want — **but** the
 extension is a `dlopen`'d `.so` into an already-running Python process, and
 ASan's runtime initializes too late to install its alloc interceptors
 (`ERROR: Interceptors are not working … loaded too late (dlopen)`).
 
 What does **not** work:
+
 - ASan-instrument the `.so` and just run it → interceptor warning + abort 134.
 - `DYLD_INSERT_LIBRARIES=libclang_rt.asan…` on an ASan `.so` → same.
 
 What **does** work (use this):
+
 1. Build a **normal** (non-ASan) extension.
 2. Preload the ASan runtime into the *interpreter* at process start, so it is
    active before Python's first malloc:
+
    ```sh
    ASR=/Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.asan_osx_dynamic.dylib
    ASAN_OPTIONS=detect_leaks=0 uv run env -u DYLD_LIBRARY_PATH \
      DYLD_INSERT_LIBRARIES="$ASR" python repro_seg.py OPT 2
    ```
+
    (Set `DYLD_INSERT_LIBRARIES` on the `python` invocation, and be sure a
    stale `DYLD_INSERT_LIBRARIES`/`DYLD_LIBRARY_PATH`/`ASAN_OPTIONS` is not left
    in the shell — a leftover one silently turns every run into an ASan abort.)
@@ -71,15 +79,18 @@ If ASan stays silent, it is a layout/timing bug — fall back to the crash-repor
 backtraces + manual bounds review, not the sanitizer.
 
 ## Pure-solver mimic (rules out / confirms the solver API)
+
 When a crash is inside a HiGHS call, write a ~100-line C program that links
 `-lhighs` and replays the exact API sequence (passLp → run → addCols/addRows →
 run → deleteColsByMask/deleteRowsByMask → destroy), 300–500 iterations, with
 and without `presolve=off`.
+
 ```sh
 clang -O1 -g mimic.c -o mimic -L$(brew --prefix)/lib -lhighs -Wl,-rpath,$(brew --prefix)/lib
 ./mimic 500 0   # presolve on
 ./mimic 500 1   # presolve off
 ```
+
 Note: the brew HiGHS install does **not** ship `lp_data/*.h` internal headers,
 so `#include "highs/interfaces/highs_c_api.h"` fails — `extern`-declare the
 small C API subset you need instead (see `Highs_addRows`/`addCols` signature:
@@ -87,6 +98,7 @@ small C API subset you need instead (see `Highs_addRows`/`addCols` signature:
 If the mimic never crashes, the bug is CSP-specific state, not the HiGHS API.
 
 ## Key architectural facts (so you don't re-derive them)
+
 - The CSP keeps the LP in a **process-lifetime global** `JJLPptr lp`
   (`native/csp/src/cspsolve.c:75`). Each Python `TauArgus()` is a fresh object,
   but `lp` (and `Nlp` in `Cspnet.c`/`cspheur.c`) survives across calls in the
@@ -102,6 +114,7 @@ If the mimic never crashes, the bug is CSP-specific state, not the HiGHS API.
   (Table.cpp:424).
 
 ## Build / rebuild quick refs
+
 - Superbuild: `cmake -S native -B native/build -DHighs_DIR=$(brew --prefix)/lib/cmake/Highs && cmake --build native/build -j8`
 - Copy fresh dylibs into the package before testing:
   `cp native/build/lib/libtauargus_{csp,hitas,rounder}.dylib python/src/tauargus/`
@@ -113,6 +126,7 @@ If the mimic never crashes, the bug is CSP-specific state, not the HiGHS API.
   (fresh `run_batch` per iteration, one `suppress` per iter).
 
 ## Status (2026-10-07) — FIXED (root cause: legacy column-0 RHS sentinel)
+
 The CSP/HiGHS teardown segfault is **fixed**. Root cause was **not** a HiGHS
 bug and not a `Highs_destroy` lifecycle problem — it was a **corrupted LP
 matrix** handed to HiGHS, which detonated in the dual-simplex pivot
@@ -130,6 +144,7 @@ Removing the sentinel (the `*rhs` is already the effective RHS after the
 gone.
 
 **The method that pinned it** (the reusable part — use this for the next one):
+
 1. **Build HiGHS itself with ASan** (this was the missing piece). The brew
    HiGHS is uninstrumented, so ASan only saw *our* code and the corruption
    "disappeared" (it was really inside HiGHS, triggered by bad input). Cloning
@@ -140,6 +155,7 @@ gone.
    `HEkkDual::iterate` → `JJdualopt` (cspsolve.c `solve_lp`), **deterministic at
    iter 0** of the `FullJJ` harness (previously "iter 12, non-deterministic").
     Build refs (write the harness below to `/tmp/asan_harness.cpp`):
+
     ```sh
     # 1) HiGHS with ASan (clone https://github.com/ERGO-Code/HiGHS, pin 1.15.x)
     cmake -S /tmp/highs -B /tmp/highs/build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -157,8 +173,10 @@ gone.
       -Wl,-rpath,native/build-asan/lib -Wl,-rpath,/tmp/highs/install/lib
     ASAN_OPTIONS=quarantine_size=0:detect_leaks=0 /tmp/asan_harness /tmp/JJ.IN 25
     ```
+
     The harness (a minimal driver that loops `FullJJ` so the CSP process-lifetime
     statics `lp`/`Nlp` persist and stress the same path as the real batch):
+
     ```cpp
     // /tmp/asan_harness.cpp — replays HiTaSCtrl::FullJJ N times in one process
     #include "HiTaSCtrl.h"
@@ -188,6 +206,7 @@ gone.
         fprintf(stderr, "ALL OK\n"); return 0;
     }
     ```
+
     `/tmp/JJ.IN` (the `.jj` model) is regenerated any time from
     `run_batch(data/TestRecode.arb).suppress(OPT)` via `write_jj_format`.
 2. **Dump the LP to MPS at the crash, then replay it standalone.** An env-gated
@@ -200,6 +219,7 @@ gone.
    gone / has returned). Each iter makes a fresh engine object so the CSP
    process-lifetime statics (`lp`, `Nlp`) persist and stress the same path the
    real batch does:
+
    ```python
    # repro: run N in-process suppressions of one kind on the sample data
    import sys
@@ -215,6 +235,7 @@ gone.
        print(f"iter {i}: OK", flush=True)
    print("ALL OK", flush=True)
    ```
+
    Pre-fix this crashed ~40% (RC 133/139); post-fix 9/9 clean. RND must set a
    rounding base (e.g. `eng.set_round_base(10**7)`) or it raises a clean
    `BatchError`, not a crash.
@@ -222,6 +243,7 @@ gone.
 **Verification:** ASan harness 60/60 `FullJJ` iters clean (RC 0, "ALL OK");
 normal build: 67/67 `uv run pytest` green; `repro_seg.py OPT` × 9 in-process
 suppressions (the old ~40% crash repro) all clean.
+
 - Kept (genuine latent fix): `add_rows` matrix buffers sized `rcnt*(mac+1)`.
 - The `put_base`/`Highs_setBasis` path (cspbranc.c branch-resume) was *not* the
   crash (that path isn't in the in-loop `solve_lp`), and its `stat`→basis-code

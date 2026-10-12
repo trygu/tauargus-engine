@@ -48,7 +48,7 @@ opens the chosen file, `q`/`Esc` quits.
 ![Loaded table](tui-images/02-table0-unsafe.png)
 
 | Region | What it is |
-|---|---|
+| --- | --- |
 | **Navigator** (left) | One row per `specify_table` in the batch: `index  ExpVars \| RespVar`. Switch tables by clicking a row or `j`/`k`. |
 | **Grid** (center) | The computed table: row/column labels from the categorical codes, every cell coloured by its status. Move the cursor with the arrow keys. |
 | **Detail pane** (bottom, 3 rows) | The cell under the cursor: value, status symbol + full status name, any pending draft mark, and, after an audit, the realised feasibility interval. |
@@ -71,7 +71,7 @@ The colour of the number is its status. The symbol in the detail pane is
 the status category letter:
 
 | Colour | Symbol | Category | Meaning |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | green | `S` | safe | passes all safety rules (or overridden safe, §4) |
 | red | `U` | unsafe | a sensitive value that must be protected (hidden or suppressed) |
 | cyan | `P` | protect | marked "keep this cell; do not suppress it" |
@@ -82,7 +82,7 @@ the status category letter:
 The full engine status codes (shown by name in the detail pane):
 
 | Code | Name | Category |
-|---|---|---|
+| --- | --- | --- |
 | 1 | `safe` | S |
 | 2 | `safe_manual` | S |
 | 3 | `unsafe_rule` | U |
@@ -109,7 +109,7 @@ The TUI's core loop is mark cells, preview a method, then accept or cancel. Noth
 With the cursor on a cell:
 
 | Key | Mark | Effect |
-|---|---|---|
+| --- | --- | --- |
 | `u` | `U` | *require suppression*, flag this value as unsafe (a sensitive value the standard rules missed) |
 | `p` | `P` | *protect*, keep this cell; do not suppress it |
 | `S` (shift+s) | `S` | *safe (override)*, mark a false positive as safe |
@@ -130,7 +130,7 @@ Marks tell the solver which values to guard before you run it.
 ### Step 2: preview a method (throwaway run)
 
 | Key | Method | What it does |
-|---|---|---|
+| --- | --- | --- |
 | `s` | OPT (cell suppression) | Runs on the whole table, not the cursor cell. The solver chooses the minimum set of cells to hide so that no unsafe (red) cell can be reconstructed from the others. Hidden cells turn yellow. |
 | `r` | RND (controlled rounding) | Rounds the table; the rounding base is chosen by the engine. |
 
@@ -172,12 +172,12 @@ fixture is 18 rows × 707 columns with 1908 unsafe cells:
 
 The single line above the footer is composed of, left to right:
 
-```
+```text
 draft rN · K edit(s) · preview <freshness> · acc rM   ·   <log>   ·   <contextual hint>
 ```
 
 | Part | Meaning |
-|---|---|
+| --- | --- |
 | `draft rN` | the draft revision, bumped by every mark/undo/redo |
 | `K edit(s)` | number of uncommitted (pending) marks |
 | `preview —/fresh/outdated` | no preview yet / preview matches the current draft / the draft changed after the preview was run |
@@ -189,7 +189,7 @@ The hint adapts to the cell kind (legacy §5.6: the apriori letters are
 u=unsafe, p=protected, s=safe):
 
 | Cursor on | Hint | Why |
-|---|---|---|
+| --- | --- | --- |
 | red (U) | `red=sensitive value s=OPT table …` | `s` protects it by hiding the *other* cells that would reconstruct it |
 | yellow (M) | `p=keep this cell …` | `p` keeps a hidden cell (do not suppress it) |
 | green (S) | `u=flag as unsafe …` | `u` flags a value the standard rules missed |
@@ -205,7 +205,7 @@ when the terminal is narrow).
 ## 6. Audit, export, workspace
 
 | Key | Action |
-|---|---|
+| --- | --- |
 | `a` | **Audit** the current table (legacy `RunAudit`). It computes realised feasibility intervals, and the detail pane shows `interval=[min, max]` for the cell under the cursor. Any subsequent edit invalidates the audit. |
 | `o` | **Diagnostic export** of the retained table as a legacy `INTERMEDIATE` `.tab` file to `<arb dir>/out/table_N.tab` (with audit columns when audited). This can contain original sensitive values; it is not a masked publication table. |
 | `w` | **Save workspace.** Writes a versioned JSON manifest next to the `.arb` (no solver run; works even before any preview). |
@@ -218,7 +218,7 @@ when the terminal is narrow).
 `w` writes `<batch-stem>.workspace.json` next to the `.arb`, atomically:
 
 | Field | Content |
-|---|---|
+| --- | --- |
 | `version` | manifest schema version (currently `1`) |
 | `arb` | path to the input `.arb`, as recorded |
 | `input_fingerprint` | sha256 of the `.arb` (input-change detection) |
@@ -281,7 +281,7 @@ screenshot below. Close with `?`/`F1`/`Esc`.
 ## 7. Full key reference
 
 | Key | Action |
-|---|---|
+| --- | --- |
 | `q` | Quit |
 | `j` / `k` | Next / previous table |
 | arrow keys | Move the cursor within the table |
@@ -370,7 +370,7 @@ no assigned shortcuts yet; §7 remains the shipped key reference.
 ## 10. Screenshot index
 
 | File | State |
-|---|---|
+| --- | --- |
 | `tui-images/01-file-browser.png` | No-arg launch: the `.arb` file browser |
 | `tui-images/02-table0-unsafe.png` | Table 0 loaded, cursor on the unsafe (red) cell |
 | `tui-images/03-marked.png` | Draft mark `u` on a safe cell (magenta `*`) |
@@ -378,4 +378,3 @@ no assigned shortcuts yet; §7 remains the shipped key reference.
 | `tui-images/05-accepted.png` | Preview accepted (`acc r2`) |
 | `tui-images/06-table1.png` | Table 1: 18 × 707 with many unsafe cells |
 | `tui-images/07-help.png` | The help overlay (`?`/`F1`) |
-

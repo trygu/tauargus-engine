@@ -1,5 +1,12 @@
 # Tau-Argus Rewrite: Archive
 
+## Release 0.5.0 and markdown lint (2026-10-12)
+
+- Released 0.5.0: parquet I/O and cloud URL support in `pytauargus`; `pytauargus-tui` kept in lockstep.
+- Recovery fixed the TUI wheel artifact name in `wheels.yml` and the TUI runtime floor; tag `py-v0.5.0` was re-pointed before anything published.
+- Verified: GitHub Release 17 assets, PyPI `pytauargus`/`pytauargus-tui` 0.5.0, GHCR `0.5.0` and `latest`.
+- Markdown lint: added `.markdownlint.json` (MD013 off); linted 16 repo `.md` files (legacy bundle excluded) and fixed structural rules, bare URLs, fenced-code languages, table/list/blank spacing.
+
 ## Protection-to-publication regression (2026-10-12)
 
 - Added four isolated pipeline tests: OPT/MOD on ex1 tabular input and an
@@ -12,7 +19,6 @@
 - Mutation checks reject bypassed suppression and unmasked publication.
 - Linux x86_64, source-built HiGHS 1.15.1 and pinned native submodules:
   native core 1 passed; Python suite 268 passed, 3 skipped; wheel build passed.
-
 
 Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 (repo meta-cleanup). See `PROGRESS.md` for current state.
@@ -44,6 +50,7 @@ Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 Branch: `rewrite`
 
 ## Consolidated DataFrame branch (2026-10-10)
+
 - Merged master (`c0b6e48`, PR #3) into `feature/dataframe-protect`, which
   already contains PR #4 and the native capacity query (`5f913c95`).
 - Both fixes, regression suites and documentation changes now share the
@@ -52,6 +59,7 @@ Branch: `rewrite`
   3 optional skips. No additional branch created.
 
 ## DataFrame API checkpoint (2026-10-10)
+
 - `protect(df|dict, tables, response, ...)` writes microdata/metadata/batch and
   reads type-5 `SO+` output into `TableResult`; `run=False` writes inputs only.
 - `Variable.is_numeric` excludes categorical variables to avoid native
@@ -61,6 +69,7 @@ Branch: `rewrite`
   macOS CI exposed an abort, so that result did not establish memory safety.
 
 ## DataFrame native abort diagnosis and fix (2026-10-10)
+
 - CI run 38071022820, macOS job 114268275994 failed in the full `protect()`
   subprocess with SIGABRT. The same input reproduced a SIGSEGV locally,
   sometimes after output, during Python GC.
@@ -84,12 +93,14 @@ Branch: `rewrite`
   subsequent fixes use the active feature branch directly.
 
 ## Original goals
+
 1. Port to the open source solver and make it cloud native and portable
 2. Clean up the code
 3. Port the Swing/Java UI to Python with a CLI-based UI
 4. Remove all traces of Java
 
 ## Architecture (as-is, at analysis time)
+
 - **Native C++ engine** in 5 git submodules under `native/`:
   - `native/core` — data model, Argus/JJ file I/O, table compute engine (`TauArgus` class). Static lib `tauargus_core`.
   - `native/csp` — cell suppression (branch-and-price LP), LP backend **HiGHS** (`src/Jjsolver.c`). Shared lib `tauargus_csp`.
@@ -102,9 +113,11 @@ Branch: `rewrite`
 - Core public API: `native/core/src/TauArgus.h` — ~172 methods.
 
 ## Environment (macOS/Apple Silicon)
+
 cmake 4.4.2, AppleClang 21, python3 3.14.7 (/opt/homebrew), HiGHS 1.15.1 via brew.
 
 ## Verified builds (all done)
+
 - [x] `native/core` → `libtauargus_core.a` on macOS (warnings only).
 - [x] `native/csp` → `libtauargus_csp.dylib` with HiGHS. Exports `SCIPv::CSP*` + globals.
 - [x] `native/hitas` → `libtauargus_hitas.dylib`, links csp + HiGHS.
@@ -113,6 +126,7 @@ cmake 4.4.2, AppleClang 21, python3 3.14.7 (/opt/homebrew), HiGHS 1.15.1 via bre
 - [x] Top-level `native/CMakeLists.txt` superbuild — all 5 modules, libs in `native/build/lib/`.
 
 ## hitas porting notes (done)
+
 - Removed `cplex.h`/`xprs.h`/SCIP includes from `HiTaSCtrl.cpp`; `CloseSolver` no-op; `CheckStart` logs "using HiGHS".
 - `WrapCSP.{h,cpp}`: single `SCIPv::` CSP API only.
 - `HITAS_EXPORT` macro replaces `__declspec(dllexport)`.
@@ -120,6 +134,7 @@ cmake 4.4.2, AppleClang 21, python3 3.14.7 (/opt/homebrew), HiGHS 1.15.1 via bre
 - SWIG wrapper `HiTaSCtrl_wrap.*` excluded.
 
 ## crp porting notes (done, HiGHS-backed)
+
 - HiGHS C API header: `<highs/interfaces/highs_c_api.h>` (NOT `highs/highs_c_api.h`).
 - `crpSmain.c` (MIP): `Highs_passMip` (CSR + integrality) → `Highs_run` → `Highs_getModelStatus` → `Highs_getSolution`.
 - `crpSaudit.c` (audit LP): `Highs_passLp` + `Highs_changeColCost`/`Highs_changeColBounds` per iteration; `col_dual` gives reduced costs directly.
@@ -130,14 +145,17 @@ cmake 4.4.2, AppleClang 21, python3 3.14.7 (/opt/homebrew), HiGHS 1.15.1 via bre
 - Verified: all `S_CRP*` entry points export; 2-cell MIP (total-25) solved correctly.
 
 ## Python port — completed state
+
 Headless Python CLI path is **end-to-end functional** for the microdata flow.
 `data/TestRecode.arb` runs to completion; **47 tests green**.
+
 - **pybind11 module** (`python/cpp/bind_{core,hitas,rounder}.cpp`): ~54 `TauArgus` methods + `HiTaSCtrl` + `RounderCtrl`. Wheel via `uv build --wheel` (self-contained, `@loader_path` rpath). Smoke: `TauArgus().version()` → `1.1.4.11`.
 - **`batch.py`** — legacy-compatible `.arb` parser (18 command dataclasses, tokenizer, status machine).
 - **`engine.py`** — `parse_rda`/`parse_rda_table` mirror `Metadata.read*Metadata`; `Engine.run_batch` drives the native engine end-to-end (clean → set info → vars → explore → tables → compute → recodes).
 - Native-call fidelity fixes: kwargs `is_numeric`/`is_hierarchical`; `set_hierarchical_digits` trims trailing-zero levels; `set_table` `max_scaled_cost >= 1`, shadow var defaults to response var; `set_table_safety` holding thresholds match `TableSet.readSafetyRule`; Recode: 3 paths (digit truncation, `<TREERECODE>` file via `get_var_code` lookup, classic `DoRecode`).
 
 ## Key files (reference)
+
 - `native/core/src/TauArgus.h` — full API surface (~172 methods)
 - `src/tauargus/service/TableService.java` — how native is driven
 - `src/tauargus/model/batch.java` — .arb grammar
@@ -147,6 +165,7 @@ Headless Python CLI path is **end-to-end functional** for the microdata flow.
 - `native/crp/src/crpSmain.c` / `crpSaudit.c` — HiGHS MIP/LP
 
 ## Notes / decisions
+
 - "Open source solver" = HiGHS for csp (LP) and crp (MIP); SCIP dropped.
 - Windows registry (WinRegistry.java, SystemUtils.getReg*) → config file / env vars.
 - Temp dir conventions → `tempfile` module + explicit work-dir option in CLI.
@@ -154,13 +173,16 @@ Headless Python CLI path is **end-to-end functional** for the microdata flow.
 - Do NOT port Swing dialogs one-by-one; CLI + headless batch is the product.
 
 ## Completed task sub-items (Tasks 1, 2 partial)
+
 Task 1 (open source solver + portable): core/csp/hitas/crp/rounder build-verified with HiGHS; rounder CMakeLists; superbuild.
 Task 2 (pybind11): module built & linked; ~54 methods bound; verified with smoke tests.
 Task 3 (model/service layer): batch.py, engine.py (metadata parse + orchestration) done; suppress.py/apriori/recode/save pending.
 
 ## Suppress/round smoke tests (done 2026-10-06)
+
 `python/tests/test_suppress.py` rewritten to assert the engine's *observable*
 invariants (the old assertions were wrong):
+
 - MOD (AHiTaS) / OPT (FullJJ) leave the target unsafe cell's status (3)
   unchanged but mark neighbouring safe cells secondary (status 11/12) →
   assert "secondary count increases".
@@ -175,6 +197,7 @@ invariants (the old assertions were wrong):
   engine.
 
 ## OPEN BUG (native/csp, HiGHS teardown segfault)
+
 Non-deterministic (~40%) segfault in `Highs_destroy` (HiGHS `HighsOptions`
 destructor) reached from `JJfreeprob` → `unload_lp` during/after `AHiTaS` in
 `native/csp` (Cspmain.c `PPCSPoptimize`, `cspsolve.c` global `JJLPptr lp`).
@@ -184,6 +207,7 @@ fix (LP lifecycle: `load_lp` in read_prob / `unload_lp` paths) — see PROGRESS.
 "Current". Not a Python/test issue.
 
 ## Completed detailed checkpoints (2026-10-09)
+
 - WRITETABLE type-5 (INTERMEDIATE) audit file ported (`Engine.write_intermediate_table`),
   `get_table_cell` pybind binding, `+SO`/`+HI`/`+SE`, CLI `save --format intermediate`.
   `+AR` realized-interval columns deferred (needs external `intervalle.exe`).
@@ -209,9 +233,11 @@ fix (LP lifecycle: `load_lp` in read_prob / `unload_lp` paths) — see PROGRESS.
   (`430b67b`) — the Pascal/FPC reference the native audit port mirrors.
 
 ## Submodule + README cleanup (2026-10-09)
+
 Legacy cruft removed from all five `native/` submodules and the top-level
 README rewritten for the rewrite. Per repo (submodule commit first, then
 parent pointer bump):
+
 - **core** `894f4c0`: dropped `Help/` (66 HTML), `nbproject/`, `NBMakefile`/
   `MakefileRobert`/`MakefileAction`/`Makefile`, `.github/` (stale Java-DLL CI),
   and the COM/VB6/SWIG sources in `src/` (GhmiterANCO, TauArgCtrl, StdAfx,
@@ -219,7 +245,7 @@ parent pointer bump):
 - **csp** `e3a2b84`: dropped `nbproject/`, old Makefiles, dead `CSPLOAD.H`.
 - **hitas** `25d935a`: dropped `nbproject/`, old Makefiles, SWIG `hitasctrl.swg`,
   generated `dist/` Java stubs, `.dep.inc`, dead `APCSPglobs.h`/`pcspmain.h`
-  + untracked CPLEX/XPRESS solver headers.
+  and untracked CPLEX/XPRESS solver headers.
 - **crp** `571b3f5`: dropped CPLEX/XPRESS solver variants (`crpC*`/`crpX*`),
   `XXRounder/` + its CMake option, `nbproject/`, `Makefile`, `crp.pc.in`,
   stale `build.yml` (referenced removed `-DUSE_SCIP`), 6-line `WrapCRP.h` stub.
@@ -233,6 +259,7 @@ build + `uv` CLI usage, tests. (Parent-root legacy files — `Makefile`,
 the CSP/HiGHS teardown checkpoint in PROGRESS.md / `docs/native-debugging.md`.)
 
 ## pytauargus rename + engine//bindings/ restructure (2026-10-09)
+
 - **`pytauargus` rename** (commit `7a6ff3d`): Python package `tauargus`→`pytauargus`
   (CLI command stays `tauargus`). Project identity = `tauargus-engine`. Only the
   Python layer renamed — C libraries keep `tauargus` names (`libtauargus_*`,
@@ -256,6 +283,7 @@ the CSP/HiGHS teardown checkpoint in PROGRESS.md / `docs/native-debugging.md`.)
   wheel (`_tauargus` + csp/hitas/rounder/CRP dylibs) verified in isolated venv.
 
 ## Self-contained wheels + cross-platform CI (2026-10-09)
+
 - **Problem:** the engine dylibs linked HiGHS at its absolute install path
   (`/opt/homebrew/opt/highs/lib/libhighs.1.dylib` on macOS), so a wheel only
   worked where HiGHS happened to live there.
@@ -281,6 +309,7 @@ the CSP/HiGHS teardown checkpoint in PROGRESS.md / `docs/native-debugging.md`.)
   macOS leg is fully proven locally.
 
 ## Submodule + root cleanup (2026-10-09)
+
 - **`reference/intervalle` submodule dropped** (`6115cbd`): the audit is fully
   ported natively (`TauAuditJj` in `engine/native/csp`), so the Pascal reference
   is no longer needed in-tree. The upstream repo (sdcTools/intervalle) stays
@@ -299,10 +328,12 @@ the CSP/HiGHS teardown checkpoint in PROGRESS.md / `docs/native-debugging.md`.)
   project files.
 
 ## README rewrite (2026-10-10)
+
 README rewritten: no Greek letters; top-level project is `tauargus-engine`
 (C/C++ libraries under `engine/`), `pytauargus` is the Python package/CLI using them.
 
 ## `.arb` + `.rda` writer ports (2026-10-10)
+
 Generator-side file writers ported from `references/rtauargus`, so the Python
 package can emit the exact `.arb`/`.rda`/`.hrc` batch inputs our own engine
 parser consumes (fixture generator + round-trip validator).
@@ -321,6 +352,7 @@ translations of `test_micro_arb.R`, `test_micro_asc_rda.R` (write_rda block),
 base R. **174 tests green.**
 
 Port notes / gotchas:
+
 - macOS: `datetime.now().strftime("%Z")` is empty (libiconv quirk); use
   `datetime.now().astimezone().strftime(...)` to match R's `Sys.time()` zone.
 - `specif_safety`/`write_rda` build each table's block as one string with
@@ -341,7 +373,7 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   OPT/MOD/RND -> status distribution -> audit() realized intervals),
   `03_generators` (micro_arb, write_rda/rda_text, write_hrc,
   generator->run_batch round-trip). Built by `notebooks/_build.py`, executed
-  + output-saved by `notebooks/_run.py` (nbclient, no Jupyter needed).
+  and output-saved by `notebooks/_run.py` (nbclient, no Jupyter needed).
 - `notebooks` optional extra (jupyterlab/nbclient/nbformat/ipykernel);
   optional `tests/test_notebooks.py` (importorskip nbclient) so the release
   `uv run pytest` gate stays fast/dependency-free. Outputs -> gitignored
@@ -503,7 +535,7 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   (35 lines, `NAME = code = text`, codes match `resource.h` exactly).
 - Fix: file restored to `engine/native/hitas/ErrorStrings.txt`; CMakeLists
   generates `ErrorStrings_generated.inc` at configure time (note: CMake's
-  regex engine does not support `[[:space:]]` — use ` *`); `HiTaSCtrl.cpp`
+  regex engine does not support `[[:space:]]`; use a literal space followed by `*` to match runs of spaces); `HiTaSCtrl.cpp`
   initializes the table from the embedded array; `LoadErrorStrings` kept as
   optional runtime override.
 - Core submodule: worktree had drifted to `e7ecb98` (ancestor of the pin
@@ -518,7 +550,7 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 
 - Pushing a parent that pins not-yet-pushed submodule commits breaks every
   runner checkout with "fatal: remote error: upload-pack: not our ref
-  <sha>" (happened for csp 3007826 / hitas d3e5b91 after the 2nd-OPT
+  `<sha>`" (happened for csp 3007826 / hitas d3e5b91 after the 2nd-OPT
   segfault fix).
 - Cadence: commit in submodule -> **push submodule** -> bump + commit
   parent -> push parent.
@@ -585,13 +617,14 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 
 | Project / person | Published contact |
 | --- | --- |
-| Tau-Argus (historical project address) | argus@cbs.nl |
-| CRP / Juan José Salazar González (historical header address) | jjsalaza@ull.es |
-| rtauargus / Julien Jamme (package maintainer) | julien.jamme@insee.fr |
-| rtauargus / Pierre-Yves Berrard | pierre-yves.berrard@insee.fr |
-| rtauargus / Nathanaël Rastout | nathanael.rastout@insee.fr |
-| rtauargus / Clara Baudry | clara.baudry@insee.fr |
-| PiArgus / Laurent Verweijen | lauwerund@gmail.com |
+| Tau-Argus (historical project address) | <argus@cbs.nl> |
+| CRP / Juan José Salazar González (historical header address) | <jjsalaza@ull.es> |
+| rtauargus / Julien Jamme (package maintainer) | <julien.jamme@insee.fr> |
+| rtauargus / Pierre-Yves Berrard | <pierre-yves.berrard@insee.fr> |
+| rtauargus / Nathanaël Rastout | <nathanael.rastout@insee.fr> |
+| rtauargus / Clara Baudry | <clara.baudry@insee.fr> |
+| PiArgus / Laurent Verweijen | <lauwerund@gmail.com> |
+
 - Verified identical sections, one expression of gratitude, all named
   contributors and project links retained, seven contacts archived, unchanged
   surrounding README content, and clean `git diff --check`.
@@ -611,6 +644,7 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
 - Verified consistent Docker command arguments and version-pinning guidance,
   existing version/latest publication tags, unchanged acknowledgements, and
   clean `git diff --check`; PROGRESS.md remains under 35 lines.
+
 ## TUI state design agreed (2026-10-11)
 
 - Traced Java cell-edit, suppression, undo and export handlers at `3c8e2ab`,
