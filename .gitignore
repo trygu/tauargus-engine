@@ -15,7 +15,7 @@
 *.sta
 CSPlogfile.txt
 # Engine-generated table output (regenerable)
-data/tableinput/out/
+data/**/out/
 # TUI workspace manifests (runtime artifacts written next to a .arb)
 *.workspace.json
 bindings/python/build/
