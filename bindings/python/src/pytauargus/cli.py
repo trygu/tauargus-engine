@@ -16,6 +16,7 @@ round      Compute, then round a table (RND).
 audit      Compute, then audit: report realized feasibility intervals.
 save       Compute, then write tables to file (CSV or cell records).
 tables     Compute, then print a per-table summary.
+protect    Protect microdata in one call: file in, protected table out.
 version    Print the engine version and exit.
 
 Example:
@@ -26,6 +27,9 @@ Example:
     tauargus audit data/TestRecode.arb
     tauargus save data/TestRecode.arb --format csv --out tables.csv
     tauargus suppress data/TestRecode.arb --method MOD --tab 1
+    tauargus protect micro.parquet --tables 'Region,Sector' \\
+        --response Turnover --safety 'NK(2,75)' --suppress 'OPT(1)' \\
+        --out protected.parquet
 """
 
 from __future__ import annotations
@@ -49,6 +53,7 @@ from .batch import (
     parse_batch,
 )
 from .engine import IDENTITY_DIM_SEQUENCE, Engine, parse_rda, run_batch
+from .protect import protect
 
 
 # Cell status codes (native/core/src/defines.h + model/CellStatus.java).
@@ -145,6 +150,36 @@ def _default_out_name(eng: Engine, i: int, suffix: str) -> Path:
 
 def _default_csv_name(eng: Engine, i: int) -> Path:
     return _default_out_name(eng, i, ".csv")
+
+
+# Remote URL forms pyarrow reads and writes natively (S3/GCS/HTTPS).
+_URL_PREFIXES = ("s3://", "s3a://", "gs://", "http://", "https://", "file://")
+
+
+def _is_url(name: str) -> bool:
+    return name.lower().startswith(_URL_PREFIXES)
+
+
+def _is_parquet_name(name: str) -> bool:
+    return name.rsplit("/", 1)[-1].lower().endswith(".parquet")
+
+
+def _per_table_out(out: str, i: int, n: int) -> str:
+    """Per-table output name: index-suffixed when writing several tables."""
+    if n == 1:
+        return out
+    if _is_url(out):
+        base, dot, ext = out.rpartition(".")
+        return f"{base}_{i + 1}.{ext}" if dot else out
+    p = Path(out)
+    return str(p.with_name(f"{p.stem}_{i + 1}{p.suffix}"))
+
+
+def _default_protect_out(micro: str, i: int) -> str:
+    """Default CSV output name in the current directory."""
+    name = micro.rsplit("/", 1)[-1]
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    return str(Path.cwd() / f"{stem}_table{i + 1}.csv")
 
 
 # ===========================================================================
@@ -325,6 +360,36 @@ def cmd_tables(args) -> int:
     return 0
 
 
+def cmd_protect(args) -> int:
+    micro = args.microdata
+    if not _is_url(micro) and not Path(micro).is_file():
+        print(f"error: microdata file not found: {micro}", file=sys.stderr)
+        return 2
+    tab_specs = [[v.strip() for v in t.split(",") if v.strip()]
+                 for t in args.tables]
+    if any(not t for t in tab_specs):
+        print("error: --tables must name at least one variable per table",
+              file=sys.stderr)
+        return 2
+
+    result = protect(micro, tab_specs, response=args.response,
+                     safety_rules=args.safety,
+                     suppress=args.suppress,
+                     workdir=args.workdir)
+
+    n = len(result.tables)
+    for i, rt in enumerate(result.tables):
+        fpath = _per_table_out(args.out, i, n) if args.out \
+            else _default_protect_out(micro, i)
+        if _is_parquet_name(fpath):
+            rt.to_parquet(fpath)
+        else:
+            result.engine._tau.write_csv(i, fpath, True,
+                                         IDENTITY_DIM_SEQUENCE, 1)
+        print(f"wrote table {i + 1} -> {fpath}")
+    return 0
+
+
 def cmd_version(args) -> int:
     from ._tauargus import TauArgus
 
@@ -418,6 +483,27 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("tables", help="compute, then print a table summary")
     sp.add_argument("batch")
     sp.set_defaults(func=cmd_tables)
+
+    sp = sub.add_parser("protect", help="protect microdata in one call "
+                                         "(file in, protected table out)")
+    sp.add_argument("microdata",
+                    help="microdata file (.parquet) or URL "
+                         "(s3://, s3a://, gs://, https://)")
+    sp.add_argument("--tables", action="append", required=True,
+                    help="explanatory variables for one table, comma-separated; "
+                         "repeat the flag for multiple tables")
+    sp.add_argument("--response", required=True,
+                    help="response variable name")
+    sp.add_argument("--safety",
+                    help="SAFETYRULE body, e.g. 'NK(1,80)' (default: none)")
+    sp.add_argument("--suppress", default="OPT(1)",
+                    help="SUPPRESS body (default 'OPT(1)')")
+    sp.add_argument("--workdir",
+                    help="directory for intermediate files (default: tempdir)")
+    sp.add_argument("--out",
+                    help="output file; a .parquet suffix writes a masked "
+                         "Parquet, any other name writes the published CSV")
+    sp.set_defaults(func=cmd_protect)
 
     sp = sub.add_parser("version", help="print the engine version")
     sp.set_defaults(func=cmd_version)

@@ -174,6 +174,11 @@ class TableResult:
     def response(self) -> str:
         return self._response
 
+    @property
+    def path(self) -> Union[str, Path, None]:
+        """The ``.tab`` file this result was parsed from, if any."""
+        return self._path
+
     # -- values --------------------------------------------------------------
     def _col(self, name: str) -> List[object]:
         return [r[name] for r in self._rows]
@@ -207,6 +212,29 @@ class TableResult:
         ``polars.DataFrame`` if only polars is, else the ``rows`` list.
         """
         return make_frame(self.rows)
+
+    def to_parquet(self, path) -> None:
+        """Write the published table to a Parquet file (requires pyarrow).
+
+        The file contains the explanatory columns and the response. Withheld
+        cells (status ``U`` or ``M``) are written as null; all other cells
+        keep their published value. ``path`` may also be an ``s3://``,
+        ``gs://`` or ``https://`` URL; pyarrow handles the transfer.
+        """
+        try:
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+        except ImportError as exc:
+            raise ImportError(
+                "to_parquet requires pyarrow; install it with "
+                "`pip install pytauargus[parquet]`") from exc
+        records = []
+        for r in self._rows:
+            rec = {name: r[name] for name in self._exp}
+            rec[self._response] = (None if r["status"] in _WITHHOLD
+                                   else r[self._response])
+            records.append(rec)
+        pq.write_table(pa.Table.from_pylist(records), str(path))
 
     def __len__(self) -> int:
         return len(self._rows)

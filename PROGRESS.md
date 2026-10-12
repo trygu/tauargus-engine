@@ -31,4 +31,8 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [ ] Rejected-method refs: sdcTools `hypercube` (Fortran GHMIter, EUPL-1.1)
   for GH; `network` has no code; README points to Castro (UPC 2014) for NET.
 - 5008 on re-OPT w/ secondary suppression (legacy limitation); GHCR/project rename.
-- OPT/MOD deadline expiry; `open_microdata`+`clean_all` note; Parquet; solver-strategy doc.
+- OPT/MOD deadline expiry; `open_microdata`+`clean_all` note; solver-strategy doc.
+- [x] Parquet input/output + S3 URL support (Python layer, no native changes):
+  `protect()` reads `.parquet` paths/URLs, `TableResult.to_parquet` writes the
+  published table, CLI `protect` verb; pyarrow behind the `parquet` extra.
+  Fixture `data/examples/parquet/micro.parquet` (read by `test_parquet`).

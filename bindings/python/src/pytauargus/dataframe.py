@@ -23,6 +23,8 @@ to make a variable categorical, pass its codes as strings.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Dict, List, Sequence, Union
 
 __all__ = [
@@ -92,6 +94,20 @@ def _checked_microdata(columns):
     return columns
 
 
+def _read_parquet_microdata(path) -> Dict[str, list]:
+    """Read a Parquet file into the microdata dict (requires pyarrow)."""
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:
+        raise ImportError(
+            "reading .parquet microdata requires pyarrow; install it with "
+            "`pip install pytauargus[parquet]`") from exc
+    table = pq.read_table(str(path))
+    out = {name: [_norm_scalar(v) for v in table[name].to_pylist()]
+           for name in table.column_names}
+    return _checked_microdata(out)
+
+
 def to_microdata(df) -> Dict[str, list]:
     """Convert a DataFrame-like object to the microdata ``dict[str, list]``.
 
@@ -100,7 +116,10 @@ def to_microdata(df) -> Dict[str, list]:
     * a ``pandas.DataFrame`` (``to_dict(orient="list")`` fast path),
     * a ``polars.DataFrame`` (``{col: df[col].to_list()}``),
     * a ``dict`` of column -> list/tuple (returned after normalising values),
-    * a ``list`` of row ``dict`` (transposed to column -> list).
+    * a ``list`` of row ``dict`` (transposed to column -> list),
+    * a path (or ``s3://``, ``gs://`` or ``https://`` URL) to a ``.parquet``
+      file (requires the ``parquet`` extra; cloud credentials come from the
+      environment, as pyarrow requires them).
 
     Column names are converted to strings and must remain unique. Column
     lengths must match; row dicts use all keys, in first-seen order, with
@@ -109,6 +128,10 @@ def to_microdata(df) -> Dict[str, list]:
     """
     if df is None:
         raise TypeError("microdata must not be None")
+
+    # Parquet file path (requires pyarrow, the ``parquet`` extra)
+    if isinstance(df, (str, os.PathLike)) and str(df).lower().endswith(".parquet"):
+        return _read_parquet_microdata(df)
 
     # dict of columns -> values
     if isinstance(df, dict):

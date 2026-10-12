@@ -14,6 +14,7 @@ the same reason.
 | `GK.grc`, `IndCode2.grc` | Recode files for the batch above | referenced by `TestRecode.arb` |
 | `region.cdl`, `region2.hrc`, `GK.CDL`, `Region.hrc` | Code lists and hierarchies from the legacy set | `region.cdl` and `region2.hrc` are asserted in `test_metadata` and `test_audit_engine` |
 | `examples/ex1/` | Published ex1 example, tabular flow with one manually marked cell | `test_table_smoke`, `test_protection_e2e`, the READMEs and `docs/tui.md` |
+| `examples/parquet/` | `micro.parquet`: eight Sector×Geo records, one primary-unsafe cell under `NK(1,80)` (the Parquet I/O example) | `test_parquet`, the Python README |
 | `tableinput/` | Pre-aggregated table flow: `TestTable.arb` + `pp.tab` + `pp.rda` + code lists | `test_table_smoke`, `test_audit_engine`, `test_batch`, `test_cover`, `test_metadata` |
 | `cellkey/Frequency/`, `cellkey/Magnitude/` | Legacy CKM (cellkey matrix) examples, frequency and magnitude variants | Reference only. CKM is dispatch-only in the headless engine, so no test runs these |
 | `vars1to5sampleG.asc`, `vars1to5sampleG.rda` | Legacy sample microdata | Not used by the current test suite; kept as reference data |

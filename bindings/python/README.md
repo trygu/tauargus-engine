@@ -133,6 +133,38 @@ Column labels become strings and must remain unique after conversion. Column
 dicts require equal lengths; row dicts use the ordered union of all keys, with
 missing fields represented by `None`.
 
+### Parquet files and cloud URLs
+
+Install the optional dependency with `pip install "pytauargus[parquet]"`
+(pyarrow). Then `protect()` also accepts a path to a `.parquet` file, or an
+`s3://`, `gs://` or `https://` URL to one, instead of a DataFrame:
+
+```python
+result = protect("s3://bucket/microdata.parquet",
+                 ["Region", "Sector"], response="Turnover",
+                 safety_rules="NK(2,75)", suppress="OPT(1)")
+result.tables[0].to_parquet("s3://bucket/protected.parquet")
+```
+
+`to_parquet` writes the published table: the explanatory columns plus the
+response, with suppressed cells (`U` and `M` status) as null. Cloud
+credentials come from the environment, as pyarrow requires them. The same
+inputs and outputs work from the command line (`protect` verb below).
+
+A runnable example lives in
+[`data/examples/parquet/`](../../data/examples/parquet/): `micro.parquet`
+holds eight records crossing Sector and Geo, and
+
+```bash
+tauargus protect data/examples/parquet/micro.parquet \
+    --tables 'Sector,Geo' --response Value \
+    --safety 'NK(1,80)' --suppress 'OPT(1)' --out protected.parquet
+```
+
+protects it. The output `protected.parquet` keeps every published value and
+writes the unsafe `(Alpha, East)` cell, plus the cells OPT suppresses to hide
+it, as null.
+
 ### Existing batch files
 
 Put the data (`.asc`), its metadata (`.rda`) and a batch file in one folder.
@@ -187,7 +219,22 @@ tauargus round    batch.arb   # compute, then round
 tauargus audit    batch.arb   # feasibility intervals of suppressed cells
 tauargus save     batch.arb   # compute, then write tables
 tauargus tables   batch.arb   # print a table summary
-tauargus version
+tauargus protect  micro.parquet --tables 'Region,Sector' --response Turnover
+version
+```
+
+`protect` runs the whole pipeline on microdata without a batch file: it
+specifies the tables, applies the safety rules and the suppression method,
+and writes the protected table. `--out` names the output; a `.parquet` suffix
+writes a masked Parquet file (requires the `parquet` extra), any other name
+writes the published CSV. `--tables` is repeated for multiple tables;
+`--safety` and `--suppress` take the same rule bodies as the batch file.
+The microdata argument is a `.parquet` path or a cloud URL (`s3://`, `gs://`,
+`https://`).
+
+```bash
+tauargus protect micro.parquet --tables 'Region,Sector' --response Turnover \
+    --safety 'NK(2,75)' --suppress 'OPT(1)' --out protected.parquet
 ```
 
 Exit code is 0 on success and non-zero on an error, with a message on stderr,
@@ -268,7 +315,8 @@ when to remove them.
 | `status()` | One `S`, `U`, `P`, `M` or `E` symbol per cell |
 | `unsafe()` | Original, unmasked responses for analysis |
 | `dataframe()` | Full diagnostic rows, including original responses |
-| `n_cells`, `columns`, `rows`, `response` | Result shape, rows and response name |
+| `to_parquet(path)` | Write the published table to Parquet, suppressed cells as null (needs the `parquet` extra) |
+| `n_cells`, `columns`, `rows`, `response`, `path` | Result shape, rows and response name |
 
 Use the explanatory columns plus `safe()` to construct the publication table,
 as in the quickstart. `dataframe()` does not mask the response automatically.

@@ -23,7 +23,8 @@ dependencies = []
 # DataFrame in/out adapters (to_microdata / TableResult.dataframe()).
 # The core never imports these; install one to get real frame objects.
 dataframe = ["pandas"]
-test = ["pytest", "pandas"]
+parquet = ["pyarrow"]
+test = ["pytest", "pandas", "pyarrow"]
 # Interactive examples + headless execution of the notebooks/ directory.
 notebooks = ["jupyterlab", "nbclient", "nbformat", "ipykernel", "pandas"]
 # Terminal UI (the `tauargus-tui` command). Installs the separate
