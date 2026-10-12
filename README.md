@@ -174,7 +174,7 @@ status grid, with per-cell detail, draft marks, and staged suppression or
 rounding previews you accept or discard. It re-implements no engine behaviour
 — every action is a call the headless CLI already makes.
 
-![tauargus-tui: a computed table with every cell coloured by its safety status](https://raw.githubusercontent.com/trygu/tauargus-engine/master/docs/tui-images/02-table0-unsafe.png)
+![tauargus-tui: a table after an accepted suppression run — green safe, orange suppressed, red still flagged](https://raw.githubusercontent.com/trygu/tauargus-engine/master/docs/tui-images/05-accepted.png)
 
 ```bash
 pip install "pytauargus[tui]"     # or: pip install pytauargus-tui
