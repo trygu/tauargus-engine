@@ -1,13 +1,13 @@
 # Tau-Argus TUI — User Guide
 
 `pytauargus-tui` is an interactive **terminal UI** for Tau-Argus: a thin, live
-view over the `pytauargus` engine. It is a *presentation layer only* — every
-action is a call the headless CLI already makes. It re-implements no engine
-behaviour and never touches the native bindings directly.
+view over the `pytauargus` engine. Statistical operations use the same engine
+as the headless CLI; the TUI owns draft/history, previews and workspace state.
+Widgets do not implement statistical rules or call native bindings directly.
 
-> Design document: [`docs/ui-design.md`](ui-design.md) (Option B, sections
-> §B.1–§B.8). This guide describes what is **implemented today** and what is
-> still **outstanding**.
+> Architecture and plans: [`docs/ui-design.md`](ui-design.md) (§B.1–§B.8
+> state contracts; §5 Java workflow review and prioritised roadmap). This
+> guide describes **implemented behaviour**; §9 separates future plans.
 
 All screenshots below were captured headlessly from the real app (Textual's
 test pilot) running against the `data/TestRecode.arb` fixture in this repo.
@@ -57,6 +57,11 @@ opens the chosen file, `q`/`Esc` quits.
 
 The cursor cell is highlighted; the detail pane and the status-line hint stay
 in sync with it.
+
+The current grid supports one or two explanatory dimensions. It has no slice
+selector for higher-dimensional tables; use the headless tools for those
+tables until full-coordinate views are implemented. Table navigation alone
+does not provide coordinated linked-table protection.
 
 ---
 
@@ -202,7 +207,7 @@ terminal is narrow).
 | Key | Action |
 |---|---|
 | `a` | **Audit** the current table (legacy `RunAudit`): computes realised feasibility intervals. For the cell under the cursor the detail pane then shows `interval=[min, max]`. Any subsequent edit invalidates the audit. |
-| `o` | **Export** the accepted table as a legacy `INTERMEDIATE` `.tab` file to `<arb dir>/out/table_N.tab` (with audit columns when audited). |
+| `o` | **Diagnostic export** of the retained table as a legacy `INTERMEDIATE` `.tab` file to `<arb dir>/out/table_N.tab` (with audit columns when audited). This can contain original sensitive values; it is not a masked publication table. |
 | `w` | **Save workspace** — writes a versioned JSON manifest next to the `.arb` (no solver run; works even before any preview). |
 | `R` | **Write replay batch** — materialises the accepted recipe as a headless-runnable `.arb` (no solver run). |
 | `?` / `F1` | **Help overlay** (below). |
@@ -321,15 +326,18 @@ screenshot below. Close with `?`/`F1`/`Esc`.
 
 ## 9. What is outstanding
 
-Tracked against [`docs/ui-design.md`](ui-design.md) §B.7/§B.8. Workspace
-reopen/restore and the replay batch (§B.7) have landed; the remainder:
+The [architecture and Java review](ui-design.md#5-java-workflow-review-and-tui-roadmap-2026-10-12)
+owns the full roadmap, source evidence and acceptance gates. These are plans,
+not new controls or promised release dates. The table-first layout and
+mark → preview → accept workflow stay central.
 
 1. **Export provenance (§B.7/§B.8)** — export does not yet *reuse saved
    accepted export artifacts* (the manifest does not reference written
-   `.tab` files) or record which revision was written. The restore path
-   rebuilds the accepted values/statuses through the engine, so an export
-   after a reopen is a verified restore — but the revision bookkeeping is
-   not in the UI yet.
+   `.tab` files) or record which revision was written. Reopen **recomputes**
+   the accepted recipe; it does not verify or restore the exact old pattern
+   or rounded values. The manifest fingerprints only the `.arb`, not its
+   referenced data/metadata/hierarchy/apriori files. Exact accepted artifacts
+   and complete dependency identities are part of the output plan.
 2. **Marking total cells** — explicitly deferred: it needs the real total
    code, which the display label does not preserve. The app blocks the mark
    with a log message.
@@ -338,6 +346,26 @@ reopen/restore and the replay batch (§B.7) have landed; the remainder:
    `rnd_base` so this is ready to grow).
 4. **Single session only** — one `.arb` batch at a time; no multi-batch and
    no spec editing from the UI.
+
+### Recommended additions, in order
+
+| Stage | Addition | How it stays simple |
+| --- | --- | --- |
+| First | Separate imported preparation, protection and output; persist exact accepted artifacts and export revision | Keep preview/accept/export distinct. Current previews replay original batch commands and confirmed ops; they can repeat output writes or return 5008 on repeated OPT |
+| First | Complete 3D+ slices, selectable axes and hierarchy levels; real total-code identity | A small View pane; changing the view never changes the protected scope |
+| First | Diagnostic versus publication view/output, including rounded values | One output picker, explicit result/revision, verified engine formats; original-value inspection stays clearly labelled |
+| Next | Summary, code/label search, next sensitive/audit-failing cell and filters | Contextual commands and dismissible panes rather than permanent toolbars |
+| Next | Expanded frequency/cost/protection details and supported audit findings | Keep the short detail pane; expand only when needed and tie evidence to its result |
+| Next | MOD selection, custom RND base and supported time limits | One Method pane with validated defaults; settings become undoable recipe changes |
+| Next / later | Strict staged apriori import, then costs/levels and bulk edits | Show matched/rejected targets before applying; use the existing draft/history model |
+| Later | Read-only recipe/rules, optional recoding and guided recipe creation | Ready `.arb` batches remain the fast path; authoring is optional |
+| Engine prerequisite | Linked-table protection and specialist methods | Expose only verified scopes/methods; multi-table navigation is not a joint solve |
+
+The Java review favours its inspection and operator controls over its modal
+screen structure. CKM needs a separate capability review despite a Python
+dispatch path; unsupported legacy methods and commercial solver settings do
+not gain TUI controls merely because Swing had them. Planned interactions have
+no assigned shortcuts yet; §7 remains the shipped key reference.
 
 ## 10. Screenshot index
 

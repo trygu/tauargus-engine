@@ -3,6 +3,30 @@
 Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 (repo meta-cleanup). See `PROGRESS.md` for current state.
 
+## Java workflow review and TUI architecture (2026-10-12)
+
+- Reviewed original sdcTools/tauargus Java revision `20d2b606`: main menus,
+  table view/indexing and actions, details/summary, method parameters,
+  protection/undo, outputs/report, apriori, recoding, specification and linked
+  workflows. Source inspection, not a Swing execution or exhaustive parity audit.
+- Compared with mainline `cad4abb` and the 4.1 manual. Confirmed stale design
+  branch/release claims, missing full-dimensional grid coordinates, preview
+  replay of original protection/output commands, and recipe recomputation on
+  reopen without exact accepted-artifact restore or dependency fingerprints.
+- Updated design status/packaging and documented module ownership, state gaps,
+  prioritised capability matrix, evidence links and incremental acceptance gates.
+  Keep the table-first layout; inspection and result/output integrity precede
+  optional authoring or specialist methods. No application code changed.
+- User guide distinguishes current diagnostic export/reopen limits from plans;
+  AGENTS now directs TUI work to both design and shipped-behaviour documents.
+- Verification: 17 pinned Java links match the inspected revision, source
+  paths and line bounds; local document/image links resolve in Git; PROGRESS
+  remains under 35 lines and `git diff --check` passes. Runtime tests were not
+  run for this documentation-only change; no screenshots or native state changed.
+- Release-pipeline checkpoint moved from PROGRESS: TUI smoke tests install the
+  engine wheel from the same run (`build-tui` needs `build-linux`); compatibility
+  floors need not rely on a previously published engine wheel.
+
 Branch: `rewrite`
 
 ## Consolidated DataFrame branch (2026-10-10)

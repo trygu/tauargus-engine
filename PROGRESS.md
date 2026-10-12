@@ -14,7 +14,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] Batch parser: `<APRIORI>` quoted separator now parses (legacy
   `"file",tab,"sep",flags` form; 3 tests in test_batch.py).
 - [x] TUI §B.7: workspace **reopen/restore** + **replay batch** (`R`);
-  TUI 82 / py 262 green.
+  TUI 82 / py 264 green.
 - [x] **Release 0.4.0 shipped**: reopen + replay + APRIORI fix; verified on
   PyPI/GH Release/GHCR; TUI smoke test now builds against this run's wheel.
 - [x] `feature/example-tables` merged: `data/examples/ex1` (tabular flow,
@@ -24,6 +24,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
   rewritten, unsafe cell stays published, non-empty M pattern).
 
 ## In flight
+- TUI architecture/plans: `docs/ui-design.md` §5; Java review in ARCHIVE.
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record
   the written revision).
 

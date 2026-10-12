@@ -1,9 +1,15 @@
 # UI Design — replacing the Java/Swing frontend
 
-Status: **The headless product is shipped; the TUI is being developed on
-`tui`.** Navigator, grid, cell details and engine actions exist. The state
-contracts below are the agreed target for the next iteration, not a claim
-that draft editing, previews or workspace persistence are implemented.
+Status (2026-10-12): **The headless CLI and TUI are shipped on `master` in
+release 0.4.0.** The TUI has draft marks/history, scratch previews,
+accept/discard, audit, workspace save/reopen and replay batches. Reopen
+recomputes the recipe; exact accepted artifacts and export provenance remain
+unfinished. The [user guide](tui.md) records shipped behaviour; this document
+owns architecture, state contracts and the prioritised roadmap (§5).
+
+Sections B.4–B.8 define the target contract, not a claim of complete parity.
+The implementation gaps are explicit in §5.2. Changes use feature branches
+and PRs; the historical `tui` branch is a Java porting reference.
 
 **State decision (2026-10-11): immediate draft edits → explicit solver
 preview → accept result → export.** Saving a workspace is a separate action.
@@ -25,8 +31,9 @@ preview → accept result → export.** Saving a workspace is a separate action.
 
 ## 2. Decision
 
-The headless CLI remains the independently shipped product (Option A).
-Option B is the chosen interactive companion and has its own release cadence.
+The headless CLI remains usable independently (Option A).
+Option B is the chosen interactive companion: a separate package released
+in lockstep with the engine.
 
 ### Option A — Headless CLI (the shipped product)
 
@@ -57,20 +64,22 @@ break the terminal, the main risk with a home-rolled `rich` grid).
 it forces us to hand-wire pane layout and focus; `textual` gives that for free.
 
 **Distribution: its own PyPI package, `pytauargus-tui`** (decided). It is a
-separate project — its own `pyproject.toml`, version, wheel, and release
-cadence — but **lives in this monorepo** (`bindings/tui/`, sibling to
-`bindings/python/`) and is developed on its **own branch** while in flight, so:
+separate project — its own `pyproject.toml` and wheel — but **lives in this
+monorepo** (`bindings/tui/`, sibling to `bindings/python/`). Related work uses
+short-lived feature branches; both packages ship from the same `py-v*` tag:
 - the core `pytauargus` wheel stays minimal — `textual` is never a dependency
-  of it (no extra, no subcommand in the core `tauargus` CLI);
-- the TUI can move (features, breaking UI changes) without bumping the engine
-  release;
+  of its base installation; `pytauargus[tui]` is an optional convenience extra,
+  and `tauargus-tui` is a separate command;
+- the release workflow checks matching engine, TUI and tag versions and
+  smoke-tests the TUI against the engine wheel built in that run;
 - `pip install pytauargus-tui` pulls `pytauargus>=<min>` (the native engine +
   CLI) as its only engine dependency.
 
 - Console script: `tauargus-tui` (distinct from the core `tauargus` CLI).
-- Depends on: `pytauargus>=0.2.1`, `textual>=0.50`.
-- Release: its own tag scheme (e.g. `tui-v*`) + wheel; can reuse the existing
-  `wheels.yml` pattern once the layout is proven.
+- Dependency floors live in `bindings/tui/pyproject.toml`; they express
+  compatibility, rather than the current coordinated release number.
+- Release: `.github/workflows/wheels.yml`, shared `py-v*` tags, separate PyPI
+  wheels; the container includes both CLIs.
 
 ### B.1 Layout
 
@@ -322,19 +331,18 @@ accepted result or its audit evidence.
 
 1. **Ship the product as Option A.** The headless CLI is the complete
    product; do not gate it on a UI.
-2. **Continue Option B on `tui`, shipped as `pytauargus-tui`.** Implement
-   revisioned draft commands and history, isolated previews, acceptance and
-   audit ownership, then workspace persistence and replay/export. The current
-   navigator/grid/actions are the foundation; the checks in B.8 define done.
+2. **Develop Option B through feature-branch PRs, shipped as
+   `pytauargus-tui`.** Close the state/output gaps and improve inspection
+   before expanding authoring or specialist methods. §5 defines priorities;
+   B.8 defines the state acceptance contract.
 3. **Keep the engine independent.** Swing is already removed from `master`;
    the TUI branch's reference copy can be dropped when porting is complete.
 
 ## 4. Split-out requirement (Option B)
 
-The UI is **its own task, its own branch, and its own PyPI package**
-(`pytauargus-tui`), independent of the native engine port and of core
-packaging:
-- Branch: `tui` (in this monorepo); source lives in `bindings/tui/`.
+The UI is **its own PyPI package** (`pytauargus-tui`) with a separate code
+boundary and coordinated engine/TUI releases:
+- Source: `bindings/tui/` on mainline; changes use feature branches and PRs.
 - Distribution: `pytauargus-tui` — its own `pyproject.toml`/version/**wheel**;
   depends on `pytauargus>=<min>` + `textual`; console script `tauargus-tui`.
 - Does not touch: `engine/native/*`, the batch parser, or solver backends.
@@ -345,4 +353,168 @@ packaging:
   Runs use the same engine semantics as headless replay; compare recipe,
   constraints and valid outcomes, retaining exact accepted artifacts for export.
 
-The TUI complements the headless product and does not gate its releases.
+The TUI complements the headless product; both packages participate in the
+coordinated release checks.
+
+## 5. Java workflow review and TUI roadmap (2026-10-12)
+
+### 5.1 Product direction: keep the table at the centre
+
+Keep the navigator, grid, detail pane and status line as the everyday screen.
+The primary loop stays **inspect → mark → preview → accept → export**.
+Add depth through a contextual command menu and small, dismissible panes for
+view selection, method settings, diagnostics and output. Existing shortcuts
+remain fast paths; new features do not each need a permanent button or key.
+No implementation or new key bindings are introduced by this plan.
+
+The Java app is useful evidence of operator needs, not a screen specification.
+It mixes valuable table inspection with many modal dialogs, solver settings,
+registry preferences and external tools. Preserve statistical semantics from
+the [4.1 manual](tau-argus-4.1-markdown-bundle/tau-argus-4.1-agent-reference.md),
+while designing a smaller interaction surface. The current upstream Java also
+contains CKM features beyond that manual; review those separately before porting.
+
+This was a source review, not an execution of Swing or a claim that every
+legacy method is supported. Reviewed upstream revision:
+[`20d2b606`](https://github.com/sdcTools/tauargus/tree/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus).
+The evidence map in §5.5 pins the workflows inspected. Current implementation
+comparisons use engine/TUI mainline `cad4abb`.
+
+### 5.2 Current architecture and gaps
+
+| Boundary | Current responsibility | Planned direction |
+| --- | --- | --- |
+| `bindings/tui/.../app.py` | Textual layout, actions, draft/history/revisions, workers, accept/discard | Keep rendering and command dispatch here; move recipe/result/job ownership into testable session state as complexity grows |
+| `bindings/tui/.../model.py` | `Session`, grids, cell instructions, method ops, scratch preview, replay | Typed view/query adapter; full cell identity; immutable recipe and result records |
+| `bindings/tui/.../workspace.py` | Schema-v1 JSON, atomic manifest save, `.arb` hash, recipe/provenance | Versioned input dependency identities and exact accepted artifacts with integrity checks |
+| `bindings/python/.../engine.py` | Metadata, compute/recode, apriori, methods, audit and writers | Own statistical validation and reusable APIs shared by TUI, CLI and Python |
+| `engine/native/` | Table engine and solver execution | Changes require their own native feature branches, verification and PRs before parent pins |
+
+Paths abbreviated above are relative to each package's `src/pytauargus_tui`
+or `src/pytauargus` directory. Today `model.py` adapts private engine/native
+accessors. Consolidate reusable inspection into the Python API as needed;
+widgets must not acquire their own native calls or statistical calculations.
+
+```mermaid
+flowchart LR
+    UI[Textual panes and commands] --> State[Recipe, history and revisions]
+    State --> Jobs[Serial native job coordinator]
+    Jobs --> Engine[Python Engine API]
+    Engine --> Native[Native table and solver libraries]
+    Jobs --> Result[Materialised result and audit evidence]
+    Result --> UI
+    State --> Store[Workspace and artifact store]
+    Result --> Store
+    Store --> Export[Accepted output and replay recipe]
+```
+
+This diagram is the target ownership model. Current workers use Textual's
+`engine` group with `exclusive=True`; that alone is not proof of native-call
+termination or process-wide serialization. A coordinator must retain native
+ownership until a call actually exits, reject late results by revision/run ID,
+and materialise data before handing it to widgets (§B.6).
+
+Known differences from the target contracts:
+
+- **Dimensions:** `_build_grid` chooses the first two variables and passes
+  only two indices. There is no complete higher-dimensional slice selector.
+  Until implemented, report unsupported dimensions clearly; do not imply a
+  displayed 2D grid represents all slices. Whole-table summaries must not
+  depend on the visible grid or double-count overlapping margins.
+- **Recipes:** loading and preview call `run_batch` on the original `.arb`;
+  preview then adds instructions and confirmed + staged methods. Imported
+  protection/output commands therefore remain executable, and repeated OPT
+  can encounter 5008 on existing secondaries. Fresh engine allocation alone
+  does not satisfy §B.6's preparation/protection/output separation. Normal
+  re-preview should replace that table's method choice; a sequence of methods
+  should be explicit, validated and distinguishable from a comparison.
+- **Persistence:** schema v1 hashes the `.arb`, not its referenced data,
+  metadata, hierarchy or apriori files. Reopen reruns the recipe and does not
+  compare/store the exact suppression pattern or rounded values. Summary
+  counts cannot establish that the old accepted outcome was restored.
+- **Output:** `o` writes an intermediate diagnostic `.tab` from the retained
+  session, without a persisted artifact/revision record or format picker.
+  It is not a publication-output workflow. Rounded release-value inspection
+  also needs an engine adapter; the current grid reads original responses.
+- **Editing:** U/S/P marks and mark history exist. Rule/recoding/cost/PL edits,
+  total-cell marks and method-parameter history remain planned. The app locks
+  marking while a preview is pending; editing during jobs is a target contract,
+  not an already established capability.
+
+### 5.3 Capabilities worth carrying forward
+
+Priority means recommended order, not a release commitment. **First** closes
+state/output correctness gaps; **Next** improves everyday inspection; **Later**
+adds authoring only when the core loop remains clear.
+
+| Legacy capability / evidence | Present TUI | Recommendation and simple interaction |
+| --- | --- | --- |
+| Row/column selection, other-dimension selectors, hierarchy depth [J2] | First two axes only | **First:** full-dimensional identity and slices; a View pane chooses axes and fixed codes, with hierarchy expand/collapse. Display changes never recode or alter solve scope |
+| Output view and adjusted cell value [J2, J3] | Original value/status grid; intermediate export | **First:** explicit diagnostic/publication views, actual rounded values and suppression markers; identify result/revision and destination before writing |
+| Save Table, report and batch generation [J1, J7] | `.tab`, manifest and replay | **First:** exact accepted artifacts, dependency hashes and export provenance; then a small output picker for verified engine formats and a concise run/audit report |
+| Table summary: cells, records, response and cost by status [J4] | Preview status-count delta | **Next:** a Summary pane with whole-table counts, scope, method outcome and audit findings; compare against a named baseline/accepted result. Define leaf/margin accounting before showing response/cost totals |
+| Rich cell details: frequency, shadow/cost, top contributions, holding info, required levels and realised bounds [J3] | Value/status/mark and audit bounds | **Next:** expandable diagnostic details, starting with frequency, cost and required versus realised protection. Label unavailable data; expose contributions only in internal diagnostics |
+| Large-table navigation and hierarchy view [J2] | Cursor, scrolling, table switch | **Next:** code/label search, next primary/secondary/audit failure, and filters. Search is a TUI addition motivated by table size, not a claimed Java feature; retain complete cell identity and show hidden-cell counts |
+| Modular/optimal/rounding settings [J2, J5] | OPT and RND shortcuts, minimum RND base | **Next:** one Method pane offering verified OPT/MOD/RND, rounding base and supported time limits; record settings in draft/history/manifest/replay. Advanced options stay collapsed and engine-validated |
+| Manual status/cost edits and apriori import/export [J2, J8] | U/S/P marks on non-total cells | **Next:** real total codes and staged strict apriori import with matched/rejected counts. **Later:** costs/protection levels, explicit range/bulk edits and instruction export, all undoable and validated through the engine |
+| Global/tree recoding [J9] | Existing batch recodes execute; no editor | **Later:** inspect existing recodes first; optional recode pane creates a new recipe revision and invalidates affected cell instructions explicitly |
+| Open microdata/tabular input; metadata and safety-rule specification [J1, J10] | Open `.arb` or workspace | **Later:** guided creation from data + metadata using existing Python writers; a read-only recipe/rule pane comes first. Preserve the ready-batch path and avoid a mandatory wizard |
+| Linked tables and cover-table protection [J11] | Multi-table navigator, single-table actions | **Later, engine prerequisite:** inspect linked scope first; coordinated solve/accept/audit/export only after joint behaviour is verified. Navigating several tables is not linked-table protection |
+| CKM, CTA, Network, Hypercube, UWE and solver tuning [J2, J6] | No method controls for these | **Defer:** review demand and engine contracts separately. Python dispatch has a CKM path, but that does not establish TUI-ready validation, diagnostics or replay. GH/NET/CTA are rejected by the current headless dispatcher; do not add enabled controls for unsupported methods |
+
+Do not carry over Windows registry preferences, commercial-solver selection,
+embedded browser/news screens, SPSS-specific import dialogs or a separate
+modal window for every parameter. Session settings belong in the workspace;
+ordinary preferences in a portable config. Acknowledgements and help remain
+accessible without occupying the table screen.
+
+### 5.4 Delivery order and acceptance gates
+
+1. **Reliable result/output foundation:** split imported preparation, method
+   and output commands; prevent implicit preview writes to user paths; store
+   exact accepted results/artifacts and full input fingerprints. Reopening
+   may offer recipe recomputation, but a changed outcome requires a new
+   preview/acceptance. Record artifact format, hash, result/revision, engine
+   version and path; preserve the previous manifest/artifacts on write failure.
+2. **Complete table inspection:** full coordinates for 3D+ tables, selectable
+   axes/slices and real total codes. Prove marks/undo target the same cell
+   after navigation; hierarchy collapse and filters leave solve scope intact.
+   Add rounded/publication views using verified engine values/writers.
+3. **Better decisions with little chrome:** summary, find/filter and expanded
+   cell detail. Audit evidence names the result and supported scope; an absent
+   or failed audit is visibly different from a successful one. A status or
+   solver success message alone must not claim confidentiality certification.
+4. **Controlled method choice:** MOD and RND base first, then supported limits.
+   Write tests for parameter validation, revision invalidation, manifest/replay
+   round trips, failed-run preservation and repeated previews. Deadline expiry
+   and cancellation require their own native verification, not just a spinner.
+5. **Optional authoring:** strict apriori, costs/levels, recoding and recipe
+   creation in separate increments. Validate targets before replacing a draft;
+   do not silently retarget invalidated instructions after recoding.
+6. **Coordinated/specialist workflows:** linked protection and any new method
+   need engine tests and explicit scope semantics before TUI controls. Keep
+   them out of the default workflow until evidence and demand justify them.
+
+Each increment uses a related feature branch and PR, with contract tests
+written before implementation. Update this roadmap and the shipped-behaviour
+guide together; feature work is not authorised by this review itself. Preserve
+the main layout and existing shortcuts, readable narrow-terminal status/help,
+and coordinated engine/TUI releases. Screenshot updates are outside this task.
+
+### 5.5 Source evidence map
+
+All Java links below pin the reviewed upstream revision. Generated Swing
+layout was used to identify controls; handlers/model code established what
+they do. The manual is authoritative for 4.1 formats and SDC meaning.
+
+- [J1: FrameMain menus](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/FrameMain.java#L564-L744): input, specification, linked tables, output/report, apriori and batch actions.
+- [J2: PanelTable](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/PanelTable.java#L473-L557) and [cell indexing](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/PanelTable.java#L830-L865): row/column permutation, hierarchy levels and remaining-dimension selectors. [Action handlers](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/PanelTable.java#L1581-L1870): marks/cost, recoding, output view, summary, audit and method selection; `DialogSelectRowColumn` chooses axes.
+- [J3: PanelCellDetails](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/PanelCellDetails.java#L62-L152): original/adjusted responses, contributions, holding details, protection distances and realised audit bounds.
+- [J4: DialogTableSummary](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/DialogTableSummary.java#L189-L234): status counts, record counts, response and cost totals.
+- [J5: DialogRoundingParameters](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/DialogRoundingParameters.java#L433-L469) and [DialogModularParameters](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/DialogModularParameters.java#L213-L224): base validation, time and method settings.
+- [J6: OptiSuppress](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/model/OptiSuppress.java): method dispatch implementation, native OPT/MOD/RND, external-tool workflows and CKM. [TableService undo](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/service/TableService.java#L86-L104): protection reset and audit bookkeeping.
+- [J7: SaveTable writers](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/model/SaveTable.java#L77-L184) and [report](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/model/SaveTable.java#L616-L740): response-type/format options, rules and method evidence.
+- [J8: APriori](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/model/APriori.java#L171-L301): status/action mappings and cost instructions; manual §§4.6.3/5.6 describes reusable apriori files.
+- [J9: DialogGlobalRecode](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/DialogGlobalRecode.java#L198-L265): recode source, tree/text alternatives and apply/undo controls.
+- [J10: DialogOpenMicrodata](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/DialogOpenMicrodata.java#L193-L280) and [DialogSpecifyTablesMicro](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/gui/DialogSpecifyTablesMicro.java#L1970-L2110): data/metadata selection and safety-rule settings. Tabular input is also exposed by `FrameMain`.
+- [J11: LinkedTables](https://github.com/sdcTools/tauargus/blob/20d2b6067105088b009d5de29335de27d7c1db07/src/tauargus/model/LinkedTables.java#L50-L113): compatibility checks and coordinated modular workflow; cover-table construction is a separate path in that model.
