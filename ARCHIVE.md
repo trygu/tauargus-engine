@@ -620,3 +620,38 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   not observable around `press` (spinner covered by its own contract test).
 - Verification: TUI suite 36/36 (was 25). TDD: tests written first, observed to
   fail for the right reason before implementing.
+
+## TUI releases 0.3.2–0.3.4 + §B.7 workspace reopen (2026-10-12)
+
+- 0.3.2: TUI shipped in lockstep with pytauargus (same `py-v*` trigger,
+  3-way version check, per-project PyPI publish, image installs both CLIs,
+  `pytauargus[tui]` extra); status-line off-screen fix (regression test);
+  `docs/tui.md` guide + 7 screenshots.
+- 0.3.3: PyPI README lesson — relative in-sdist image paths do NOT render on
+  PyPI (verified broken on the 0.3.3 page); fix = absolute
+  raw.githubusercontent URLs.
+- 0.3.4: TUI README product-first rewrite (what it does / what it can't do
+  yet), hosted screenshots; verified in the published PyPI description
+  (0 relative refs).
+- §B.7 reopen/restore: `tauargus-tui` accepts a `.workspace.json` (CLI arg or
+  file browser). `Session.from_workspace` replays the manifest recipe on a
+  fresh engine (spec + confirmed apriori marks + confirmed ops); the pending
+  draft is restored as undoable edits; revisions/focus stay continuous.
+  `WorkspaceStale` (fingerprint mismatch / missing input) → the current input
+  is opened fresh instead (explicit reconciliation, the saved outcome is NOT
+  treated as current); incompatible manifest version refused → file browser.
+- Replay batch (`R`): `model.replay_batch()` writes `<stem>.replay.arb` next
+  to the input with one `<SUPPRESS>` line per confirmed op and one
+  `<APRIORI>` line (full legacy 5-field form, strict `0,0`) per table of
+  confirmed marks, plus sibling `<stem>.tab<n>.apri` files. The still-pending
+  draft is not included — the replay encodes the accepted recipe only.
+- Engine fix: `_parse_apriory` (batch.py) could not parse ANY legacy
+  `<APRIORI>` line — the quoted separator was read with `next_token`, which
+  kept the closing quote (and trailing flags). Now read up to the closing
+  quote; 3 new tests in test_batch.py pin the rtauargus `apriori_batch` form.
+- Docs: `docs/tui.md` (reopen + replay sections, `R` key, outstanding list),
+  TUI README (reopen + replay in "what it does"), top-level README (TUI
+  section, current Docker image, screenshot — `e62270f`).
+- Verification: TUI suite 82 passed (was 68); Python suite 262 passed /
+  3 skipped (was 259). TDD throughout (red → green). Release 0.4.0
+  (lockstep) pending user go-ahead — PyPI versions are immutable.

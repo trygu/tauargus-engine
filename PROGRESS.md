@@ -8,23 +8,22 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] Engine fixes in-tree: 2nd-OPT SIGABRT (csp `3007826`), `ErrorStrings.txt`
   (hitas `d3e5b91`), FullJJ streams (`caf7528`).
 - [x] Dev loop: `scripts/sync-venv.sh`; venvs run local wheels, not PyPI.
-- [x] TUI on mainline (`bindings/tui/`, pkg `pytauargus-tui`): staged s/r
-  preview, marks u/p/S + undo/redo, audit, workspace save, preview-in-grid.
-- [x] **Release 0.3.2 shipped**: TUI in lockstep with pytauargus (same
-  `py-v*` trigger, 3-way version check, per-project PyPI publish, GH Release
-  all wheels, image installs both CLIs, `pytauargus[tui]`); status-line
-  off-screen bug fixed (regression test, TUI suite 68); `docs/tui.md` guide.
-- [x] **Release 0.3.3 shipped** (docs-only): PyPI freezes each version's
-  README — but relative in-sdist screenshot paths do NOT render on PyPI
-  (verified broken; lesson: use absolute hosted image URLs).
-- [x] **Release 0.3.4 shipped** (docs-only): TUI README product-first
-  (what it does / can't yet), screenshots at absolute raw.githubusercontent
-  URLs — verified in the published PyPI description (0 relative refs).
-- [x] Conventional Commits adopted for new history; agent rule: always
-  respond in English (AGENTS.md §8).
+- [x] TUI on mainline: staged s/r preview, marks u/p/S + undo/redo, audit,
+  workspace save, preview-in-grid; guide `docs/tui.md`.
+- [x] **Releases 0.3.2 / 0.3.3 / 0.3.4 shipped** (lockstep TUI pipeline;
+  PyPI README lesson: absolute hosted image URLs; product-first TUI README).
+- [x] Conventional Commits for new history; agent rule: English replies.
+- [x] Batch parser: `<APRIORI>` quoted separator now parses (legacy
+  `"file",tab,"sep",flags` form; 3 tests in test_batch.py).
+- [x] TUI §B.7: workspace **reopen/restore** (CLI arg + file browser; recipe
+  re-run on a fresh engine, draft restored undoable, stale input reconciled
+  fresh, bad version refused) + **replay batch** (`R`). TUI 82 / py 262 green.
 
 ## In flight
-- [ ] TUI §B.7/§B.8: workspace reopen/restore + replay/export.
+- [ ] Release 0.4.0 (lockstep) to publish the §B.7 feature on PyPI —
+  pending user go-ahead (immutable version).
+- [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record
+  the written revision).
 
 ## Feature branches
 - `feature/example-tables`: `data/examples/ex1` fixture (pushed, unmerged).
