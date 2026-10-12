@@ -2,10 +2,35 @@
 
 Statistical disclosure control (SDC) for tabular data, as a Python package and
 a headless `tauargus` command. Protect tables directly from DataFrames with
-`protect()`, or run legacy Tau-Argus 4.1 `.arb` batch files without the GUI.
+`protect()`, or run supported legacy Tau-Argus `.arb` batches without the GUI.
+The 4.1 manual is the batch/file-format reference, not a complete feature
+compatibility guarantee.
 The engine solves with the open-source
 [HiGHS](https://github.com/ERGO-Code/HiGHS) solver. Part of
 [tauargus-engine](https://github.com/trygu/tauargus-engine).
+
+## Supported workflows and validation
+
+- **OPT, MOD and RND** are implemented and regression-tested.
+- **CKM** has a dispatch path, but no dedicated end-to-end CKM regression suite.
+- **GH, NET and CTA** are rejected by the headless engine, even though the
+  parser/generators accept their legacy syntax.
+- **Suppression audit** runs in-process and has known-interval contract tests.
+
+Regression tests do not establish comprehensive numerical equivalence with
+original Tau-Argus. Compare protection requirements, realised audit intervals,
+information loss and failure behaviour on representative tables before adopting
+a workflow; solver changes can produce different valid suppression patterns.
+Audit is explicit: `engine.audit(tab)` checks the supplied table's suppression
+constraints. `TableResult.safe()` masks cells; it does not run the audit.
+
+Run independent jobs in separate processes and working/output directories.
+The native solver retains process-global state, and concurrent engine calls in
+the same process are not validated. OPT/MOD limits are in minutes (`0`: no
+limit); the positive-limit tests do not cover deadline expiry or partial results.
+
+See [Compatibility and validation](https://github.com/trygu/tauargus-engine#compatibility-and-validation)
+for the project scope and the distinction between diagnostics and publication.
 
 ## Install
 
@@ -288,7 +313,7 @@ micro_arb(
     explanatory_vars=[["REGION"], ["SEXE"]],
     response_var="CA",
     safety_rules=["NK(1,85)", "FREQ(3,10)"],
-    suppress="GH(.,100)",
+    suppress="OPT(.)",
     output_names=["tab1.csv", "tab2.csv"],
     output_type="1",  # CSV; the generator default is SBS/type 4
 )

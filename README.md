@@ -2,8 +2,9 @@
 
 Native, headless engine for statistical disclosure control (SDC) of tabular
 data, plus a Python tool that drives it. It is a drop-in replacement for the
-batch mode of legacy Tau-Argus 4.1: same `.arb` batch files, file formats and
-outputs, without the GUI.
+supported batch mode of legacy Tau-Argus 4.1: same `.arb` batch files, file
+formats and outputs, without the GUI — for the documented methods and batch
+commands (see [Compatibility and validation](#compatibility-and-validation)).
 
 This is a personal rewrite of the legacy product, started a few years ago and
 worked on in on-and-off sprints: the C/C++ solver engine is rebuilt to a modern
@@ -118,6 +119,44 @@ WORKDIR /work
 ENTRYPOINT ["tauargus"]
 ```
 
+## Compatibility and validation
+
+The engine is the legacy Tau-Argus solver code, modernised: it builds on a
+current toolchain and solves with [HiGHS](https://github.com/ERGO-Code/HiGHS)
+instead of CPLEX, XPRESS or the legacy free solver. The behavioural reference
+is the τ-ARGUS 4.1 manual; the legacy product continued to 4.2, so this is a
+4.1-era drop-in, not a guarantee of every later feature.
+
+**Supported suppression methods.** `OPT`, `MOD` and `RND` are implemented and
+regression-tested. `CKM` has a dispatch path but no dedicated end-to-end
+regression suite. `GH`, `NET` and `CTA` are rejected by the headless engine
+although the batch parser still accepts their legacy syntax.
+
+**No numerical-equivalence claim.** The regression suite is a contract check,
+not proof of equivalence with original Tau-Argus: the solver change can alter
+tolerances, termination and the choice between equally good solutions. Before
+adopting a workflow, compare protection requirements, realised audit intervals,
+information loss and failure behaviour on representative tables — an identical
+suppression pattern is not required, a defensible one is.
+
+**Audit is explicit.** The feasibility-interval audit (the legacy `intervalle`
+program) runs in-process and is contract-tested against known intervals from
+the manual. Call it with `engine.audit(tab)`; `TableResult.safe()` only masks
+unsafe/secondary cells and does not run the audit.
+
+**Diagnostics versus publication.** The engine's intermediate outputs (JJ,
+INTERMEDIATE `.tab`, audit bounds) are diagnostics: they carry protection
+levels and bounds and are not masked release tables. Build publication output
+explicitly through the engine API/CLI. The TUI grid is a diagnostic view too:
+the first two variables, original responses even after rounding.
+
+**Operational limits.** Run one job per process and working/output directory:
+the native solver keeps process-global state, and concurrent engine calls in
+one process are not validated. `OPT`/`MOD` time limits are in minutes
+(`0` = no limit); deadline expiry and partial results are not yet covered by
+tests — validate that behaviour before relying on a time limit as a production
+termination guarantee.
+
 ## Quick start
 
 ### From a DataFrame
@@ -185,7 +224,7 @@ tauargus-tui path/to/batch.arb                 # or start on a batch directly
 tauargus-tui path/to/batch.workspace.json      # or reopen a saved workspace
 ```
 
-What it does (and what it can't do yet):
+Current capabilities and limitations (including workspace replay and diagnostic export):
 [bindings/tui/README.md](bindings/tui/README.md). Full user guide with every
 key and every status code:
 [docs/tui.md](docs/tui.md).
@@ -224,7 +263,7 @@ micro_arb(
     explanatory_vars=[["REGION"], ["SEXE"]],
     response_var="CA",
     safety_rules=["NK(1,85)", "FREQ(3,10)"],
-    suppress="GH(.,100)",
+    suppress="OPT(.)",
     output_names=["tab1.csv", "tab2.csv"],
     output_type="1",  # CSV; the generator default is SBS/type 4
 )

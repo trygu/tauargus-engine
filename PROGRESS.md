@@ -29,5 +29,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
   the written revision).
 
 ## Watch items
+- [ ] sdcTools `hypercube`/`network` (github.com/sdcTools) as subsystem
+  candidates for the rejected methods (NET/GH).
 - 5008 on re-OPT w/ secondary suppression (legacy limitation); GHCR/project rename.
 - OPT/MOD deadline expiry; `open_microdata`+`clean_all` note; Parquet; solver-strategy doc.

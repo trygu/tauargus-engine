@@ -15,7 +15,7 @@ and installing it gives you the `tauargus` CLI as well.
 
 ## What it does
 
-- **Runs your `.arb` batch** — the full Tau-Argus pipeline (apriori safety
+- **Runs supported `.arb` batches** — the engine pipeline (apriori safety
   rules, suppression, rounding, audit) with every computed table browsable.
   Start without a file and a `.arb` file browser opens.
 - **Colours cells by status** — green safe · red unsafe (a sensitive value) ·
@@ -34,7 +34,7 @@ and installing it gives you the `tauargus` CLI as well.
 - **Exports** — writes the accepted table as a legacy `INTERMEDIATE` `.tab`
   file (`o`).
 - **Saves the workspace** — a versioned, fingerprinted JSON manifest of
-  everything you did (accepted operations, cell marks) next to the `.arb`
+  the accepted operations and pending cell marks next to the `.arb`
   (`w`).
 - **Reopens a saved workspace** — launch `tauargus-tui` on the
   `.workspace.json` (or pick it in the file browser): the accepted result is
@@ -44,9 +44,25 @@ and installing it gives you the `tauargus` CLI as well.
   instead, with a clear message.
 - **Writes a replay batch** — `R` materialises the accepted recipe as a
   headless-runnable `.arb` (plus apriori files) next to the input, so
-  `tauargus run <stem>.replay.arb` reproduces the recorded operator intent.
+  `tauargus run <stem>.replay.arb` replays the recorded operator intent. This
+  reruns the solver; it does not restore or guarantee an identical numerical
+  result.
 
 ## What it can't do (yet)
+
+- **Inspect all dimensions** — the grid uses the first two variables and
+  has no selector for higher-dimensional slices. Use the Python/CLI workflow
+  for higher-dimensional inspection; the grid is not a complete view.
+- **Restore the exact accepted result** — reopening reruns the recipe.
+  The manifest hashes the `.arb`, not referenced data, metadata, hierarchy
+  or apriori files; changes in those dependencies are not detected by that hash.
+  Keep the complete inputs and accepted outputs when reproducibility matters.
+- **Provide a publication-output workflow** — `o` exports a diagnostic
+  INTERMEDIATE `.tab`, not a masked release table. The grid shows original
+  responses, including after rounding. Inspect actual rounded values and
+  explicitly select publication output through the engine API/CLI.
+- **Offer every legacy method** — the headless engine rejects GH/NET/CTA;
+  the interactive method shortcuts are OPT and RND.
 
 - **Mark total cells** — that needs the real total code, which the display
   labels do not preserve; the app blocks such marks with a message.
