@@ -198,7 +198,10 @@ print(published)
 
 `protect()` generates `.asc`, `.rda` and `.arb`, computes the table, applies
 OPT suppression by default and returns `TableResult` objects. Dicts of columns,
-lists of row dicts and polars DataFrames are accepted too. Pass a nested list
+lists of row dicts and polars DataFrames are accepted too, as is a `.parquet`
+file path or an `s3://`, `gs://` or `https://` URL to one (the `parquet`
+extra, pyarrow). `TableResult.to_parquet(path)` writes the published table
+back with suppressed cells as null. Pass a nested list
 of explanatory variables for multiple tables, or `run=False` to write inputs
 without invoking the engine.
 
@@ -248,6 +251,7 @@ tauargus round    mybatch.arb    # compute, then round
 tauargus audit    mybatch.arb    # feasibility intervals of suppressed cells
 tauargus save     mybatch.arb    # compute, then write tables
 tauargus tables   mybatch.arb    # print a table summary
+tauargus protect  micro.parquet  # protect microdata in one call, write the table
 ```
 
 `<SOLVER>` tags in a batch file are accepted, but only HiGHS is used; any
@@ -290,8 +294,8 @@ the complete DataFrame-to-files-to-engine pipeline.
 executed, output-saved notebooks that double as API documentation:
 
 1. [`01_quickstart`](bindings/python/notebooks/01_quickstart.ipynb): a
-   DataFrame through `protect()` to a `TableResult`, a masked CSV, then
-   existing batches.
+   DataFrame through `protect()` to a `TableResult`, masked CSV and Parquet
+   output, then existing batches.
 2. [`02_protection_and_audit`](bindings/python/notebooks/02_protection_and_audit.ipynb):
    OPT/MOD DataFrame protection, explicit audit and masked export, plus the
    lower-level OPT/MOD/RND methods and the ported Intervalle.
