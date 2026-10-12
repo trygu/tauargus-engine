@@ -569,7 +569,9 @@ class SafetyRuleSet:
     zero_range: float = 0.0
     empty_as_ns: bool = False
     ns_range: int = 10
-    manual_perc: int = 0
+    # Legacy TableSet.manualMarge = 20 (manual p.123: "The default value = 20"):
+    # protection margin for manually unsafe cells when no MAN rule is given.
+    manual_perc: int = 20
 
     @staticmethod
     def from_rules(rules: List[SafetyRule]) -> "SafetyRuleSet":

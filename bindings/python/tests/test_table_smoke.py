@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from pytauargus.engine import Engine, run_batch
+from pytauargus.engine import CS_SECONDARY_UNSAFE_MANUAL, Engine, run_batch
 
 DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
 
@@ -68,3 +68,63 @@ def test_min_cell_value_finite(engine):
     assert mn == mn  # not NaN
     assert mn >= 0
     assert mx >= mn
+
+
+# ===========================================================================
+# Manual-unsafe default margin (legacy TableSet.manualMarge = 20; manual p.123)
+# ===========================================================================
+
+_EX1 = DATA / "examples" / "ex1"
+
+
+def _code_index(eng, var_name, code):
+    vi = eng.metadata.index_of(var_name)
+    _n, n_active = eng._tau.get_var_number_of_codes(vi)
+    for ci in range(n_active):
+        ok, _ct, cs, _miss, _level = eng._tau.get_var_code(vi, ci)
+        if ok and cs.strip() == code:
+            return ci
+    raise LookupError(f"code {code!r} not found for {var_name}")
+
+
+def _cell(eng, tab, row, col):
+    res = eng._tau.get_table_cell(tab, [_code_index(eng, row[0], row[1]),
+                                        _code_index(eng, col[0], col[1])], 0)
+    return float(res[1]), int(res[10])
+
+
+def test_manual_unsafe_default_margin_is_20_percent():
+    """A manually unsafe cell without a ``MAN`` rule gets the legacy default
+    20% protection margin (legacy ``TableSet.manualMarge = 20``; manual
+    p.123: "The default value = 20")."""
+    eng = run_batch(_EX1 / "ex1.arb")
+    value, status = _cell(eng, 0, ("Sto", "Stor"), ("Reg", "Nord"))
+    assert (value, status) == (150.0, 9)  # single-company cell, manual U
+    n_cols = eng._tau.get_var_number_of_codes(
+        eng.metadata.index_of("Reg"))[1]
+    ncell = _code_index(eng, "Sto", "Stor") * n_cols + _code_index(eng, "Reg", "Nord")
+    lpl, upl = eng._tau.get_table_cell_protection_levels(0, ncell)
+    assert (lpl, upl) == (30.0, 30.0), f"expected 20% margin, got {(lpl, upl)}"
+
+
+def test_opt_protects_manual_unsafe_with_secondary_pattern():
+    """OPT is cell suppression (manual 4.2.3.5): it never rewrites a cell
+    value — the manually unsafe cell stays published, unsafe and unmodified —
+    and marks a non-empty set of safe cells secondary (M) so the unsafe value
+    cannot be isolated by differencing."""
+    from pytauargus.batch import Suppress
+
+    eng = run_batch(_EX1 / "ex1.arb")
+    n, _ = eng._tau.get_total_table_size(0)
+    before = [eng._tau.get_table_cell_value(0, i) for i in range(n)]
+
+    eng.suppress(Suppress(kind="OPT", tab_no=1))
+
+    after = [eng._tau.get_table_cell_value(0, i) for i in range(n)]
+    assert before == after, "cell suppression must not rewrite cell values"
+    value, status = _cell(eng, 0, ("Sto", "Stor"), ("Reg", "Nord"))
+    assert (value, status) == (150.0, 9), "unsafe cell stays published"
+    secondary = sum(
+        1 for i in range(n)
+        if eng._tau.get_table_cell_status(0, i) == CS_SECONDARY_UNSAFE_MANUAL)
+    assert secondary >= 1, "expected a non-empty secondary pattern"

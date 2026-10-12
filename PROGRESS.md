@@ -13,21 +13,19 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] Conventional Commits for new history; agent rule: English replies.
 - [x] Batch parser: `<APRIORI>` quoted separator now parses (legacy
   `"file",tab,"sep",flags` form; 3 tests in test_batch.py).
-- [x] TUI §B.7: workspace **reopen/restore** (CLI arg + file browser; recipe
-  re-run on a fresh engine, draft restored undoable, stale input reconciled
-  fresh, bad version refused) + **replay batch** (`R`). TUI 82 / py 262 green.
-- [x] **Release 0.4.0 shipped**: workspace reopen + replay + APRIORI fix;
-  verified on PyPI/GH Release/GHCR.
-- [x] Release pipeline: TUI smoke test now installs the engine wheel built
-  in the same run (`build-tui` needs `build-linux`) — floors may track the
-  release version instead of the last published one.
+- [x] TUI §B.7: workspace **reopen/restore** + **replay batch** (`R`);
+  TUI 82 / py 262 green.
+- [x] **Release 0.4.0 shipped**: reopen + replay + APRIORI fix; verified on
+  PyPI/GH Release/GHCR; TUI smoke test now builds against this run's wheel.
+- [x] `feature/example-tables` merged: `data/examples/ex1` (tabular flow,
+  one manual-U cell; demo: `s` → OPT M-pattern, red cell stays).
+- [x] Manual safety margin default 20 (legacy `TableSet.manualMarge`;
+  manual p.123) + OPT contract test (cell suppression: values never
+  rewritten, unsafe cell stays published, non-empty M pattern).
 
 ## In flight
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record
   the written revision).
-
-## Feature branches
-- `feature/example-tables`: `data/examples/ex1` fixture (pushed, unmerged).
 
 ## Watch items
 - 5008 on re-OPT w/ secondary suppression (legacy limitation); GHCR/project rename.
