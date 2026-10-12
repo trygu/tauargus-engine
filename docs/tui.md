@@ -28,15 +28,16 @@ and `textual`, so one install gives you both the headless CLI and the TUI.
 Launch:
 
 ```bash
-tauargus-tui                 # opens a file browser (below)
-tauargus-tui path/to/batch.arb   # opens that .arb batch directly
+tauargus-tui                          # opens a file browser (below)
+tauargus-tui path/to/batch.arb        # opens that .arb batch directly
+tauargus-tui path/to/batch.workspace.json   # reopens a saved workspace
 ```
 
 ### The file browser (no-argument launch)
 
 With no batch given, a picker opens showing the current directory, filtered
-to subdirectories and `.arb` files. `Enter` opens the chosen file, `q`/`Esc`
-quits.
+to subdirectories, `.arb` files and saved `.workspace.json` files. `Enter`
+opens the chosen file, `q`/`Esc` quits.
 
 ![File browser](tui-images/01-file-browser.png)
 
@@ -203,6 +204,7 @@ terminal is narrow).
 | `a` | **Audit** the current table (legacy `RunAudit`): computes realised feasibility intervals. For the cell under the cursor the detail pane then shows `interval=[min, max]`. Any subsequent edit invalidates the audit. |
 | `o` | **Export** the accepted table as a legacy `INTERMEDIATE` `.tab` file to `<arb dir>/out/table_N.tab` (with audit columns when audited). |
 | `w` | **Save workspace** — writes a versioned JSON manifest next to the `.arb` (no solver run; works even before any preview). |
+| `R` | **Write replay batch** — materialises the accepted recipe as a headless-runnable `.arb` (no solver run). |
 | `?` / `F1` | **Help overlay** (below). |
 | `q` | Quit. |
 
@@ -222,8 +224,45 @@ terminal is narrow).
 | `provenance` | `{"pytauargus": <version>}` |
 | `tab` | the table in focus at save time |
 
-The manifest is a **replayable recipe** — but *reopening* it in the TUI is
-not implemented yet (see *Outstanding*).
+### Reopening a workspace
+
+The manifest is a **replayable recipe** — and the TUI can replay it:
+
+```bash
+tauargus-tui path/to/batch.workspace.json
+```
+
+or pick the `.workspace.json` in the file browser (it is listed next to the
+`.arb` files). On reopen the app:
+
+1. **Rebuilds the accepted result through the engine** — the recorded recipe
+   (spec + confirmed cell marks + confirmed method ops) is re-run on a fresh
+   engine. A replayable recipe does not promise identical optimiser
+   tie-breaking; the manifest's `accepted_summary` is reference data, not
+   something loaded back in.
+2. **Restores the pending draft** — the saved `pending_instructions` come
+   back as draft marks, each of them an *undoable* edit (`ctrl+z` clears one).
+3. **Restores the revisions** — the saved `draft_revision` /
+   `accepted_revision` and the table in focus, so the status line is
+   continuous across the restart.
+
+**Explicit reconciliation** (design §B.7): if the `.arb` changed since the
+save (fingerprint mismatch) or is missing, the saved outcome is **not**
+treated as current — the current input opens as a fresh session and the
+status line tells you why. An incompatible manifest version is refused with
+a message and the file browser opens so you can pick something else.
+
+### Replay batch (`R`)
+
+`R` writes the **accepted recipe** as a headless-runnable batch next to the
+input: `<stem>.replay.arb` (the original batch plus one `<SUPPRESS>` line per
+confirmed op and one `<APRIORI>` line per table of confirmed marks, with the
+apriori files beside it). `tauargus run <stem>.replay.arb` then reproduces
+the recorded operator intent through the headless CLI — no solver run
+happens in the TUI when you press `R`. The still-pending draft is *not*
+included: the replay encodes the accepted recipe only. This does not
+substitute for the saved workspace, which also carries the draft, the
+revisions and the accepted summary.
 
 ### Help overlay
 
@@ -251,6 +290,7 @@ screenshot below. Close with `?`/`F1`/`Esc`.
 | `a` | Audit the table (feasibility intervals) |
 | `o` | Export the accepted table (`.tab`) |
 | `w` | Save the workspace manifest (`.workspace.json`) |
+| `R` | Write the replay batch (`<stem>.replay.arb` + apriori files) |
 | `?` / `F1` | Help overlay |
 
 ---
@@ -267,35 +307,37 @@ screenshot below. Close with `?`/`F1`/`Esc`.
 - Audit (realised feasibility intervals) with invalidation on mutation.
 - Export of the accepted table as a legacy `.tab`.
 - Versioned workspace **save** (atomic, fingerprinted manifest).
+- Workspace **reopen / restore**: launch on a `.workspace.json` (CLI or
+  file browser) — the accepted result is rebuilt through the engine, the
+  pending draft is restored (undoable), revisions and focus are continuous;
+  stale input is reconciled explicitly (fresh session of the current input),
+  incompatible versions are refused.
+- **Replay batch** (`R`): the accepted recipe materialised as a
+  headless-runnable `.arb` + apriori files next to the input.
 - Status line with state facts + contextual hints, always one row.
 - Help overlay; spinner while the engine works.
-- **68 automated tests** (Textual pilot tests driving the real app, plus
+- **82 automated tests** (Textual pilot tests driving the real app, plus
   model and workspace unit tests) — `bindings/tui/tests/`.
 
 ## 9. What is outstanding
 
-Tracked against [`docs/ui-design.md`](ui-design.md) §B.7/§B.8:
+Tracked against [`docs/ui-design.md`](ui-design.md) §B.7/§B.8. Workspace
+reopen/restore and the replay batch (§B.7) have landed; the remainder:
 
-1. **Workspace reopen / restore (§B.7)** — the biggest gap. The manifest
-   module already ships `load_workspace()` and `input_changed()` (tested at
-   module level), but the app has **no way to open a `.workspace.json`**: no
-   CLI argument, no key. Consequently:
-   - reopening a workspace to restore the draft is not wired up (the help
-     text's "Reopening it restores the draft" is the forward promise);
-   - the saved *accepted outcome* is not displayed on reopen;
-   - there is no explicit reconciliation when the input fingerprint changed
-     or the manifest version is incompatible;
-   - export does not yet *reuse saved accepted artifacts* or record which
-     revision was written.
+1. **Export provenance (§B.7/§B.8)** — export does not yet *reuse saved
+   accepted export artifacts* (the manifest does not reference written
+   `.tab` files) or record which revision was written. The restore path
+   rebuilds the accepted values/statuses through the engine, so an export
+   after a reopen is a verified restore — but the revision bookkeeping is
+   not in the UI yet.
 2. **Marking total cells** — explicitly deferred: it needs the real total
    code, which the display label does not preserve. The app blocks the mark
    with a log message.
 3. **RND base selection** — the rounding base is always the engine's
    `_min_round_base`; the user cannot choose it (the manifest records
    `rnd_base` so this is ready to grow).
-4. **Single session only** — one `.arb` batch at a time; no multi-batch, no
-   spec editing, and no replay command in the UI (the "replayable recipe"
-   language is the manifest's philosophy until §B.7 lands).
+4. **Single session only** — one `.arb` batch at a time; no multi-batch and
+   no spec editing from the UI.
 
 ## 10. Screenshot index
 

@@ -36,11 +36,18 @@ and installing it gives you the `tauargus` CLI as well.
 - **Saves the workspace** — a versioned, fingerprinted JSON manifest of
   everything you did (accepted operations, cell marks) next to the `.arb`
   (`w`).
+- **Reopens a saved workspace** — launch `tauargus-tui` on the
+  `.workspace.json` (or pick it in the file browser): the accepted result is
+  rebuilt through the engine, the pending draft comes back (undoable), and
+  the revisions are continuous. If the `.arb` changed since the save, the
+  old outcome is *not* treated as current — the current input opens fresh
+  instead, with a clear message.
+- **Writes a replay batch** — `R` materialises the accepted recipe as a
+  headless-runnable `.arb` (plus apriori files) next to the input, so
+  `tauargus run <stem>.replay.arb` reproduces the recorded operator intent.
 
 ## What it can't do (yet)
 
-- **Reopen a saved workspace** — the manifest is saved, but restoring a
-  session from it is not implemented (design §B.7).
 - **Mark total cells** — that needs the real total code, which the display
   labels do not preserve; the app blocks such marks with a message.
 - **Choose the rounding base** — `r` always uses the engine's minimum base.
@@ -58,8 +65,9 @@ pip install "pytauargus[tui]"
 ## Run
 
 ```bash
-tauargus-tui                 # opens a .arb file browser
-tauargus-tui path/to/batch.arb
+tauargus-tui                          # opens a file browser (.arb + saved workspaces)
+tauargus-tui path/to/batch.arb        # opens that .arb batch directly
+tauargus-tui path/to/batch.workspace.json   # reopens a saved workspace
 ```
 
 **Full user guide** — every key, every status code, the whole workflow:
