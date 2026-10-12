@@ -42,6 +42,8 @@ Issues = "https://github.com/trygu/tauargus-engine/issues"
 
 [project.scripts]
 tauargus-tui = "pytauargus_tui.app:main"
+# Alias named after the package so `uvx pytauargus-tui` finds an executable.
+pytauargus-tui = "pytauargus_tui.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pytauargus_tui"]

@@ -23,7 +23,8 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## In flight
 
-- TUI architecture/plans: `docs/ui-design.md` §5; Java review in ARCHIVE.
+- [ ] TUI: `pytauargus-tui` console alias so `uvx pytauargus-tui` works
+  (test_packaging.py, wheel verified); needs 0.5.1 release.
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts;
   record the written revision).
 
