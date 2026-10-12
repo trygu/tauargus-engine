@@ -192,6 +192,35 @@ print("wrote 01_dataframe_publication.csv")
 '''),
 
     md(
+        "## 3. Parquet input and output",
+        "",
+        "`protect()` also accepts a **path to a `.parquet` file** (or an",
+        "`s3://`, `gs://` or `https://` URL) in place of a DataFrame, and",
+        "`TableResult.to_parquet(path)` writes the published table back out:",
+        "the explanatory codes plus the response, with suppressed cells",
+        "(`U` and `M`) as null. Both need the `parquet` extra (pyarrow);",
+        "cloud credentials come from the environment, as pyarrow requires them.",
+    ),
+    code('''\
+import pyarrow.parquet as pq
+
+# The repo ships a small parquet microdata fixture (see data/README.md):
+# eight Sector x Geo records where only (Alpha, East) fails NK(1,80).
+micro_pq = DATA / "examples" / "parquet" / "micro.parquet"
+pq_result = protect(
+    micro_pq, ["Sector", "Geo"], response="Value",
+    safety_rules="NK(1,80)", workdir=str(OUT / "01_protect_parquet"),
+)
+pq_table = pq_result.tables[0]
+print("status:", pq_table.status())
+
+out_pq = OUT / "01_protected.parquet"
+pq_table.to_parquet(out_pq)
+print("wrote", out_pq.name)
+pq.read_table(out_pq).to_pylist()
+'''),
+
+    md(
         "## Working with existing batches",
         "",
         "pytauargus has **zero runtime dependencies**; the native engine",
@@ -201,7 +230,7 @@ print("wrote 01_dataframe_publication.csv")
         "| Symbol | Source | Purpose |",
         "|--------|--------|---------|",
         "| `protect(…)` / `ProtectResult` | `pytauargus` | DataFrame/dict → protected tables + files + engine |",
-        "| `TableResult` | `pytauargus` | `safe()`, `status()`, `unsafe()`, `dataframe()` |",
+        "| `TableResult` | `pytauargus` | `safe()`, `status()`, `unsafe()`, `dataframe()`, `to_parquet(path)` |",
         "| `Engine` | `pytauargus.engine` | High-level driver for the native engine |",
         "| `run_batch(arb)` | `pytauargus.engine` | Parse + execute a `.arb` batch file → `Engine` |",
         "| `parse_rda(path)` | `pytauargus.engine` | Parse `.rda` metadata → `Metadata` |",
@@ -412,6 +441,7 @@ for idx in range(6):
         "3. Parsed the `.rda` metadata and listed the variables",
         "4. Run a `.arb` batch through the engine",
         "5. Inspected computed table cells and their safety statuses",
+        "6. Protected a `.parquet` microdata file and exported it with `to_parquet()`",
         "",
         "**Next:** [02_protection_and_audit.ipynb](02_protection_and_audit.ipynb)",
         "— suppress the unsafe cells and run the audit (Intervalle).",

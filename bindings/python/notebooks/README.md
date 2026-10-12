@@ -6,7 +6,7 @@ surface it exercises.
 
 | # | Notebook | What it covers |
 |---|----------|----------------|
-| 1 | [`01_quickstart.ipynb`](01_quickstart.ipynb) | DataFrame → `protect()` → `TableResult` → masked CSV; existing batches and native cell inspection |
+| 1 | [`01_quickstart.ipynb`](01_quickstart.ipynb) | DataFrame → `protect()` → `TableResult` → masked CSV/Parquet; existing batches and native cell inspection |
 | 2 | [`02_protection_and_audit.ipynb`](02_protection_and_audit.ipynb) | OPT/MOD DataFrame protection, explicit audit and masked export; batch OPT/MOD/RND |
 | 3 | [`03_generators.ipynb`](03_generators.ipynb) | `protect(run=False)` file preview, multiple tables, custom writers and batch round-trip |
 
@@ -34,7 +34,8 @@ uv run python notebooks/_run.py
 The notebooks locate the repo `data/` fixtures by walking up from the current
 directory, and write their scratch outputs to `notebooks/out/` (gitignored).
 
-The `notebooks` extra includes pandas and the execution tools.
+The `notebooks` extra includes pandas, pyarrow (the Parquet cells) and the
+execution tools.
 `tests/test_notebooks.py` executes the same notebooks under pytest:
 
 ```bash

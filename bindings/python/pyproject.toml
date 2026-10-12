@@ -26,7 +26,7 @@ dataframe = ["pandas"]
 parquet = ["pyarrow"]
 test = ["pytest", "pandas", "pyarrow"]
 # Interactive examples + headless execution of the notebooks/ directory.
-notebooks = ["jupyterlab", "nbclient", "nbformat", "ipykernel", "pandas"]
+notebooks = ["jupyterlab", "nbclient", "nbformat", "ipykernel", "pandas", "pyarrow"]
 # Terminal UI (the `tauargus-tui` command). Installs the separate
 # pytauargus-tui package, which itself depends on pytauargus, so the engine
 # stays the base. `pip install "pytauargus[tui]"`.
