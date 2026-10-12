@@ -15,8 +15,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
   `"file",tab,"sep",flags` form; 3 tests in test_batch.py).
 - [x] TUI §B.7: workspace **reopen/restore** + **replay batch** (`R`);
   TUI 82 / py 264 green.
-- [x] **Release 0.4.0 shipped**: reopen + replay + APRIORI fix; verified on
-  PyPI/GH Release/GHCR; TUI smoke test now builds against this run's wheel.
+- [x] **Release 0.4.0 shipped** (verified PyPI/GH/GHCR; TUI smoke test in CI).
 - [x] `feature/example-tables` merged: `data/examples/ex1` (tabular flow,
   one manual-U cell; demo: `s` → OPT M-pattern, red cell stays).
 - [x] Manual safety margin default 20 (legacy `TableSet.manualMarge`;
@@ -29,7 +28,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
   the written revision).
 
 ## Watch items
-- [ ] sdcTools `hypercube`/`network` (github.com/sdcTools) as subsystem
-  candidates for the rejected methods (NET/GH).
+- [ ] Rejected-method refs: sdcTools `hypercube` (Fortran GHMIter, EUPL-1.1)
+  for GH; `network` has no code — README points to Castro (UPC 2014) for NET.
 - 5008 on re-OPT w/ secondary suppression (legacy limitation); GHCR/project rename.
 - OPT/MOD deadline expiry; `open_microdata`+`clean_all` note; Parquet; solver-strategy doc.
