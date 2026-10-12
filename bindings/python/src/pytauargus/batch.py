@@ -543,7 +543,15 @@ def _parse_apriory(tok: Tokenizer) -> Apriory:
     if not tok.test_next_char() == '"':
         raise BatchError("A quote was expected here before the separator")
     tok.next_char()  # consume opening quote
-    sep = tok.next_token()
+    # The separator is a quoted string (legacy form: ``","`` / ``";"``);
+    # read it up to the closing quote.
+    idx = tok.line.find('"')
+    if idx == -1:
+        sep = tok.line.strip()
+        tok.line = ""
+    else:
+        sep = tok.line[:idx].strip()
+        tok.line = tok.line[idx + 1:].strip()
     if sep == "":
         raise BatchError("No separator was specified")
     ignore_error = True

@@ -227,3 +227,39 @@ class TestSolverCommand:
         with caplog.at_level("WARNING", logger="pytauargus.engine"):
             Engine()._execute(cmd)
         assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+class TestAprioryGrammar:
+    """The ``<APRIORI>`` batch line: filename, table number, *quoted*
+    separator, optional IgnoreError and ExpandTrivial flags — the format
+    rtauargus's ``apriori_batch`` generator emits and legacy batch files
+    carry."""
+
+    @staticmethod
+    def _parse(tmp_path, line):
+        arb = tmp_path / "a.arb"
+        arb.write_text(line + "\n")
+        return parse_batch(arb)
+
+    def test_full_legacy_form(self, tmp_path):
+        (cmd,) = self._parse(
+            tmp_path, '<APRIORI> "info.hst",1,",",0,0')
+        assert cmd.file == "info.hst"
+        assert cmd.tab_no == 1
+        assert cmd.separator == ","
+        assert cmd.ignore_error is False
+        assert cmd.expand_bogus is False
+
+    def test_semicolon_separator_with_flags(self, tmp_path):
+        (cmd,) = self._parse(
+            tmp_path, '<APRIORI> "a.hst",2,";",1,1')
+        assert cmd.tab_no == 2
+        assert cmd.separator == ";"
+        assert cmd.ignore_error is True
+        assert cmd.expand_bogus is True
+
+    def test_flags_optional(self, tmp_path):
+        (cmd,) = self._parse(tmp_path, '<APRIORI> "a.hst",2,";"')
+        assert cmd.separator == ";"
+        assert cmd.ignore_error is True  # parser default
+        assert cmd.expand_bogus is False
