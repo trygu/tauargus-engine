@@ -17,7 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "pytauargus>=0.4.0",
+    "pytauargus>=0.3.4",
     "textual>=0.50",
 ]
 
