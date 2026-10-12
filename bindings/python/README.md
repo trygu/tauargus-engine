@@ -353,6 +353,25 @@ uv run --with nbclient --with nbformat --with ipykernel python notebooks/_run.py
 executes them as tests too (the test skips when `nbclient` is absent, so the
 default `uv run pytest` gate stays dependency-free).
 
+## Protection regression tests
+
+`uv run pytest tests/test_protection_e2e.py` runs OPT and MOD on two cases.
+The `ex1` tabular case checks the legacy 20% manual protection margin,
+confirms that the original cell is recoverable before secondary suppression,
+and checks its realised lower and upper protection after suppression.
+The microdata case adapts the basic dominance example from
+[GaussSuppression's magnitude-table vignette](https://statisticsnorway.github.io/ssb-gausssuppression/articles/Magnitude_table_suppression.html),
+by Statistics Norway. Contributions are scaled by ten to give integer input;
+each row is treated as an independent contribution, without company IDs or
+hierarchies. It checks the four cells selected by the 80% dominance rule.
+
+Both cases run the feasibility audit and read back a CSV containing only
+dimensions and masked publication values. Primary and secondary suppressed
+values must be masked, and unmasked values must be retained. The tests do
+not require a particular secondary suppression pattern and do not compare
+results against the Gauss algorithm. They cover these two examples, not
+singleton knowledge, linked-table disclosure or general statistical safety.
+
 ## Acknowledgements
 
 This project builds on Tau-Argus, its statistical methods and native
@@ -390,6 +409,11 @@ Its metadata, batch and hierarchy generation logic was ported to
 [Laurent Verweijen (`lverweijen`)](https://github.com/lverweijen) and
 contributors, inspired the DataFrame-to-table workflow and `TableResult`
 with its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
+
+[GaussSuppression](https://github.com/statisticsnorway/ssb-gausssuppression)
+is developed at Statistics Norway by Øyvind Langsrud, Daniel Lupp,
+Hege Bøvelstad and contributors. The protection regression tests adapt
+the dominance example from its magnitude-table vignette.
 
 ## License
 

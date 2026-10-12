@@ -3,6 +3,7 @@
 Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## Verified checkpoints (details in ARCHIVE.md)
+- [x] OPT/MOD end-to-end protection, audit and masked CSV on ex1 and dominance.
 - [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
 - [x] Headless CLI; wheel + CI to PyPI + GHCR; releases 0.3.2-0.4.0 shipped
   (lockstep TUI pipeline; 0.4.0 verified PyPI/GH/GHCR; TUI smoke test in CI).

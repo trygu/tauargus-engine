@@ -462,6 +462,11 @@ Its metadata, batch and hierarchy generation logic was ported to
 contributors, inspired the DataFrame-to-table workflow and `TableResult`
 with its `safe()`, `status()`, `unsafe()` and `dataframe()` accessors.
 
+[GaussSuppression](https://github.com/statisticsnorway/ssb-gausssuppression)
+is developed at Statistics Norway by Øyvind Langsrud, Daniel Lupp,
+Hege Bøvelstad and contributors. The protection regression tests adapt
+the dominance example from its magnitude-table vignette.
+
 ## License
 
 Distributed under the European Union Public Licence (EUPL) v1.2; see

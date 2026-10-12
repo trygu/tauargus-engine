@@ -1,4 +1,18 @@
-# Tau-Argus Rewrite — Archive
+# Tau-Argus Rewrite: Archive
+
+## Protection-to-publication regression (2026-10-12)
+
+- Added four isolated pipeline tests: OPT/MOD on ex1 tabular input and an
+  adapted GaussSuppression magnitude/dominance microdata example.
+- ex1 verifies the known recoverable pre-suppression value, 20% required
+  margins and realised protection on both sides. Dominance verifies the
+  externally documented primary cells and their native protection levels.
+- Both cases audit withheld cells and round-trip a minimal masked release
+  CSV. No fixed secondary pattern or Gauss-method equivalence is asserted.
+- Mutation checks reject bypassed suppression and unmasked publication.
+- Linux x86_64, source-built HiGHS 1.15.1 and pinned native submodules:
+  native core 1 passed; Python suite 268 passed, 3 skipped; wheel build passed.
+
 
 Historical/completed state, extracted from `PROGRESS.md` on 2026-10-06
 (repo meta-cleanup). See `PROGRESS.md` for current state.
