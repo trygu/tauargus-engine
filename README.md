@@ -2,9 +2,9 @@
 
 Native, headless engine for statistical disclosure control (SDC) of tabular
 data, plus a Python tool that drives it. It is a drop-in replacement for the
-supported batch mode of legacy Tau-Argus 4.1: same `.arb` batch files, file
-formats and outputs, without the GUI — for the documented methods and batch
-commands (see [Compatibility and validation](#compatibility-and-validation)).
+supported batch mode of the legacy open-source τ-ARGUS: same `.arb` batch
+files, file formats and outputs, without the GUI — for the documented methods
+and batch commands (see [Compatibility and validation](#compatibility-and-validation)).
 
 This is a personal rewrite of the legacy product, started a few years ago and
 worked on in on-and-off sprints: the C/C++ solver engine is rebuilt to a modern
@@ -25,7 +25,12 @@ The project has three parts:
 
 ## Relationship to the original Tau-Argus
 
-This is the original Tau-Argus solver code, not a reimplementation:
+This is the original Tau-Argus solver code, not a reimplementation. The
+legacy open-source τ-ARGUS is maintained by Statistics Netherlands (EUPL) at
+[sdcTools/tauargus](https://github.com/sdcTools/tauargus). Version marking in
+that code is inconsistent (the inherited `core` module reports `1.1.4.11`,
+`hitas` says `4.3.1.1`), so this project calls the code line "τ-ARGUS 4.x"
+and uses the bundled 4.1 manual as the behavioural reference.
 
 - **Engine:** the C/C++ code is largely unchanged. The changes make it build
   with a modern toolchain (CMake, current GCC/Clang/MSVC), switch the solver
@@ -121,11 +126,12 @@ ENTRYPOINT ["tauargus"]
 
 ## Compatibility and validation
 
-The engine is the legacy Tau-Argus solver code, modernised: it builds on a
+The engine is the legacy τ-ARGUS solver code, modernised: it builds on a
 current toolchain and solves with [HiGHS](https://github.com/ERGO-Code/HiGHS)
 instead of CPLEX, XPRESS or the legacy free solver. The behavioural reference
-is the τ-ARGUS 4.1 manual; the legacy product continued to 4.2, so this is a
-4.1-era drop-in, not a guarantee of every later feature.
+is the bundled τ-ARGUS 4.1 manual; the legacy release line continued at
+least through 4.2.x, so this is a 4.x drop-in, not a guarantee of every
+legacy feature.
 
 **Supported suppression methods.** `OPT`, `MOD` and `RND` are implemented and
 regression-tested. `CKM` has a dispatch path but no dedicated end-to-end
