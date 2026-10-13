@@ -66,7 +66,7 @@ run_batch("mybatch.arb")
 ```
 
 Wheels bundle HiGHS and the engine libraries, so nothing else needs installing.
-They are built for Python 3.10-3.13 on:
+They are built for Python 3.10-3.15 on:
 
 | Platform               | Architecture          |
 |------------------------|-----------------------|

@@ -43,7 +43,7 @@ These commands install the current release. To keep a specific version, use
 `pytauargus==<version>` from [PyPI](https://pypi.org/project/pytauargus/#history).
 
 Wheels bundle HiGHS and the native engine; no other installation is needed.
-Available for Python 3.10-3.13 on macOS arm64, Linux x86_64 and aarch64 (manylinux_2_28) and
+Available for Python 3.10-3.15 on macOS arm64, Linux x86_64 and aarch64 (manylinux_2_28) and
 Windows x64. Other platforms: build from source (see the repository).
 
 ## Cloud native
