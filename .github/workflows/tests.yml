@@ -59,10 +59,16 @@ jobs:
       - name: Test native core
         run: ctest --test-dir engine/build/native/core --output-on-failure
 
-      - name: Install package
+      - name: Build and test Python binding
         working-directory: bindings/python
-        run: uv sync --extra test
+        run: uv run --with pytest --with pybind11 pytest tests -q
 
-      - name: Run tests
-        working-directory: bindings/python
-        run: uv run pytest -q
+      - name: Install R binding (compile check)
+        env:
+          HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
+        run: R CMD INSTALL bindings/r/tauargusengine
+
+      - name: Run R binding smoke
+        env:
+          HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
+        run: Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R

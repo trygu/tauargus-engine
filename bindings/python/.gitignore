@@ -1,9 +1,0 @@
-.venv/
-build/
-dist/
-*.egg-info/
-__pycache__/
-*.so
-*.dylib
-.pytest_cache/
-out/

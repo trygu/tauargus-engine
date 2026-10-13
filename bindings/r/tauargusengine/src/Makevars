@@ -21,18 +21,21 @@ ifeq ($(OS),Windows_NT)
 PKG_CPPFLAGS = /I"$(TA_CORE_INC)" /I"$(TA_CSP_INC)" /I"$(TA_HITAS_INC)" /I"$(TA_ROUNDER_INC)"
 PKG_LIBS = -libpath:$(TA_LIB) tauargus_csp.lib tauargus_hitas.lib tauargus_rounder.lib CRP.lib tauargus_core.lib highs.lib
 else ifeq ($(UNAME),Darwin)
-HIGHSPREFIX := $(shell brew --prefix highs 2>/dev/null)
+# HIGHSPREFIX may be set in the environment (CI builds HiGHS into a
+# temp prefix); otherwise fall back to the Homebrew install.
+HIGHSPREFIX ?= $(shell brew --prefix highs 2>/dev/null)
 ifeq ($(HIGHSPREFIX),)
 HIGHSPREFIX := /opt/homebrew/opt/highs
 endif
 PKG_CPPFLAGS = -I$(TA_CORE_INC) -I$(TA_CSP_INC) -I$(TA_HITAS_INC) -I$(TA_ROUNDER_INC) -I$(HIGHSPREFIX)/include/highs
-PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB)
+PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB) -Wl,-rpath,$(HIGHSPREFIX)/lib
 else
-# Linux
-HIGHSPREFIX := $(shell pkg-config --variable=prefix highs 2>/dev/null)
+# Linux. HIGHSPREFIX may be set in the environment (CI builds HiGHS
+# into a temp prefix); otherwise fall back to pkg-config / system.
+HIGHSPREFIX ?= $(shell pkg-config --variable=prefix highs 2>/dev/null)
 ifeq ($(HIGHSPREFIX),)
 HIGHSPREFIX := /usr
 endif
 PKG_CPPFLAGS = -I$(TA_CORE_INC) -I$(TA_CSP_INC) -I$(TA_HITAS_INC) -I$(TA_ROUNDER_INC) -I$(HIGHSPREFIX)/include/highs
-PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -lhighs -Wl,-rpath,$(TA_LIB)
+PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB) -Wl,-rpath,$(HIGHSPREFIX)/lib
 endif

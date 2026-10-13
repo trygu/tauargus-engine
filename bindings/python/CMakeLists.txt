@@ -5,14 +5,25 @@ set(CMAKE_CXX_STANDARD 11)
 
 find_package(pybind11 CONFIG REQUIRED)
 
+# Root of the tauargus-engine checkout. In-tree builds use the default
+# (this dir's grandparent); the pytauargus repo's wheel build passes it
+# explicitly (or via the TAUARGUS_ENGINE_DIR environment variable).
+if(NOT DEFINED TAUARGUS_ENGINE_DIR)
+    if(DEFINED ENV{TAUARGUS_ENGINE_DIR})
+        set(TAUARGUS_ENGINE_DIR $ENV{TAUARGUS_ENGINE_DIR})
+    else()
+        set(TAUARGUS_ENGINE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+    endif()
+endif()
+
 # The engine is pre-built by the superbuild (engine/CMakeLists.txt) into
 # engine/build/lib. We link the already-compiled libs by path, so their
 # file names are resolved per host platform below.
-set(NATIVE_LIB_DIR ${CMAKE_SOURCE_DIR}/../../engine/build/lib)
-set(NATIVE_CORE_SRC ${CMAKE_SOURCE_DIR}/../../engine/native/core/src)
-set(NATIVE_CSP_SRC ${CMAKE_SOURCE_DIR}/../../engine/native/csp/src)
-set(NATIVE_HITAS_SRC ${CMAKE_SOURCE_DIR}/../../engine/native/hitas/src)
-set(NATIVE_ROUNDER_SRC ${CMAKE_SOURCE_DIR}/../../engine/native/rounder/src)
+set(NATIVE_LIB_DIR ${TAUARGUS_ENGINE_DIR}/engine/build/lib)
+set(NATIVE_CORE_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/core/src)
+set(NATIVE_CSP_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/csp/src)
+set(NATIVE_HITAS_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/hitas/src)
+set(NATIVE_ROUNDER_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/rounder/src)
 
 # Resolve the engine lib file names for the host platform.
 #   - macOS / Linux: shared libs are lib<name>.{dylib,so} in build/lib.
@@ -89,8 +100,13 @@ target_link_libraries(_tauargus PRIVATE
 )
 
 # Output the extension straight into the python package dir so that a plain
-# `import pytauargus._tauargus` works both in dev and inside the wheel.
-set(PKG_DIR ${CMAKE_SOURCE_DIR}/src/pytauargus)
+# `import pytauargus._tauargus` works both in dev and inside the wheel. The
+# pytauargus repo's wheel build points this at its own src/pytauargus; the
+# engine-side binding tests point it at a scratch dir.
+if(NOT DEFINED TAUARGUS_PY_PKG_DIR)
+    set(TAUARGUS_PY_PKG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/pytauargus)
+endif()
+set(PKG_DIR ${TAUARGUS_PY_PKG_DIR})
 set_target_properties(_tauargus PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${PKG_DIR}
     LIBRARY_OUTPUT_DIRECTORY_RELEASE ${PKG_DIR}

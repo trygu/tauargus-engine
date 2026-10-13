@@ -20,7 +20,9 @@ data/**/out/
 *.workspace.json
 bindings/python/build/
 bindings/python/build-make/
+bindings/python/build-ext/
 bindings/python/dist/
+.vscode/
 engine/native/build/
 engine/build/
 engine/build-asan/

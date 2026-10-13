@@ -37,21 +37,25 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   Superbuild at `engine/CMakeLists.txt`.
   Build/commit INSIDE each submodule first, then bump pointers in the parent repo.
 - Solver backend: Pure HiGHS (`<highs/interfaces/highs_c_api.h>`). No CPLEX, XPRESS, or legacy SCIP.
-- Python layer: `bindings/python/` (pybind11 bindings + `pytauargus` package, `tauargus` CLI).
-  Target product is headless `.arb` batch CLI. A future R binding lives under `bindings/r/`.
+- Python binding: `bindings/python/` (pybind11 `_tauargus` extension, `cpp/`
+  + CMake). The `pytauargus` package, `tauargus` CLI and TUI live in the
+  separate `pytauargus` repo (github.com/trygu/pytauargus), built from a
+  pinned revision of this repo (its `tauargus-engine-rev`).
+- R binding: `bindings/r/tauargusengine` (thin R package). The `rtauargus`
+  front-end is a separate repo (github.com/trygu/rtauargus).
+- Engine bugs are fixed here; the front-end repos bump their engine pin.
+  Never backport engine changes into a front-end repo.
 - Legacy Java frontend `src/tauargus/`: removed from `master`; kept on the `tui`
   branch as the TUI porting reference (read-only; restorable from history).
-- For TUI work, read `docs/ui-design.md` (architecture, state contracts and
-  prioritised plans) and `docs/tui.md` (shipped behaviour and current limits).
-  Update both when implementing a planned capability; plans are not shipped features.
+- TUI docs (`docs/tui.md`, `docs/ui-design.md`) moved to the pytauargus repo;
+  for TUI work read them there and update them in that repo.
 
 ## 5. Build Commands (macOS / Apple Silicon)
 
-- **Sync a venv with the current tree.** The single dev-loop command; run it
-  after ANY change under `engine/` or `bindings/python/`:
-  `scripts/sync-venv.sh <venv>`: submodule-drift gate, release engine,
-  wheel for the venv's Python, force-install. Dev venvs must run a locally
-  built wheel, never PyPI (PyPI lags in-tree engine fixes by a release).
+- **Dev loop.** Build the engine superbuild, then run the binding tests
+  (section 6). The `pytauargus` repo has its own `scripts/sync-venv.sh`
+  (pin gate, engine build from the pinned checkout, local wheel,
+  force-install); use that repo's venvs for package work.
 - Highs Brew prefix: `-DHighs_DIR=$(brew --prefix)/lib/cmake/Highs`
 - Submodule build:
   `cmake -S engine/native/<mod> -B engine/native/<mod>/build -DHighs_DIR=$(brew --prefix)/lib/cmake/Highs && cmake --build engine/native/<mod>/build`
@@ -67,7 +71,10 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - **TDD:** The agent is an avid TDD fan. For every feature/port, write the test
   *first* (it encodes the legacy contract), watch it fail for the right reason,
   then implement until green. A feature is not done until its test passes.
-- Verification: `cd bindings/python && uv run pytest` | `uv build --wheel`
+- Verification: native core `ctest --test-dir engine/build/native/core`;
+  Python binding `cd bindings/python && uv run --with pytest --with pybind11 pytest tests -q`;
+  R binding `R CMD INSTALL bindings/r/tauargusengine && Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R`.
+  Package, CLI, TUI and end-to-end tests run in the pytauargus repo.
 - Surgical edits: Use targeted search/replace or patches. Avoid full-file rewrites.
 - Commit cadence: Submodule commit first -> parent submodule bump + `PROGRESS.md` update.
 - Conventional Commits for all new history (adopted at the 0.3.2 release;
@@ -79,21 +86,14 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - No Windows registry APIs: Use environment variables, config files, or `tempfile`.
 - Commits are authored as the user only: no `Co-authored-by` trailer.
 
-## 7. Releasing (PyPI + GHCR image)
+## 7. Releasing
 
-- Releases are tag-driven: tag `py-v<version>` runs `.github/workflows/wheels.yml`
-  (wheels -> GitHub Release -> PyPI via trusted publishing -> GHCR image).
-- PyPI versions are immutable and the workflow fails if the tag differs from the
-  package version. Never reuse or move a published tag.
-- To release (only when the user asks):
-  1. Bump `version` in `bindings/python/pyproject.toml` (semver: patch = fixes,
-     minor = features, major = breaking).
-  2. `cd bindings/python && uv lock && uv run pytest` must pass.
-  3. Commit (`chore(release): X.Y.Z`) and push the branch.
-  4. `git tag py-vX.Y.Z && git push origin py-vX.Y.Z`.
-  5. Watch the run: `gh run list --workflow wheels --limit 1`.
-- Wheels: macOS arm64, Linux x86_64+aarch64 (manylinux_2_28), Windows x64; Python 3.10-3.15.
-- The image is `ghcr.io/trygu/tauargus-engine:<version>` and `:latest`.
+- This repo has no package release. Wheels, the PyPI publish, the GitHub
+  Release and the GHCR image are built by the `pytauargus` repo from a pinned
+  revision of this repo.
+- To advance the pin (only when the user asks): commit and push the engine
+  change here first, then update `tauargus-engine-rev` in the pytauargus repo
+  to the new commit and release there.
 
 ## 8. Communication
 
