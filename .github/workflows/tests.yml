@@ -63,6 +63,10 @@ jobs:
         working-directory: bindings/python
         run: uv run --with pytest --with pybind11 pytest tests -q
 
+      - name: Install R
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y r-base
+
       - name: Install R binding (compile check)
         env:
           HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
