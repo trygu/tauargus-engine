@@ -20,7 +20,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
   paths/URLs, `TableResult.to_parquet`, CLI `protect`; pyarrow `parquet` extra.
 - [x] Markdown lint: `.markdownlint.json` (MD013 off), legacy bundle excluded;
   repo `.md` files clean under `markdownlint-cli2`.
-- [x] 0.5.2: wheel matrix cp314/cp315 (Python 3.15 final broke uvx default).
+- [x] 0.5.2 shipped: cp314/cp315 wheels on PyPI; plain `uvx pytauargus-tui` works again.
 
 ## In flight
 
