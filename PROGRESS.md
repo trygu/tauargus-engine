@@ -23,7 +23,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## In flight
 
-- [ ] Repo split (finish): pin the first engine revision in the `pytauargus` repo; run and verify its tests/wheels CI; PyPI trusted publishing for the new repo.
+- [ ] Repo split (finish): first release from the `pytauargus` repo (wheels workflow verification on the `py-v*` tag; PyPI trusted publishing configured there).
 - [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record the written revision).
 
 ## Watch items
