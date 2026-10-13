@@ -63,16 +63,23 @@ jobs:
         working-directory: bindings/python
         run: uv run --with pytest --with pybind11 pytest tests -q
 
-      - name: Install R
+      - name: Install R (apt)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y r-base
 
+      - name: Install R (Homebrew)
+        if: runner.os == 'macOS'
+        run: sudo -E brew install r
+
+      # Install into a temp library: the runner's system R library is not
+      # writable by the runner user on Linux.
       - name: Install R binding (compile check)
         env:
           HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
-        run: R CMD INSTALL bindings/r/tauargusengine
+        run: R CMD INSTALL --library="${RUNNER_TEMP}/Rlib" bindings/r/tauargusengine
 
       - name: Run R binding smoke
         env:
           HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
+          R_LIBS: ${{ runner.temp }}/Rlib
         run: Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R
