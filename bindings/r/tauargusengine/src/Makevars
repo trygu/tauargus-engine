@@ -1,0 +1,38 @@
+# tauargusengine build flags.
+#
+# The package lives at <engine>/bindings/r/tauargusengine, so from src/ the
+# engine root is four levels up. It links the prebuilt native libs from
+# <engine>/engine/build/lib (produced by the tauargus-engine superbuild) plus
+# HiGHS. (R 4.6+ compiles package C++ with its default standard, C++20, which
+# is compatible with the engine's C++11 headers.)
+
+TA_ENGINE := $(abspath ../../../..)
+TA_LIB := $(TA_ENGINE)/engine/build/lib
+TA_CORE_INC := $(TA_ENGINE)/engine/native/core/src
+TA_CSP_INC := $(TA_ENGINE)/engine/native/csp/src
+TA_HITAS_INC := $(TA_ENGINE)/engine/native/hitas/src
+TA_ROUNDER_INC := $(TA_ENGINE)/engine/native/rounder/src
+
+UNAME := $(shell uname -s 2>/dev/null)
+
+ifeq ($(OS),Windows_NT)
+# Best-effort Windows: link the import libs from build/lib; the runtime DLLs
+# (build/bin) must be on PATH or bundled with the package at install time.
+PKG_CPPFLAGS = /I"$(TA_CORE_INC)" /I"$(TA_CSP_INC)" /I"$(TA_HITAS_INC)" /I"$(TA_ROUNDER_INC)"
+PKG_LIBS = -libpath:$(TA_LIB) tauargus_csp.lib tauargus_hitas.lib tauargus_rounder.lib CRP.lib tauargus_core.lib highs.lib
+else ifeq ($(UNAME),Darwin)
+HIGHSPREFIX := $(shell brew --prefix highs 2>/dev/null)
+ifeq ($(HIGHSPREFIX),)
+HIGHSPREFIX := /opt/homebrew/opt/highs
+endif
+PKG_CPPFLAGS = -I$(TA_CORE_INC) -I$(TA_CSP_INC) -I$(TA_HITAS_INC) -I$(TA_ROUNDER_INC) -I$(HIGHSPREFIX)/include/highs
+PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB)
+else
+# Linux
+HIGHSPREFIX := $(shell pkg-config --variable=prefix highs 2>/dev/null)
+ifeq ($(HIGHSPREFIX),)
+HIGHSPREFIX := /usr
+endif
+PKG_CPPFLAGS = -I$(TA_CORE_INC) -I$(TA_CSP_INC) -I$(TA_HITAS_INC) -I$(TA_ROUNDER_INC) -I$(HIGHSPREFIX)/include/highs
+PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -lhighs -Wl,-rpath,$(TA_LIB)
+endif

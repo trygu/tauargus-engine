@@ -1,0 +1,22 @@
+Package: tauargusengine
+Title: Native R Bindings to the Tau-Argus SDC Engine
+Version: 0.1.0
+Authors@R: c(
+    person("Trygve", "Kleven", role = c("aut", "cre"),
+           email = "trygve@example.com")
+  )
+Description: Thin C/C++ interface to the 'tauargus-engine' native
+    statistical-disclosure-control libraries (core, csp, hitas, crp,
+    rounder; HiGHS-backed). Exposes the 'TauArgus', 'HiTaSCtrl' and
+    'RounderCtrl' objects and the 'audit_jj' routine to R through '.Call'.
+    This is a low-level binding; the batch-level orchestration lives in
+    'rtauargus'.
+License: EUPL-1.2
+Encoding: UTF-8
+NeedsCompilation: yes
+SystemRequirements: A C++ compiler, a prebuilt 'tauargus-engine'
+    (engine/build/lib) and HiGHS (>= 1.x).
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+RoxygenNote: 7.3.1
