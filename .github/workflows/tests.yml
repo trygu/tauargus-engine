@@ -69,14 +69,16 @@ jobs:
 
       - name: Install R (Homebrew)
         if: runner.os == 'macOS'
-        run: sudo -E brew install r
+        run: brew install r
 
       # Install into a temp library: the runner's system R library is not
       # writable by the runner user on Linux.
       - name: Install R binding (compile check)
         env:
           HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
-        run: R CMD INSTALL --library="${RUNNER_TEMP}/Rlib" bindings/r/tauargusengine
+        run: |
+          mkdir -p "${RUNNER_TEMP}/Rlib"
+          R CMD INSTALL --library="${RUNNER_TEMP}/Rlib" bindings/r/tauargusengine
 
       - name: Run R binding smoke
         env:
