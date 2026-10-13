@@ -679,6 +679,7 @@ class Engine:
         self._n_tables: int = 0
         self._work_dir: Path = Path.cwd()
         self._rounded_tables: set = set()  # indices of tables marked rounded (RND)
+        self._ckm_tables: set = set()  # indices of tables marked cell-key protected
         self._protect_cover_table: bool = False  # legacy <COVER> global flag
         # Cell audit (intervalle) results: tab index -> {cell: (min, max, unsafe)}
         self._audit: Dict[int, Dict[int, Tuple[float, float, bool]]] = {}
@@ -1466,6 +1467,7 @@ class Engine:
                 resp.ckm_epsilon, cmd.ckm_mu_c,
             )
             logger.info("CKM cont: table %d processed.", tab + 1)
+        self._ckm_tables.add(tab)
 
     # -- audit -----------------------------------------------------------------
     def audit(self, tab: int) -> List[dict]:
@@ -1778,8 +1780,19 @@ class Engine:
         tab = cmd.tab_no - 1
         fpath = self._work_dir / cmd.file if cmd.file else self._work_dir / f"table_{tab + 1}.tab"
 
+        # Response type follows the legacy SaveTable: 0 = raw values,
+        # 1 = rounded (after RND), 3 = cell-key protected. (The legacy
+        # batch processor derives it from tableSet.rounded/ckmProtect;
+        # writing the rounded response before RND would yield all zeros.)
+        if tab in self._ckm_tables:
+            resp = 3
+        elif tab in self._rounded_tables:
+            resp = 1
+        else:
+            resp = 0
+
         if cmd.output_type == 1:  # CSV
-            self._tau.write_csv(tab, str(fpath), True, IDENTITY_DIM_SEQUENCE, 1)
+            self._tau.write_csv(tab, str(fpath), True, IDENTITY_DIM_SEQUENCE, resp)
         elif cmd.output_type == 5:  # INTERMEDIATE (audit table)
             opts = set(cmd.options)
             simple = "+SO" in opts
@@ -1798,7 +1811,7 @@ class Engine:
         elif cmd.output_type in (2, 3, 4, 6, 7):
             # CellRecords (SBS, code value, etc.)
             self._tau.write_cell_records(tab, str(fpath), True, False,
-                                         False, "", False, True, 1)
+                                         False, "", False, True, resp)
         else:
             raise BatchError(f"Unknown output type {cmd.output_type}")
         logger.info("Wrote table %d to %s", tab + 1, fpath)
@@ -2092,6 +2105,7 @@ class Engine:
         self._tables = []
         self._safety_rules_buf = []
         self._rounded_tables = set()
+        self._ckm_tables = set()
         self._protect_cover_table = False
         self._audit = {}
 
@@ -2142,6 +2156,7 @@ class Engine:
             self._safety_rules_buf = []
             self._metadata = None
             self._rounded_tables = set()
+            self._ckm_tables = set()
             self._protect_cover_table = False
             self._audit = {}
             logger.info("Cleared state.")
