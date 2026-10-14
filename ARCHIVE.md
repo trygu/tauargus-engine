@@ -1,5 +1,13 @@
 # Tau-Argus Rewrite: Archive
 
+## 3-repo restructure + 0.5.3 release (2026-10-14)
+
+- P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev`); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata (`engine_meta()`); CI green at `483d12f`.
+- P2 R repo: repo + package renamed to `rtauargus.native`; engine as pinned submodule; combined `release.yml` builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set (clean-room + publish on tags); `docs/compatibility.md`.
+- P3 engine: `r-package.yml` removed (R releases move to the rtauargus.native pipeline); README/AGENTS/build-and-distribution updated for the 3-repo ownership.
+- P4+P5: both front-end submodules at engine `a68a76f`; R release pipeline green on linux/macos/windows with the full test suite (run 38604830619); R release binaries are R 4.5.3 (`..._r4.5.3_...`), chosen so front-end dependencies install as CRAN binaries.
+- 0.5.3 published: `py-v0.5.3` (25 wheels, GitHub Release; wheel pipeline fixes: engine build dir, `shell: bash` for the HiGHS pin step, `TAUARGUS_ENGINE_DIR` for manylinux, `./tui` so pip 26 builds the local TUI package) + `r-v0.5.3` (3 platform binaries + 2 source tarballs, clean-room verified). Container image job removed from the wheel pipeline (user decision).
+
 ## GHMITER reference assessment (2026-10-12)
 
 - Forked `sdcTools/hypercube` to `trygu/hypercube` (`5b61311`) and assessed it as the GH/GHMITER reference. The submodule was removed after the assessment; no retained dependency.

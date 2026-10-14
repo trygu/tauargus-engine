@@ -15,13 +15,12 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] Distribution independence: HiGHS pin file, self-contained R staging, r-package.yml green on 3 OSes + clean-room (release commit `dba1a14`), release-file install + full rtauargus suite verified.
 - [x] Release history backfill: 12 `py-v*` releases (0.1.0-0.5.2, 195 assets) moved to the pytauargus repo; this repo's release page clean; wheel pipeline re-enabled.
 
-## In flight: 3-repo restructure (user directive, 2026-10-14)
+## In flight: R single-package release (user directive, 2026-10-14)
 
-- [x] P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev`); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata (`engine_meta()`); CI green at `483d12f`.
-- [x] P2 R repo: repo + package renamed to `rtauargus.native`; engine as pinned submodule; combined `release.yml` builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set (clean-room + publish on tags); `docs/compatibility.md`.
-- [x] P3 engine: `r-package.yml` removed (R releases move to the rtauargus.native pipeline); README/AGENTS/build-and-distribution updated for the 3-repo ownership.
-- [x] P4+P5: both front-end submodules at engine `a68a76f`; R release pipeline green on linux/macos/windows with the full test suite (run 38604830619); R release binaries are R 4.5.3 (`..._r4.5.3_...`), chosen so front-end dependencies install as CRAN binaries.
-- [x] 0.5.3 published: `py-v0.5.3` (25 wheels, GitHub Release) + `r-v0.5.3` (3 platform binaries + 2 source tarballs, clean-room verified). Container image job removed from the wheel pipeline (user decision).
+- [ ] Ship one self-contained `rtauargus.native` package per platform in the R release, replacing the separate `tauargusengine` binding package (two-file install removed).
+- [x] Staging: `stage-r-package.sh --merge-into DIR` composes the native layer (binding R/src, configure, vendored engine + HiGHS, provenance) into the front-end; NAMESPACE/DESCRIPTION patched in place; `scripts/test-stage-r-merge.sh` green (20 checks); standalone mode regression-tested.
+- [ ] Local integration: staged merged package builds and installs (configure builds the vendored engine + HiGHS) and passes the full front-end suite.
+- [ ] R repo: `release.yml` single-package flow, one-file clean-room install, README install procedure + docs; branch CI green, then the 0.5.4 tags (user).
 
 ## Watch items
 
