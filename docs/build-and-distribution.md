@@ -89,9 +89,9 @@ matches your platform; names carry version, R version, platform and
 architecture) and the `rtauargus.native` source tarball:
 
 ```r
-# the binding: platform binary (no compiler; R 4.4.3) or source
+# the binding: platform binary (no compiler; R 4.5.3) or source
 install.packages(
-    "https://github.com/trygu/rtauargus.native/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z_r4.4.3_linux-x86_64.tar.gz",
+    "https://github.com/trygu/rtauargus.native/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z_r4.5.3_linux-x86_64.tar.gz",
     repos = NULL, type = "binary")
 # the front-end: pure R, any platform
 install.packages(
@@ -114,7 +114,7 @@ The pipeline lives in the
 (`.github/workflows/release.yml`), which pins this repo as a submodule
 and reuses `scripts/stage-r-package.sh` from it. On every push it
 builds and installs both R packages on ubuntu-24.04, macos-15 and
-windows-2022 (R 4.4.3) and runs the full `rtauargus.native` test
+windows-2022 (R 4.5.3) and runs the full `rtauargus.native` test
 suite; it repackages the installed binding as a platform binary in the
 standard R format (gzipped tarball on Linux/macOS, zip on Windows). On
 an `r-v*` tag it publishes one GitHub Release set (both source tarballs
@@ -140,5 +140,5 @@ commit (both front-end repos pin it as their submodule):
 - Python wheels: Linux (x86_64, aarch64, manylinux_2_28), macOS arm64,
   Windows x86_64; CPython 3.10 to 3.15.
 - R package: source builds on any platform with CMake and a C++11
-  compiler. Binary packages for R 4.4.3 on Linux x86_64 (built on
+  compiler. Binary packages for R 4.5.3 on Linux x86_64 (built on
   ubuntu-24.04, glibc floor 2.39), macOS arm64 and Windows x86_64.
