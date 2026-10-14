@@ -126,7 +126,8 @@ jobs:
       - name: Install system deps
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends binutils ca-certificates
+          # setup-r needs sudo, which the bare ubuntu image lacks.
+          apt-get install -y --no-install-recommends binutils ca-certificates sudo
 
       - uses: actions/download-artifact@v4
         with:
