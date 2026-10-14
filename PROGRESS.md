@@ -25,7 +25,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## Watch items
 
-- User report: secondary suppression differs from legacy tau-ARGUS on a real dataset (89 of 1631 cells): `docs/secondary-suppression-discrepancy.md`; blocked on the user's test setup (.arb, data, reference output).
+- User report: secondary suppression differs from legacy tau-ARGUS on a real dataset (89 of 1631 cells): reproduced; omitted cost/exponent defaults identified as a major cause (89 differences to 3 residual cells, all around C28). Findings + next steps in `docs/secondary-suppression-discrepancy.md`; separate format-4 zero-response export issue noted.
 
 - [ ] Rejected-method refs: sdcTools `hypercube` (Fortran GHMIter, EUPL-1.1) for GH; NET -> Castro (UPC 2014).
 - 5008 on re-OPT w/ secondary suppression; GHCR/project rename; OPT/MOD deadline expiry; solver-strategy doc.
