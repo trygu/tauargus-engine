@@ -171,9 +171,10 @@ Requirements:
 
 - CMake ≥ 3.16 and a C++11 compiler
 - Python 3.10+ and [uv](https://docs.astral.sh/uv/)
-- [HiGHS](https://github.com/ERGO-Code/HiGHS) with its CMake package:
-  `brew install highs` (macOS), `sudo apt-get install libhighs-dev`
-  (Debian/Ubuntu), or [build from source](https://github.com/ERGO-Code/HiGHS#building)
+- [HiGHS](https://github.com/ERGO-Code/HiGHS) with its CMake package, at
+  the version pinned in `engine/HiGHS-VERSION`: `brew install highs`
+  (macOS), `sudo apt-get install libhighs-dev` (Debian/Ubuntu), or
+  [build from source](https://github.com/ERGO-Code/HiGHS#building)
 
 Clone with submodules (`git clone --recurse-submodules`). Build the five native
 libraries first; the Python binding links the resulting `engine/build/lib/`
@@ -199,6 +200,17 @@ cmake --build bindings/python/build-ext -j
 Release wheels (bundling HiGHS and the engine) are built and published by
 the [pytauargus](https://github.com/trygu/pytauargus) repo from a pinned
 revision of this repo.
+
+### R package
+
+The distributable R package `tauargusengine` is self-contained:
+`scripts/stage-r-package.sh` assembles it with the engine and HiGHS
+sources, and its configure script builds everything from the package's
+own sources at install time. Releases (source package to GitHub
+Packages, binaries on GitHub Releases) run from `r-v*` tags via
+`.github/workflows/r-package.yml`. See
+[Build and distribution](docs/build-and-distribution.md) for the full
+build chain across the three repos.
 
 ## Testing
 
