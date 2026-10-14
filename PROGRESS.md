@@ -17,13 +17,14 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## In flight: R single-package release (user directive, 2026-10-14)
 
-- [ ] Ship one self-contained `rtauargus.native` package per platform in the R release, replacing the separate `tauargusengine` binding package (two-file install removed).
-- [x] Staging: `stage-r-package.sh --merge-into DIR` composes the native layer (binding R/src, configure, vendored engine + HiGHS, provenance) into the front-end; NAMESPACE/DESCRIPTION patched in place; `scripts/test-stage-r-merge.sh` green (24 checks); standalone mode regression-tested.
-- [x] Merge blockers found in local integration and fixed: (1) R CMD build runs configure via its temp install and tars the mutated tree, so sources vendor in top-level `engine/`/`highs/` dirs R never installs and configure is read-only on them; (2) R names the shared object after the package verbatim (`rtauargus.native.so`), so `useDynLib` keeps the dot form, the init symbol is the underscore form `R_init_rtauargus_native` (valid C; R's dynload falls back to it when the dotted lookup fails), and the fork's `tauargusengine::` test qualifier is rewritten to the front-end namespace by staging; (3) the clean-room installs the CRAN deps because binary `R CMD INSTALL` checks Imports. A stale `tauargusengine 0.1.0` left in the local R framework library was silently masking the namespace problem; removed.
-- [x] Version 0.5.4 prep: engine binding DESCRIPTION 0.5.4; both front-end pins at engine `aa811ed`; pytauargus + TUI 0.5.4; pushed (pytauargus `95d4ca3`, rtauargus.native master `4d67cb7`, 3-platform branch CI running).
-- [x] Table-mode primary-rule gap fixed: `FillInTable` unconditionally stored the caller's `Status` (often `CS_SAFE`) even when `m_HasStatus` was false, so `ComputeCellStatuses` skipped rule evaluation. Moved the status assignment inside the `m_HasStatus` guard; R front-end now also calls `SetTableSafetyInfo` to declare `FREQUENCY`/`MAXSCORE`/`STATUS` presence.
-- [x] Verification: local integration green (386 PASS, binding smoke, README `tab_rtauargus` example, otool build-path guard). R branch CI green (3 platforms, R 4.5.3) and re-cut of `r-v0.5.4` tag remain for the user.
-- [x] R repo edits: `release.yml` single-package flow (tag vs engine-pin check, merge staging, one binary per platform, one-file clean-room + CRAN deps, static tarball verification), README per-platform install + quick test, `docs/compatibility.md` (was untracked; force-added), `tools/engine-meta-check.R` on the merged package, DESCRIPTION 1.3.7 + NEWS. `audit_jj` (CSP intervalle audit) stays exported in the merged NAMESPACE; the front-end `audit(tab)`/`with_audit` paths are untouched fork code.
+- [ ] Ship one self-contained `rtauargus.native` package per platform in the R release, replacing the separate `tauargusengine` binding package. Preparation complete: staging, merge blockers, engine table-mode fix, R front-end fixes, and local integration (386 PASS, README example, build-path guard) are verified; branch CI running on `native-engine`. The `r-v0.5.4` tag must be re-cut on the final commit and the release run by the user.
+
+## Secondary suppression discrepancy (user directive, 2026-10-15)
+
+- [x] Legacy `SPECIFYTABLE` cost/lambda default confirmed: shadow and cost default to response, lambda defaults to 1.
+- [x] Fix implemented in pytauargus (`batch.py`, `engine.py`) and rtauargus.native (`R/engine_batch.R`, `R/engine_run.R`); regression tests added.
+- [x] `sy1` reproduction: discrepancy reduced from 89 to 3 cells (all around `C28`) with correct response-cost default; default and explicit-response-cost runs are now identical.
+- [ ] Root-cause the 3 residual `C28` differences as a model/port discrepancy (not solver tie-breaking); verify or fix.
 
 ## Watch items
 

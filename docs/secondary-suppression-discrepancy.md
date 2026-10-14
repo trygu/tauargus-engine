@@ -1,12 +1,11 @@
 # Secondary suppression discrepancy against legacy tau-ARGUS
 
-**Status:** reproduced on published `pytauargus` 0.5.2; the cost
-defaults are identified as a major cause; three residual cell
-differences remain with explicit legacy-equivalent costs. Main
-hypothesis (unconfirmed): Modular's integer weight scaling makes
-different costs indistinguishable in the optimization. No library
-fix has been made.
-**Recorded:** 2026-10-14.
+**Status:** the omitted `SPECIFYTABLE` cost/lambda default has been
+fixed. The discrepancy dropped from 89 to 3 cells, and the default
+run now matches the explicit-response-cost run. The three residual
+cell differences around `C28` remain and are treated as a model/port
+discrepancy to be root-caused, not as solver tie-breaking.
+**Recorded:** 2026-10-14; updated 2026-10-15.
 
 ## Report
 
@@ -61,7 +60,31 @@ revision.
 
 ## Confirmed findings
 
-### 1. Exact reproduction of the reported discrepancy
+### 1. Cost/lambda default fix
+
+**Root cause:** pytauargus and the R front-end treated an omitted cost
+as frequency (`-1`) and an omitted lambda as `0` (log transform). The
+legacy τ-ARGUS 4.1 manual states that shadow and cost default to the
+response variable and lambda defaults to `1`.
+
+**Fix:**
+- `pytauargus/src/pytauargus/batch.py`: default `lam` changed from `0.0`
+  to `1.0`.
+- `pytauargus/src/pytauargus/engine.py`: omitted `cost_var` now maps to
+  the response variable index; explicit `-1`/`-2`/`-3` codes are mapped
+  correctly.
+- `rtauargus.native/R/engine_batch.R`: default `lam` changed from `0` to
+  `1`.
+- `rtauargus.native/R/engine_run.R`: same omitted-cost mapping as the
+  Python side.
+
+**Verification:** `tests/test_specify_table_cost_defaults.py` covers
+omitted cost, explicit lambda `0`, explicit response cost, and special
+codes `-1`/`-2`. The full pytauargus suite is green (283 passed, 3
+skipped) and the rtauargus.native suite is green (386 passed, 1 skipped,
+README example passes).
+
+### 2. Exact reproduction of the reported discrepancy
 
 The original `SPECIFYTABLE` line, with only paths adjusted, produces
 exactly the cross-tab reported above for the 1631-cell selection.
@@ -95,13 +118,17 @@ Controlled diagnostic batch:
 With explicit response cost and exponent `1`, the total cell cost
 becomes `9043500512`, matching its response. The selected-cell
 discrepancy falls from 89 to 3. This changes both the cost variable
-and the exponent; it is a batch workaround, not a code fix.
+and the exponent; it was a batch workaround before the code fix.
 
 | Legacy status / our status, explicit response cost | M | S | U |
 |---|---:|---:|---:|
 | B | 0 | 0 | 425 |
 | D | 213 | 2 | 0 |
 | V | 1 | 990 | 0 |
+
+After the code fix (omitted cost defaults to response, lambda to `1`),
+the default run produces the same table as the explicit-response-cost
+run, so the cross-tab above also applies to the default batch.
 
 Full-table results:
 
@@ -110,13 +137,14 @@ Full-table results:
 | Legacy CPLEX | 429 | 221 | 1003 | 12 | reference |
 | HiGHS, omitted cost/exponent | 429 | 204 | 1020 | 12 | 93 |
 | HiGHS, explicit response cost/exponent 1 | 429 | 220 | 1004 | 12 | 3 |
+| HiGHS, omitted cost/exponent (after fix) | 429 | 220 | 1004 | 12 | 3 |
 
-Candidate implementation points (verified against `pytauargus`
-`src/`): `SpecifyTable.lam`, `_parse_specify_table` in `batch.py`
-(omitted cost gives `cost_idx = -1`, omitted lambda gives
-`lam = 0.0`), and `_call_set_table` in `engine.py`. Check the legacy
-default selection and exponent before changing code. Preserve the
-explicit `-1`/`-2`/`-3` cost meanings and explicit lambda values.
+Candidate implementation points (now fixed in `pytauargus`
+`src/` and `rtauargus.native` `R/`): `SpecifyTable.lam`,
+`_parse_specify_table` in `batch.py`, `_call_set_table` in `engine.py`,
+and the R equivalents in `R/engine_batch.R` / `R/engine_run.R`.
+Explicit `-1`/`-2`/`-3` cost codes and explicit lambda values are
+preserved.
 
 ### 3. Residual differences
 
@@ -179,16 +207,17 @@ Consequences, if this hypothesis holds:
 
 Because the weights are computed deterministically from the input
 costs, identical input costs should give identical weights and hence
-identical subtable models. The residual difference is then either
-(a) several equally weighted optimal patterns, with CPLEX and HiGHS
-choosing different ones, or (b) a model or computation difference
-between the legacy libTauHiTaS 4.3.2.1 and our port. Step 4 below
-distinguishes the two cases.
+identical subtable models. With the same MIP model and the same solver
+settings, CPLEX and HiGHS should return the same optimal solution. The
+residual difference is therefore treated as a model or computation
+difference between the legacy libTauHiTaS 4.3.2.1 and our port until
+proven otherwise. Step 4 below distinguishes a true model difference
+from a solver-setting difference.
 
 Decision: do not force the same three suppressions until the cause is
-known. If the models are identical, accept the differing patterns and
-verify cost and protection; if the models or computations differ, fix
-the port.
+known. If the models are identical, investigate solver settings
+(tolerances, MIP gap, time limits, heuristics, presolve); if the models
+or computations differ, fix the port.
 
 ## Comparison caveats from Oyvind
 
@@ -208,10 +237,12 @@ the port.
 
 1. Obtain the original hierarchy files and confirm the reconstruction.
 2. Repeat with the current development version before deciding whether
-   a fix is still needed.
+   a fix is still needed. **Done:** the discrepancy dropped from 89 to 3
+   cells; default and explicit-response-cost runs are identical.
 3. Correct the omitted cost/exponent interpretation against the
    legacy contract. Add a regression using this fixture, checking
-   costs before suppression as well as the final result.
+   costs before suppression as well as the final result. **Done:**
+   fixed in pytauargus and rtauargus.native; regression tests added.
 4. Locate the first divergent Modular subproblem around C28 with
    identical cost inputs. Compare subtable ordering, solver models,
    the integer weights after scaling and `ceil` rounding (see the
