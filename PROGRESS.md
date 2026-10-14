@@ -19,8 +19,8 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] B: `scripts/stage-r-package.sh` -> self-contained R source package (engine + HiGHS sources in `inst/`, configure builds in-package, static HiGHS, 4 bundled engine dylibs, rpath = @loader_path only, `tauargus_engine_meta()` provenance). Verified: tarball -> R CMD INSTALL -> smoke green, no build paths in the installed binaries.
 - [x] C: `r-package.yml` CI: source + binary packages (ubuntu-24.04 / macos arm64 / windows, R 4.4.3), install-from-sources + smoke on each OS, clean-room container job (no checkout/compiler), publish to GitHub Packages + GitHub Release on `r-v*`. (First live run still pending: cut by the user on a tag.)
 - [x] D (engine side): pytauargus workflows read the HiGHS tag from the pinned engine checkout; pin bump to this engine commit in the pytauargus repo.
-- [ ] E: rtauargus `native-engine`: tauargusengine minimum version, README install docs, CI test workflow installing tauargusengine from GHP (pinned).
-- [ ] F: docs: engine `docs/build-and-distribution.md` done; rtauargus README pending (E); clean-room verification on Linux still pending.
+- [x] E: rtauargus `native-engine`: `tauargusengine (>= 0.5.3)`, README install docs (GHP PAT / release binaries), `tests.yaml` installs the pinned engine from GHP (`TAUARGUSENGINE_VERSION`) and runs the full suite incl. e2e, pkgdown pre-installs the engine. Verified locally: full rtauargus suite against the installed tauargusengine green (386 pass, 0 fail). Fork CI needs a `GITHUB_PAT` secret (read:packages) before first green run.
+- [ ] F: docs: engine `docs/build-and-distribution.md` done. Live CI verification in flight: `r-package.yml` dispatch run (3-OS source install + clean-room ubuntu container) + pytauargus tests on the new pin. Local Linux container unavailable (colima down); the CI clean-room job covers the Linux acceptance criterion.
 
 ## Watch items
 
