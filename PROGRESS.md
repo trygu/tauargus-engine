@@ -20,7 +20,8 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] P2 R repo: repo + package renamed to `rtauargus.native`; engine as pinned submodule; combined `release.yml` builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set (clean-room two-package install on tags); `docs/compatibility.md`; master pushed.
 - [x] P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev`); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata (`engine_meta()`); local suite green (274 pass).
 - [x] P3 engine: `r-package.yml` removed (R releases move to the rtauargus.native pipeline); README/AGENTS/build-and-distribution updated for the 3-repo ownership.
-- [ ] P4: re-pin both front-end submodules to the final engine commit; verify the new pipelines green on all three repos; user then cuts `py-v0.5.3` (pytauargus) + `r-v0.5.3` (rtauargus.native) from the same engine commit.
+- [x] P4 re-pin: both front-end submodules at the final engine commit `a68a76f`; pytauargus CI green at `483d12f` (submodule checkout flow proven live).
+- [ ] P5: first green run of the rtauargus.native `release.yml` (linux/macos/windows + full suite); then the user cuts `py-v0.5.3` on pytauargus `483d12f` + `r-v0.5.3` on the rtauargus.native tip from the same engine commit.
 
 ## Watch items
 
