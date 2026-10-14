@@ -139,6 +139,7 @@ jobs:
           r-version: ${{ env.R_VERSION }}
 
       - name: Install the binary and run the smoke test
+        shell: bash
         run: |
           set -euo pipefail
           RLIB="$(mktemp -d)/Rlib"
