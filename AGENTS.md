@@ -101,8 +101,7 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Release X.Y.Z = two tags cut from one engine commit (both front-end
   repos pin it as their submodule):
   1. `py-vX.Y.Z` on the `pytauargus` repo: the wheel pipeline builds
-     self-contained wheels and publishes to PyPI, GitHub Release and
-     GHCR.
+     self-contained wheels and publishes to PyPI and GitHub Release.
   2. `r-vX.Y.Z` on the `rtauargus.native` repo: its pipeline publishes
      the release set (both R source tarballs plus the platform
      binaries; standard R formats: gzipped tarball on Linux/macOS, zip

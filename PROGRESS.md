@@ -21,7 +21,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] P2 R repo: repo + package renamed to `rtauargus.native`; engine as pinned submodule; combined `release.yml` builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set (clean-room + publish on tags); `docs/compatibility.md`.
 - [x] P3 engine: `r-package.yml` removed (R releases move to the rtauargus.native pipeline); README/AGENTS/build-and-distribution updated for the 3-repo ownership.
 - [x] P4+P5: both front-end submodules at engine `a68a76f`; R release pipeline green on linux/macos/windows with the full test suite (run 38604830619); R release binaries are R 4.5.3 (`..._r4.5.3_...`), chosen so front-end dependencies install as CRAN binaries.
-- Release ready: user cuts `py-v0.5.3` on pytauargus `483d12f` + `r-v0.5.3` on rtauargus.native `ff1c431` (same engine commit; the R tag also runs the clean-room install + the GitHub Release).
+- [x] 0.5.3 published: `py-v0.5.3` (25 wheels, GitHub Release) + `r-v0.5.3` (3 platform binaries + 2 source tarballs, clean-room verified). Container image job removed from the wheel pipeline (user decision).
 
 ## Watch items
 

@@ -129,8 +129,8 @@ from the same engine commit. Release X.Y.Z = two tags from one engine
 commit (both front-end repos pin it as their submodule):
 
 1. `py-vX.Y.Z` on `pytauargus`: the wheel pipeline builds self-contained
-   wheels, runs the test suites, and publishes to PyPI, GitHub Release
-   and GHCR.
+   wheels, runs the test suites, and publishes to PyPI and GitHub
+   Release.
 2. `r-vX.Y.Z` on `rtauargus.native`: the R pipeline publishes the
    release set (both source tarballs plus the three platform
    binaries).
