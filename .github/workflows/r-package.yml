@@ -63,8 +63,8 @@ jobs:
           fi
 
       # Install from the staged sources: configure builds HiGHS and the
-      # engine from the package's own sources. R CMD INSTALL also checks
-      # that no absolute build paths survive in the shared objects.
+      # engine from the package's own sources. The clean-room job later
+      # verifies that no absolute build paths survive in the binaries.
       #
       # The binary package is the installed package directory, repackaged:
       # no compiler is needed to install it.
