@@ -36,6 +36,7 @@ echo '"_PACKAGE"' > "$FE/R/rtauargus.native-package.R"
 printf 'YEAR: 2026\nCOPYRIGHT HOLDER: fixture\n' > "$FE/LICENSE"
 echo '^docs$' > "$FE/.Rbuildignore"
 echo 'test_that("front", expect_true(TRUE))' > "$FE/tests/testthat/test_front.R"
+echo 'tauargusengine::tauargus_example(1L)' >> "$FE/tests/testthat/test_front.R"
 cat > "$FE/tests/testthat.R" <<'EOF'
 library(testthat)
 library(rtauargus.native)
@@ -85,6 +86,8 @@ check "binding smoke test loads the front-end" \
     'grep -q "library(rtauargus.native)" $FE/tests/test_binding_smoke.R && ! grep -q "library(tauargusengine)" $FE/tests/test_binding_smoke.R'
 check "front-end tests kept" \
     '[[ -f $FE/tests/testthat/test_front.R && -f $FE/tests/testthat.R ]]'
+check "engine tests: binding namespace rewritten to the front-end" \
+    'grep -q "rtauargus.native::tauargus_example" $FE/tests/testthat/test_front.R && ! grep -q "tauargusengine::" $FE/tests/testthat/test_front.R'
 check "NAMESPACE: import(tauargusengine) removed" \
     '! grep -q "^import(tauargusengine)$" $FE/NAMESPACE'
 check "NAMESPACE: useDynLib points at the front-end (dot form)" \

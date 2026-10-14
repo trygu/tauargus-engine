@@ -135,6 +135,14 @@ if [[ -n "$MERGE_INTO" ]]; then
     sed "s/R_init_tauargusengine/R_init_${PKG_DYN}/" \
         "$PKG_DIR/src/init.c" > "$PKG_DIR/.init.staged"
     mv "$PKG_DIR/.init.staged" "$PKG_DIR/src/init.c"
+    # The fork's engine tests qualify the binding namespace
+    # (tauargusengine::). In the merged package the functions live in
+    # the front-end namespace, so rewrite the qualifier.
+    for f in "$PKG_DIR"/tests/testthat/*.R; do
+        [[ -f "$f" ]] || continue
+        sed "s/tauargusengine::/${PKG_NAME}::/" "$f" > "$f.ta"
+        mv "$f.ta" "$f"
+    done
 fi
 
 # 2) Provenance header (overwrites the in-tree dev placeholder).

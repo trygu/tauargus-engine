@@ -42,10 +42,12 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
   separate `pytauargus` repo (github.com/trygu/pytauargus), which pins
   this repo as a git submodule (`tauargus-engine/`; the gitlink is the
   pin).
-- R binding: `bindings/r/tauargusengine` (thin R package). The
+- R binding: `bindings/r/tauargusengine` (thin developer package). The
   `rtauargus.native` front-end (a fork of INSEE's `rtauargus`) is a
   separate repo (github.com/trygu/rtauargus.native); it pins this repo
-  as a submodule and runs the R release pipeline for both R packages.
+  as a submodule and runs the R release pipeline, which stages the
+  native layer into the fork so the release is one self-contained
+  package.
 - Engine bugs are fixed here; the front-end repos bump their engine pin.
   Never backport engine changes into a front-end repo.
 - Legacy Java frontend `src/tauargus/`: removed from `master`; kept on the `tui`
@@ -95,18 +97,19 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 
 ## 7. Releasing
 
-- Lockstep versioning: the R package (`tauargusengine`) and the Python
-  wheel (`pytauargus`) always ship the same version, built from the same
-  engine commit. Never release one without the other.
+- Lockstep versioning: the R package (`rtauargus.native`) and the
+  Python wheel (`pytauargus`) always ship the same version, built from
+  the same engine commit. Never release one without the other.
 - Release X.Y.Z = two tags cut from one engine commit (both front-end
   repos pin it as their submodule):
   1. `py-vX.Y.Z` on the `pytauargus` repo: the wheel pipeline builds
      self-contained wheels and publishes to PyPI and GitHub Release.
-  2. `r-vX.Y.Z` on the `rtauargus.native` repo: its pipeline publishes
-     the release set (both R source tarballs plus the platform
-     binaries; standard R formats: gzipped tarball on Linux/macOS, zip
-     on Windows; names carry version, R version, platform and
-     architecture). See `docs/build-and-distribution.md`.
+  2. `r-vX.Y.Z` on the `rtauargus.native` repo: its pipeline stages
+     the native layer into the fork (single self-contained package)
+     and publishes the release set (the R source tarball plus the
+     platform binaries; standard R formats: gzipped tarball on
+     Linux/macOS, zip on Windows; names carry version, R version,
+     platform and architecture). See `docs/build-and-distribution.md`.
 - Commit and push the engine change here first, then cut both tags.
   Release tags are cut by the user, not the agent.
 
