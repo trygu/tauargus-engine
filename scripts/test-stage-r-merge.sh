@@ -72,7 +72,7 @@ check "binding src injected" \
 check "provenance meta header generated" \
     'grep -q "RTA_META_ENGINE_SHA " $FE/src/rta_meta.h'
 check "init symbol renamed to the front-end" \
-    'grep -q "R_init_rtauargus.native" $FE/src/init.c && ! grep -q "R_init_tauargusengine" $FE/src/init.c'
+    'grep -q "R_init_rtauargus_native" $FE/src/init.c && ! grep -q "R_init_tauargusengine" $FE/src/init.c'
 check "engine sources vendored" \
     '[[ -d $FE/engine/native/core/src && -d $FE/engine/native/rounder/src && -f $FE/engine/HiGHS-VERSION ]]'
 check "highs sources vendored" \
@@ -88,7 +88,7 @@ check "front-end tests kept" \
 check "NAMESPACE: import(tauargusengine) removed" \
     '! grep -q "^import(tauargusengine)$" $FE/NAMESPACE'
 check "NAMESPACE: useDynLib points at the front-end" \
-    'grep -q "^useDynLib(rtauargus.native, .registration = TRUE)$" $FE/NAMESPACE'
+    'grep -q "^useDynLib(rtauargus_native, .registration = TRUE)$" $FE/NAMESPACE'
 check "NAMESPACE: binding exports kept" \
     'grep -q "^export(new_hitas)$" $FE/NAMESPACE && grep -q "^export(audit_jj)$" $FE/NAMESPACE'
 check "NAMESPACE: front-end exports kept" \

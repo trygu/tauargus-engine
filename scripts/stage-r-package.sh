@@ -91,6 +91,11 @@ if [[ -n "$MERGE_INTO" ]]; then
     done
     [[ -d "$PKG_DIR/R" ]] || { echo "merge target missing R/: $PKG_DIR" >&2; exit 1; }
     PKG_NAME="$(awk -F': *' '/^Package:/{print $2; exit}' "$PKG_DIR/DESCRIPTION")"
+    # R names the extension after the package with dots turned into
+    # underscores (as for data.table: DLL data_table, symbol
+    # R_init_data_table). The init function must be valid C, so the
+    # underscore form is the only option.
+    PKG_DYN="${PKG_NAME//./_}"
 else
     PKG_DIR="$OUT/tauargusengine"
     rm -rf "$OUT"
@@ -121,9 +126,10 @@ cp "$BINDING"/src/init.c "$BINDING"/src/rta.h "$BINDING"/src/rta_cpp.h \
    "$BINDING"/src/rta_meta.cpp "$PKG_DIR/src/"
 
 # In merge mode the DLL entry point must carry the front-end package
-# name, or R loads the extension without registering the routines.
+# name (dot form), or R loads the extension without registering the
+# routines.
 if [[ -n "$MERGE_INTO" ]]; then
-    sed "s/R_init_tauargusengine/R_init_${PKG_NAME}/" \
+    sed "s/R_init_tauargusengine/R_init_${PKG_DYN}/" \
         "$PKG_DIR/src/init.c" > "$PKG_DIR/.init.staged"
     mv "$PKG_DIR/.init.staged" "$PKG_DIR/src/init.c"
 fi
@@ -150,7 +156,7 @@ if [[ -n "$MERGE_INTO" ]]; then
     # front-end, keep both export sets.
     {
         grep -v '^import(tauargusengine)$' "$PKG_DIR/NAMESPACE"
-        printf 'useDynLib(%s, .registration = TRUE)\n' "$PKG_NAME"
+        printf 'useDynLib(%s, .registration = TRUE)\n' "$PKG_DYN"
         grep -v '^useDynLib(' "$BINDING/NAMESPACE"
     } > "$PKG_DIR/.NAMESPACE.staged"
     mv "$PKG_DIR/.NAMESPACE.staged" "$PKG_DIR/NAMESPACE"
