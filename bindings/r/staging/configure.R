@@ -84,7 +84,7 @@ local({
   engine_rpath <- if (is_mac) "@loader_path" else if (is_win) NULL else "$ORIGIN"
   e_args <- c("-S", sl_engine_src, "-B", sl_engine_bld, gen,
               "-DCMAKE_BUILD_TYPE=Release",
-              paste0("-DHighs_DIR=", file.path(sl_highs_pre, "lib", "cmake", "Highs")),
+              paste0("-DHighs_DIR=", file.path(sl_highs_pre, "lib", "cmake", "highs")),
               paste0("-DCMAKE_INSTALL_PREFIX=", sl_engine_pre))
   if (!is.null(engine_rpath))
     e_args <- c(e_args, paste0("-DCMAKE_INSTALL_RPATH=", engine_rpath))
