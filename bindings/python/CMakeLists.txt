@@ -19,6 +19,19 @@ endif()
 # The engine is pre-built by the superbuild (engine/CMakeLists.txt) into
 # engine/build/lib. We link the already-compiled libs by path, so their
 # file names are resolved per host platform below.
+# Build provenance baked into the extension (cpp/py_meta.h.in): the engine
+# commit and the pinned HiGHS version, exposed via _tauargus.engine_meta().
+execute_process(
+    COMMAND git -C ${TAUARGUS_ENGINE_DIR} rev-parse HEAD
+    OUTPUT_VARIABLE ENGINE_SHA OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE _meta_git_res)
+if(NOT _meta_git_res EQUAL 0)
+    set(ENGINE_SHA "unknown")
+endif()
+file(READ ${TAUARGUS_ENGINE_DIR}/engine/HiGHS-VERSION _HIGHS_VERSION_RAW)
+string(STRIP "${_HIGHS_VERSION_RAW}" HIGHS_VERSION)
+configure_file(cpp/py_meta.h.in ${CMAKE_CURRENT_BINARY_DIR}/py_meta.h @ONLY)
+
 set(NATIVE_LIB_DIR ${TAUARGUS_ENGINE_DIR}/engine/build/lib)
 set(NATIVE_CORE_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/core/src)
 set(NATIVE_CSP_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/csp/src)
@@ -85,6 +98,7 @@ pybind11_add_module(_tauargus
 target_include_directories(_tauargus
     PRIVATE
         ${CMAKE_SOURCE_DIR}/cpp
+        ${CMAKE_CURRENT_BINARY_DIR}
         ${NATIVE_CORE_SRC}
         ${NATIVE_CSP_SRC}
         ${NATIVE_HITAS_SRC}
