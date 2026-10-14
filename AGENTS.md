@@ -39,10 +39,13 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Solver backend: Pure HiGHS (`<highs/interfaces/highs_c_api.h>`). No CPLEX, XPRESS, or legacy SCIP.
 - Python binding: `bindings/python/` (pybind11 `_tauargus` extension, `cpp/`
   + CMake). The `pytauargus` package, `tauargus` CLI and TUI live in the
-  separate `pytauargus` repo (github.com/trygu/pytauargus), built from a
-  pinned revision of this repo (its `tauargus-engine-rev`).
-- R binding: `bindings/r/tauargusengine` (thin R package). The `rtauargus`
-  front-end is a separate repo (github.com/trygu/rtauargus).
+  separate `pytauargus` repo (github.com/trygu/pytauargus), which pins
+  this repo as a git submodule (`tauargus-engine/`; the gitlink is the
+  pin).
+- R binding: `bindings/r/tauargusengine` (thin R package). The
+  `rtauargus.native` front-end (a fork of INSEE's `rtauargus`) is a
+  separate repo (github.com/trygu/rtauargus.native); it pins this repo
+  as a submodule and runs the R release pipeline for both R packages.
 - Engine bugs are fixed here; the front-end repos bump their engine pin.
   Never backport engine changes into a front-end repo.
 - Legacy Java frontend `src/tauargus/`: removed from `master`; kept on the `tui`
@@ -95,14 +98,16 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Lockstep versioning: the R package (`tauargusengine`) and the Python
   wheel (`pytauargus`) always ship the same version, built from the same
   engine commit. Never release one without the other.
-- Release X.Y.Z = two tags cut from one engine commit:
-  1. `py-vX.Y.Z` on the `pytauargus` repo: bump `tauargus-engine-rev` to
-     the engine commit; wheels to PyPI, GitHub Release and GHCR.
-  2. `r-vX.Y.Z` on this repo: the GitHub Release with the source package
-     and the platform binaries (standard R formats: gzipped tarball on
-     Linux/macOS, zip on Windows; names carry version, R version,
-     platform and architecture). See
-     `docs/build-and-distribution.md`.
+- Release X.Y.Z = two tags cut from one engine commit (both front-end
+  repos pin it as their submodule):
+  1. `py-vX.Y.Z` on the `pytauargus` repo: the wheel pipeline builds
+     self-contained wheels and publishes to PyPI, GitHub Release and
+     GHCR.
+  2. `r-vX.Y.Z` on the `rtauargus.native` repo: its pipeline publishes
+     the release set (both R source tarballs plus the platform
+     binaries; standard R formats: gzipped tarball on Linux/macOS, zip
+     on Windows; names carry version, R version, platform and
+     architecture). See `docs/build-and-distribution.md`.
 - Commit and push the engine change here first, then cut both tags.
   Release tags are cut by the user, not the agent.
 

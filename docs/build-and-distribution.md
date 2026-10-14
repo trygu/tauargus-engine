@@ -4,11 +4,13 @@ The three repos and what each owns:
 
 - `trygu/tauargus-engine` (this repo): the native engine (five modules
   under `engine/native/`), the thin Python and R bindings, the R package
-  build recipe, and the R package release pipeline.
+  build recipe, and the engine and binding tests.
 - `trygu/pytauargus`: the `pytauargus` package, the `tauargus` CLI, the
-  TUI, and the Python wheel pipeline.
-- `trygu/rtauargus`: the high-level R package. It imports
-  `tauargusengine`; it contains no native code of its own.
+  TUI, and the Python wheel pipeline. Pins this repo as a git submodule.
+- `trygu/rtauargus.native`: the high-level R package (a fork of INSEE's
+  `rtauargus`). It imports `tauargusengine`; it contains no native code
+  of its own. Pins this repo as a git submodule and runs the R release
+  pipeline for both R packages.
 
 ## The HiGHS version pin
 
@@ -36,10 +38,12 @@ smoke, R binding smoke.
 
 ## Python chain (pytauargus)
 
-- `pytauargus/tauargus-engine-rev` pins the exact engine commit.
-- CI checks out that commit with all submodules, builds HiGHS from the
-  pinned tag, builds the engine superbuild, and builds the wheel from
-  the pinned sources.
+- The `tauargus-engine` git submodule in `pytauargus` (the gitlink) pins
+  the exact engine commit.
+- CI checks out the repo with `submodules: recursive`, builds HiGHS from
+  the pinned tag, builds the engine superbuild, and builds the wheel
+  from the pinned sources. The wheel records the engine commit and HiGHS
+  version (`pytauargus.engine_meta()`).
 - The wheel bundles the binding, the four engine shared libraries and
   HiGHS (the platform repair step adds HiGHS). The installed wheel and
   `uvx pytauargus-tui` work without any engine checkout.
@@ -78,57 +82,58 @@ resolves its libraries relative to the installation
 (`@loader_path`/`$ORIGIN`, the DLL directory on Windows). The installed
 package references no build-machine path.
 
-Install from a GitHub Release of this repo. The release files are the
-distribution channel; pick the one that matches your platform (names
-carry version, R version, platform and architecture):
-
-Binary (no compiler; R 4.4.3):
+Install from a GitHub Release of the
+[rtauargus.native](https://github.com/trygu/rtauargus.native) repo. Its
+release set contains the `tauargusengine` files (pick the one that
+matches your platform; names carry version, R version, platform and
+architecture) and the `rtauargus.native` source tarball:
 
 ```r
+# the binding: platform binary (no compiler; R 4.4.3) or source
 install.packages(
-    "https://github.com/trygu/tauargus-engine/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z_r4.4.3_linux-x86_64.tar.gz",
+    "https://github.com/trygu/rtauargus.native/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z_r4.4.3_linux-x86_64.tar.gz",
     repos = NULL, type = "binary")
+# the front-end: pure R, any platform
+install.packages(
+    "https://github.com/trygu/rtauargus.native/releases/download/r-vX.Y.Z/rtauargus.native_1.3.6.tar.gz",
+    repos = NULL)
 ```
 
 On macOS use `..._macos-arm64.tar.gz`, on Windows
-`..._windows-x86_64.zip` (the standard R zip binary format).
-
-Source (any platform; needs CMake >= 3.16 and a C++11 compiler):
-
-```r
-install.packages(
-    "https://github.com/trygu/tauargus-engine/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z.tar.gz",
-    repos = NULL)
-```
+`..._windows-x86_64.zip` (the standard R zip binary format). The
+`tauargusengine` source tarball installs on any platform with CMake >=
+3.16 and a C++11 compiler.
 
 `tauargus_engine_meta()` reports the exact engine SHA, submodule pins
 and HiGHS version a build came from. Use it when reporting a problem.
 
 ### R release pipeline
 
-`.github/workflows/r-package.yml` runs on pull requests to `master` and
-on `r-v*` tags:
-
-- builds and installs the staged package on ubuntu-24.04, macos-15 and
-  windows-2022 (R 4.4.3) and runs the binding smoke test;
-- repackages each installed package as a platform binary in the
-  standard R format (gzipped tarball on Linux/macOS, zip on Windows),
-  named with version, R version, platform and architecture;
-- on a tag: attaches the source package and the three platform
-  binaries to a GitHub Release, and runs a clean-room job that
-  installs the Linux binary in a bare container with no checkout and
-  no compiler.
+The pipeline lives in the
+[rtauargus.native](https://github.com/trygu/rtauargus.native) repo
+(`.github/workflows/release.yml`), which pins this repo as a submodule
+and reuses `scripts/stage-r-package.sh` from it. On every push it
+builds and installs both R packages on ubuntu-24.04, macos-15 and
+windows-2022 (R 4.4.3) and runs the full `rtauargus.native` test
+suite; it repackages the installed binding as a platform binary in the
+standard R format (gzipped tarball on Linux/macOS, zip on Windows). On
+an `r-v*` tag it publishes one GitHub Release set (both source tarballs
+plus the three platform binaries) and runs a clean-room job that
+installs both packages from the release artifacts in a bare container
+with no checkout and no compiler.
 
 ## Releasing (lockstep)
 
-The R package and the Python wheel always ship the same version, built
+The R packages and the Python wheel always ship the same version, built
 from the same engine commit. Release X.Y.Z = two tags from one engine
-commit:
+commit (both front-end repos pin it as their submodule):
 
-1. `py-vX.Y.Z` on `pytauargus`: bump `tauargus-engine-rev`, build the
-   wheels, publish to PyPI, GitHub Release and GHCR.
-2. `r-vX.Y.Z` on this repo: the GitHub Release with the source package
-   and the three platform binaries.
+1. `py-vX.Y.Z` on `pytauargus`: the wheel pipeline builds self-contained
+   wheels, runs the test suites, and publishes to PyPI, GitHub Release
+   and GHCR.
+2. `r-vX.Y.Z` on `rtauargus.native`: the R pipeline publishes the
+   release set (both source tarballs plus the three platform
+   binaries).
 
 ## Supported platforms
 

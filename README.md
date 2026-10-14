@@ -26,8 +26,9 @@ The user-facing front-ends live in separate repos:
   (DataFrame API `protect()`, batch API, `tauargus` CLI) and the
   `pytauargus-tui` terminal UI. Its wheels bundle HiGHS and the engine,
   built from a pinned revision of this repo.
-- **[rtauargus](https://github.com/trygu/rtauargus)**: the R package
-  front-end over the thin R binding.
+- **[rtauargus.native](https://github.com/trygu/rtauargus.native)**: the
+  R package front-end over the thin R binding (a fork of INSEE's
+  `rtauargus`). It owns the R release pipeline for both R packages.
 
 ## Relationship to the original Tau-Argus
 
@@ -206,9 +207,10 @@ revision of this repo.
 The distributable R package `tauargusengine` is self-contained:
 `scripts/stage-r-package.sh` assembles it with the engine and HiGHS
 sources, and its configure script builds everything from the package's
-own sources at install time. Releases (source package plus platform
-binaries as GitHub Release files) run from `r-v*` tags via
-`.github/workflows/r-package.yml`. See
+own sources at install time. The script is reusable: the
+[rtauargus.native](https://github.com/trygu/rtauargus.native) repo pins
+this repo as a submodule and runs its release pipeline from this recipe
+on `r-v*` tags (one GitHub Release set with both R packages). See
 [Build and distribution](docs/build-and-distribution.md) for the full
 build chain across the three repos.
 

@@ -17,9 +17,10 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## In flight: 3-repo restructure (user directive, 2026-10-14)
 
-- [ ] P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev` as source of truth); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata; user then cuts `py-v0.5.3`.
-- [ ] P2 R repo: rename to `rtauargus.native` (repo + package); engine as pinned submodule; combined pipeline builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set; one tested install procedure for both; branch pushed.
-- [ ] P3 engine: remove `r-package.yml` once P2 is green; README ownership/dependency/install updates in all three repos; superseded docs removed.
+- [x] P2 R repo: repo + package renamed to `rtauargus.native`; engine as pinned submodule; combined `release.yml` builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set (clean-room two-package install on tags); `docs/compatibility.md`; master pushed.
+- [x] P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev`); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata (`engine_meta()`); local suite green (274 pass).
+- [x] P3 engine: `r-package.yml` removed (R releases move to the rtauargus.native pipeline); README/AGENTS/build-and-distribution updated for the 3-repo ownership.
+- [ ] P4: re-pin both front-end submodules to the final engine commit; verify the new pipelines green on all three repos; user then cuts `py-v0.5.3` (pytauargus) + `r-v0.5.3` (rtauargus.native) from the same engine commit.
 
 ## Watch items
 
