@@ -17,7 +17,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 - [x] A: engine owns the recipe: `engine/HiGHS-VERSION` (v1.15.1), versioned `find_package(Highs)` in csp/crp, CI + `scripts/dev-test.sh` read the file.
 - [x] B: `scripts/stage-r-package.sh` -> self-contained R source package (engine + HiGHS sources in `inst/`, configure builds in-package, static HiGHS, 4 bundled engine dylibs, rpath = @loader_path only, `tauargus_engine_meta()` provenance). Verified: tarball -> R CMD INSTALL -> smoke green, no build paths in the installed binaries.
-- [ ] C: `r-package.yml` CI: source + binary packages (ubuntu-24.04 / macos arm64 / windows, R 4.4), publish to GitHub Packages + Release, clean-room install job.
+- [x] C: `r-package.yml` CI: source + binary packages (ubuntu-24.04 / macos arm64 / windows, R 4.4.3), install-from-sources + smoke on each OS, clean-room container job (no checkout/compiler), publish to GitHub Packages + GitHub Release on `r-v*`. (First live run still pending: cut by the user on a tag.)
 - [ ] D: pytauargus: HiGHS tag read from pinned engine; pin bump.
 - [ ] E: rtauargus `native-engine`: tauargusengine minimum version, README install docs, CI test workflow installing tauargusengine from GHP (pinned).
 - [ ] F: docs: build chain per repo (engine `docs/build-and-distribution.md`, pytauargus README, rtauargus README); clean-room verification (Linux container).
