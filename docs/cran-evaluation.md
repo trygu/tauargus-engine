@@ -110,3 +110,9 @@ distribution for R users matters later, Posit Package Manager (P3M) is
 the standard alternative to CRAN for native packages. The build numbers
 above show the source is CRAN-ready on mechanics; only the license
 prevents a submission, and that is fixed by the derivation.
+
+## If the CRAN track resumes
+
+The CRAN policies (https://cran.r-project.org/web/packages/policies.html)
+are part of the submission requirements for that track; check them
+against both packages when the license question is resolved.
