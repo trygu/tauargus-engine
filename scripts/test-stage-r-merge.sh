@@ -71,6 +71,8 @@ check "binding src injected" \
     '[[ -f $FE/src/init.c && -f $FE/src/rta_engine.cpp && -f $FE/src/rta_meta.cpp && -f $FE/src/rta_csp.cpp && -f $FE/src/rta_hitas.cpp && -f $FE/src/rta_rounder.cpp ]]'
 check "provenance meta header generated" \
     'grep -q "RTA_META_ENGINE_SHA " $FE/src/rta_meta.h'
+check "init symbol renamed to the front-end" \
+    'grep -q "R_init_rtauargus.native" $FE/src/init.c && ! grep -q "R_init_tauargusengine" $FE/src/init.c'
 check "engine sources vendored" \
     '[[ -d $FE/engine/native/core/src && -d $FE/engine/native/rounder/src && -f $FE/engine/HiGHS-VERSION ]]'
 check "highs sources vendored" \

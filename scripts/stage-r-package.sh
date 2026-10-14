@@ -120,6 +120,14 @@ cp "$BINDING"/src/init.c "$BINDING"/src/rta.h "$BINDING"/src/rta_cpp.h \
    "$BINDING"/src/rta_hitas.cpp "$BINDING"/src/rta_rounder.cpp \
    "$BINDING"/src/rta_meta.cpp "$PKG_DIR/src/"
 
+# In merge mode the DLL entry point must carry the front-end package
+# name, or R loads the extension without registering the routines.
+if [[ -n "$MERGE_INTO" ]]; then
+    sed "s/R_init_tauargusengine/R_init_${PKG_NAME}/" \
+        "$PKG_DIR/src/init.c" > "$PKG_DIR/.init.staged"
+    mv "$PKG_DIR/.init.staged" "$PKG_DIR/src/init.c"
+fi
+
 # 2) Provenance header (overwrites the in-tree dev placeholder).
 HIGHS_VERSION="${HIGHS_TAG#v}"
 cat > "$PKG_DIR/src/rta_meta.h" <<EOF
