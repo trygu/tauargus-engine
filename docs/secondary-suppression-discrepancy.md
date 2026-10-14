@@ -226,10 +226,12 @@ the port.
 
 ## Reproduction and evidence
 
-The accompanying `/data/rtauargus-examples` includes unchanged
-original inputs, local Unix batch/metadata copies, reconstructed
-hierarchies, result tables, audit JSON, per-cell differences, a README
-and `run_repro.py`.
+The evidence pack lives outside the repo, in `tauargus-suppression-repro/`
+next to the engine checkout: `argus_files_orig.zip` (the user's
+original files) plus `rtauargus-examples/` (unchanged original inputs,
+local Unix batch/metadata copies, reconstructed hierarchies, result
+tables, audit JSON, per-cell differences, a README and
+`run_repro.py`).
 
 From its extracted directory:
 
