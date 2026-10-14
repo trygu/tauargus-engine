@@ -21,9 +21,12 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] D (engine side): pytauargus workflows read the HiGHS tag from the pinned engine checkout; pin bump to this engine commit in the pytauargus repo.
 - [x] E: rtauargus `native-engine`: `tauargusengine (>= 0.5.3)`, README install docs from the engine's GitHub Releases, `tests.yaml` + pkgdown install the pinned engine binary from the release files (no secrets; needs the `r-v*` release to exist). Verified locally: full rtauargus suite against the installed tauargusengine green (386 pass, 0 fail). Branch unpushed (CI red until the release exists).
 - [x] F (local): release-file install verified in a clean local environment: staged pkg -> source tarball + release-format binary -> fresh-library install -> inline smoke + slim installed tree (no bundled sources; configure discovers `highs-config.cmake`, moves engine sources to the build tree) + full rtauargus suite green.
-- [ ] F (live): CI verification in flight: `r-package.yml` dispatch (3-OS source install + clean-room) and pytauargus tests on the re-bumped pin (pin + 0.5.3 version bump happen on the final green engine commit, before the user cuts the tags).
+- [ ] F (live): CI runs 3+4 red on linux+windows. Root causes fixed in configure.R: R's system2 passes args unquoted (Windows: CMake generator split into three args; Unix: `-DCMAKE_INSTALL_RPATH=$ORIGIN` expanded to empty, so the engine .so files had no RUNPATH and rounder could not find libCRP.so) -> hand-quoted command lines on both platforms; R exports its own CXXFLAGS to configure (a distro-built R bakes in -Werror=format-security, which breaks the legacy engine sources) -> *FLAGS env vars cleared before the CMake builds; source tarball now built before the in-place install that consumes the bundled sources.
+- [ ] F (verify): container repro (ubuntu:24.04, R 4.3.3) of the Linux load failure with the fixes; local macOS re-verify; then commit + push + dispatch CI run 5 (3-OS source install + clean-room), and the pytauargus pin + 0.5.3 bump on the final green engine commit.
 
 ## Watch items
+
+- User report: secondary suppression differs from legacy tau-ARGUS on a real dataset (89 of 1631 cells): `docs/secondary-suppression-discrepancy.md`; blocked on the user's test setup (.arb, data, reference output).
 
 - [ ] Rejected-method refs: sdcTools `hypercube` (Fortran GHMIter, EUPL-1.1) for GH; NET -> Castro (UPC 2014).
 - 5008 on re-OPT w/ secondary suppression; GHCR/project rename; OPT/MOD deadline expiry; solver-strategy doc.

@@ -58,6 +58,14 @@ local({
       stop("g++ (Rtools MinGW toolchain) not found on PATH")
   }
 
+  # R CMD INSTALL exports CC/CFLAGS/CXX/CXXFLAGS/... from its own build for
+  # the configure script. The nested CMake builds must not inherit the flag
+  # variables: a distro-built R bakes in flags such as
+  # -Werror=format-security and -D_FORTIFY_SOURCE=3, which break the legacy
+  # engine sources. The compiler choices (CC/CXX) are kept.
+  for (v in c("CFLAGS", "CXXFLAGS", "FFLAGS", "FLIBS", "LDFLAGS", "CPPFLAGS"))
+    Sys.unsetenv(v)
+
   # Forward slashes everywhere: they survive both the shell and GNU make.
   sl <- function(p) gsub("\\\\", "/", p, fixed = TRUE)
   sl_highs_src  <- sl(highs_src)
@@ -69,9 +77,26 @@ local({
   sl_eng_lib    <- sl(eng_lib)
   sl_eng_bin    <- sl(eng_bin)
 
+  # R's system2 is unsafe for both platforms: on Unix it only shQuotes
+  # the command and passes the args to the shell unquoted (a -D flag
+  # containing $ORIGIN is expanded to an empty variable), and on Windows
+  # it does not quote multi-word args at all ("-G MinGW Makefiles"
+  # arrives as three arguments). Build the command line by hand with
+  # explicit quoting; cmake output streams to the install log and the
+  # exit status is returned.
+  q_win <- function(a) {
+    if (grepl("[ \\t\"']", a))
+      paste0("\"", gsub("\"", "\\\"", a, fixed = TRUE), "\"")
+    else a
+  }
+  q_posix <- function(a) paste0("'", gsub("'", "'\\''", a, fixed = TRUE), "'")
   run <- function(args) {
     cat(paste0("configure: cmake ", paste(args, collapse = " "), "\n"))
-    ok <- system2("cmake", args, stdout = 2, stderr = 2)
+    if (is_win)
+      line <- paste("cmake", paste(vapply(args, q_win, character(1)), collapse = " "))
+    else
+      line <- paste("cmake", paste(vapply(args, q_posix, character(1)), collapse = " "))
+    ok <- system(line)
     stop_if(ok != 0, "cmake failed (see output above)")
   }
 
@@ -205,6 +230,10 @@ local({
              if (is_mac) "" else " -pthread"))
   }
   writeLines(mv, file.path(pkg_root, "src", "Makevars"))
+  # Echo the generated Makevars: it is the single source of the native
+  # build flags, and install link/load failures without it are hard to
+  # diagnose.
+  writeLines(mv)
 
   # The bundled HiGHS sources have served their purpose (the engine and
   # the headers live in the build tree now); drop them from the package

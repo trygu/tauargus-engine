@@ -62,6 +62,18 @@ jobs:
             scripts/stage-r-package.sh
           fi
 
+      # The source package is platform-neutral; build it once (on linux).
+      # It must run before the install below: R CMD INSTALL runs configure
+      # in place on the staged directory, which consumes the bundled
+      # sources (inst/engine, inst/highs).
+      - name: Build the source package
+        if: matrix.osname == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/dist
+          (cd build/dist && R CMD build "$GITHUB_WORKSPACE/build/r-package/tauargusengine")
+
       # Install from the staged sources: configure builds HiGHS and the
       # engine from the package's own sources. The clean-room job later
       # verifies that no absolute build paths survive in the binaries.
@@ -89,15 +101,6 @@ jobs:
             # installed package directory.
             tar -czf "build/bin/${NAME}.tar.gz" -C "$RLIB" tauargusengine
           fi
-
-      # The source package is platform-neutral; build it once (on linux).
-      - name: Build the source package
-        if: matrix.osname == 'linux'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/dist
-          (cd build/dist && R CMD build "$GITHUB_WORKSPACE/build/r-package/tauargusengine")
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
