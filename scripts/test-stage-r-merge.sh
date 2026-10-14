@@ -72,9 +72,9 @@ check "binding src injected" \
 check "provenance meta header generated" \
     'grep -q "RTA_META_ENGINE_SHA " $FE/src/rta_meta.h'
 check "engine sources vendored" \
-    '[[ -d $FE/inst/engine/native/core/src && -d $FE/inst/engine/native/rounder/src && -f $FE/inst/engine/HiGHS-VERSION ]]'
+    '[[ -d $FE/engine/native/core/src && -d $FE/engine/native/rounder/src && -f $FE/engine/HiGHS-VERSION ]]'
 check "highs sources vendored" \
-    '[[ -d $FE/inst/highs/highs && -d $FE/inst/highs/extern ]]'
+    '[[ -d $FE/highs/highs && -d $FE/highs/extern ]]'
 check "configure set in place" \
     '[[ -x $FE/configure && -f $FE/configure.win && -f $FE/configure.R ]]'
 check "binding smoke test copied" \

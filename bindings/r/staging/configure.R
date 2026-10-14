@@ -23,8 +23,13 @@ local({
   # generated Makevars is consumed by make from src/.
   pkg_root   <- normalizePath(".", winslash = "/")
   build      <- file.path(pkg_root, "src", ".ta")
-  highs_src  <- file.path(pkg_root, "inst", "highs")
-  engine_src <- file.path(pkg_root, "inst", "engine")
+  # The bundled sources live in top-level directories (not inst/): R only
+  # installs the standard package directories, so they stay out of the
+  # installed package without configure having to remove them. That keeps
+  # configure read-only on the sources, which matters because R CMD build
+  # runs configure (via its temporary install) on the tree it tars.
+  highs_src  <- file.path(pkg_root, "highs")
+  engine_src <- file.path(pkg_root, "engine")
   highs_bld  <- file.path(build, "highs-build")
   engine_bld <- file.path(build, "engine-build")
   highs_pre  <- file.path(build, "highs")
@@ -32,8 +37,8 @@ local({
   eng_lib    <- file.path(engine_pre, "lib")
   eng_bin    <- file.path(engine_pre, "bin")
 
-  stop_if(!dir.exists(highs_src), "inst/highs (bundled HiGHS sources) is missing")
-  stop_if(!dir.exists(engine_src), "inst/engine (bundled engine sources) is missing")
+  stop_if(!dir.exists(highs_src), "highs/ (bundled HiGHS sources) is missing")
+  stop_if(!dir.exists(engine_src), "engine/ (bundled engine sources) is missing")
   if (is.null(Sys.which("cmake")))
     stop("cmake not found on PATH; install CMake >= 3.16 first")
 
@@ -146,14 +151,10 @@ local({
   run(c("--build", sl_engine_bld, "--parallel", jobs))
   run(c("--install", sl_engine_bld))
 
-  # 2b) Relocate the engine sources into the build tree. The Makevars
-  # include paths must point at the build tree, because the bundled
-  # sources are dropped from the package before R compiles src/ (inst/
-  # would otherwise be installed as package data).
-  engine_in_tree <- file.path(build, "engine-src")
-  stop_if(!file.rename(file.path(pkg_root, "inst", "engine"), engine_in_tree),
-          "could not move inst/engine into the build tree")
-  sl_engine_in_tree <- sl(engine_in_tree)
+  # 2b) The bundled engine sources stay where they are; the Makevars
+  # include paths point at the sources directly (configure is read-only
+  # on them, so the tree survives R CMD build's temporary install).
+  engine_in_tree <- sl_engine_src
 
   # 3) Stage the engine runtime libs into inst/libs -> installed <pkg>/libs.
   # On Windows R installs the package DLL into libs/x64/ and, when it
@@ -188,7 +189,7 @@ local({
   # 4) Generate src/Makevars. Paths are build-time only; the runtime lookup
   # is relative to the installed package (rpath below / DLL dir on Windows).
   inc <- c(vapply(c("core", "csp", "hitas", "rounder"),
-                  function(m) file.path(sl_engine_in_tree, "native", m, "src"),
+                  function(m) file.path(sl_engine_src, "native", m, "src"),
                   character(1)),
            file.path(sl_highs_pre, "include", "highs"))
 
@@ -240,11 +241,6 @@ local({
   # build flags, and install link/load failures without it are hard to
   # diagnose.
   writeLines(mv)
-
-  # The bundled HiGHS sources have served their purpose (the engine and
-  # the headers live in the build tree now); drop them from the package
-  # being installed so inst/ is not installed as package data.
-  unlink(file.path(pkg_root, "inst", "highs"), recursive = TRUE)
 
   cat("configure: bundled engine built; Makevars written.\n")
 })

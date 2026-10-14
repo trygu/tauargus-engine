@@ -2,7 +2,7 @@
 # Assemble the self-contained tauargusengine R source package.
 #
 # The staged package carries the binding sources plus the native engine
-# sources (inst/engine) and the pinned HiGHS sources (inst/highs). Its
+# sources (engine/) and the pinned HiGHS sources (highs/). Its
 # configure script builds everything from the package's own sources at
 # install time, so no engine checkout, engine/build/lib or prebuilt engine
 # is needed downstream. This script only assembles files; it does not
@@ -23,7 +23,7 @@
 #
 # Merge mode (--merge-into): instead of assembling a standalone
 # tauargusengine package, compose the native layer (binding R code, src/,
-# configure, inst/engine, inst/highs, provenance) into an existing
+# configure, engine/, highs/, provenance) into an existing
 # front-end package (the rtauargus.native checkout) so the release ships
 # one self-contained package. The front-end keeps its own name, version
 # and R code; its NAMESPACE and DESCRIPTION are patched in place, and the
@@ -95,7 +95,7 @@ else
     PKG_DIR="$OUT/tauargusengine"
     rm -rf "$OUT"
 fi
-mkdir -p "$PKG_DIR/src" "$PKG_DIR/inst/engine" "$PKG_DIR/inst/highs"
+mkdir -p "$PKG_DIR/src" "$PKG_DIR/engine" "$PKG_DIR/highs"
 
 # 1) Binding: R code, C/C++ sources, tests.
 if [[ -n "$MERGE_INTO" ]]; then
@@ -167,7 +167,7 @@ if [[ -n "$MERGE_INTO" ]]; then
     cat >> "$PKG_DIR/LICENSE" <<EOF
 
 ---
-The bundled native sources (src/, inst/engine, inst/highs, configure,
+The bundled native sources (src/, engine/, highs/, configure,
 configure.win, configure.R) belong to tauargus-engine
 (https://github.com/trygu/tauargus-engine) and are licensed under EUPL-1.2.
 EOF
@@ -208,15 +208,15 @@ chmod +x "$PKG_DIR/configure"
 
 # 5) Native engine sources (same tree and CMake recipes the superbuild uses).
 cp "$ENGINE_DIR/engine/CMakeLists.txt" "$ENGINE_DIR/engine/HiGHS-VERSION" \
-   "$PKG_DIR/inst/engine/"
+   "$PKG_DIR/engine/"
 for m in core csp hitas crp rounder; do
-    mkdir -p "$PKG_DIR/inst/engine/native/$m"
-    cp "$ENGINE_DIR/engine/native/$m/CMakeLists.txt" "$PKG_DIR/inst/engine/native/$m/"
-    cp -R "$ENGINE_DIR/engine/native/$m/src" "$PKG_DIR/inst/engine/native/$m/src"
+    mkdir -p "$PKG_DIR/engine/native/$m"
+    cp "$ENGINE_DIR/engine/native/$m/CMakeLists.txt" "$PKG_DIR/engine/native/$m/"
+    cp -R "$ENGINE_DIR/engine/native/$m/src" "$PKG_DIR/engine/native/$m/src"
     # Other build-input files at the module top level (e.g. hitas/ErrorStrings.txt)
     find "$ENGINE_DIR/engine/native/$m" -maxdepth 1 -type f \
         ! -name "CMakeLists.txt" ! -name "README.md" \
-        -exec cp {} "$PKG_DIR/inst/engine/native/$m/" \;
+        -exec cp {} "$PKG_DIR/engine/native/$m/" \;
 done
 
 # 6) HiGHS sources at the pinned tag (library build subset; the app and
@@ -225,10 +225,10 @@ done
 for f in CMakeLists.txt Version.txt highs.pc.in LICENSE.txt AUTHORS \
          CITATION.cff README.md CODE_OF_CONDUCT.md CONTRIBUTING.md \
          FEATURES.md THIRD_PARTY_NOTICES.md; do
-    [[ -f "$HIGHS_SRC/$f" ]] && cp "$HIGHS_SRC/$f" "$PKG_DIR/inst/highs/" || true
+    [[ -f "$HIGHS_SRC/$f" ]] && cp "$HIGHS_SRC/$f" "$PKG_DIR/highs/" || true
 done
 cp -R "$HIGHS_SRC/cmake" "$HIGHS_SRC/highs" "$HIGHS_SRC/extern" \
-   "$HIGHS_SRC/app" "$HIGHS_SRC/examples" "$PKG_DIR/inst/highs/"
+   "$HIGHS_SRC/app" "$HIGHS_SRC/examples" "$PKG_DIR/highs/"
 
 echo "staged: $PKG_DIR"
 echo "  engine: $ENGINE_SHA (HiGHS $HIGHS_TAG)"
