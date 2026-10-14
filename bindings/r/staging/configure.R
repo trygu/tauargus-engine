@@ -156,7 +156,12 @@ local({
   sl_engine_in_tree <- sl(engine_in_tree)
 
   # 3) Stage the engine runtime libs into inst/libs -> installed <pkg>/libs.
-  libs_dir <- file.path(pkg_root, "inst", "libs")
+  # On Windows R installs the package DLL into libs/x64/ and, when it
+  # loads the DLL, searches that directory for the DLL's dependencies
+  # (it prepends the DLL's own directory to PATH and passes it as the
+  # dyn.load DLLpath). The engine DLLs must sit next to it.
+  libs_dir <- if (is_win) file.path(pkg_root, "inst", "libs", "x64")
+              else file.path(pkg_root, "inst", "libs")
   unlink(libs_dir, recursive = TRUE)
   dir.create(libs_dir, recursive = TRUE, showWarnings = FALSE)
 
