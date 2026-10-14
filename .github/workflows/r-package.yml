@@ -3,12 +3,14 @@
 # - build: stage the self-contained source package (engine + HiGHS sources),
 #   install it from scratch (its configure builds the native libs from the
 #   package's own sources), run the binding smoke test, and repackage the
-#   installed package as a platform binary tarball.
+#   installed package as a platform binary (gzipped tarball on
+#   Linux/macOS, zip on Windows; names carry platform, arch and R version).
 # - clean-room: on a bare ubuntu:24.04 container with no checkout, no
 #   compiler and no engine build, install the Linux binary and run the
 #   smoke test from the installed package.
-# - publish (r-v* tags only): upload the source package to the GitHub
-#   Packages registry and attach source + binaries to a GitHub Release.
+# - publish (r-v* tags only): attach the source package and the three
+#   platform binaries to a GitHub Release. The release files are the only
+#   distribution channel (no separate R package registry).
 #
 # Releases are lockstep with the Python binding: the same version ships as
 # py-vX.Y.Z in the pytauargus repo (see AGENTS.md, Releasing).
@@ -76,8 +78,17 @@ jobs:
           R_LIBS="$RLIB" Rscript build/r-package/tauargusengine/tests/test_binding_smoke.R
           mkdir -p build/bin
           VER="$(awk -F': ' '/^Version:/{print $2; exit}' build/r-package/tauargusengine/DESCRIPTION)"
-          tar -czf "build/bin/tauargusengine_${VER}_${{ matrix.osname }}-${{ matrix.arch }}.tar.gz" \
-            -C "$RLIB" tauargusengine
+          RVER="$(Rscript -e 'cat(R.version$major, ".", R.version$minor, sep = "")')"
+          NAME="tauargusengine_${VER}_r${RVER}_${{ matrix.osname }}-${{ matrix.arch }}"
+          if [ "${{ matrix.osname }}" = "windows" ]; then
+            # Standard R Windows binary format: a zip of the installed
+            # package directory (bsdtar picks the format from -a).
+            tar -a -c -f "build/bin/${NAME}.zip" -C "$RLIB" tauargusengine
+          else
+            # Standard R Linux/macOS binary format: gzipped tarball of the
+            # installed package directory.
+            tar -czf "build/bin/${NAME}.tar.gz" -C "$RLIB" tauargusengine
+          fi
 
       # The source package is platform-neutral; build it once (on linux).
       - name: Build the source package
@@ -92,7 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bin-${{ matrix.osname }}-${{ matrix.arch }}
-          path: build/bin/tauargusengine_*.tar.gz
+          path: build/bin/tauargusengine_*
 
       - name: Upload source
         if: matrix.osname == 'linux'
@@ -129,7 +140,18 @@ jobs:
           RLIB="$(mktemp -d)/Rlib"
           mkdir -p "$RLIB"
           R CMD INSTALL --library="$RLIB" pkg/tauargusengine_*.tar.gz
-          R_LIBS="$RLIB" Rscript "$RLIB/tauargusengine/tests/test_binding_smoke.R"
+          # tests/ is not part of an installed package, so the smoke
+          # runs inline from the installed library only.
+          R_LIBS="$RLIB" Rscript -e '
+            library(tauargusengine)
+            engine <- new_tauargus()
+            version <- tauargus_version(engine)
+            stopifnot(nchar(version) > 0L)
+            stopifnot(!is.null(new_hitas()), !is.null(new_rounder()))
+            meta <- tauargus_engine_meta()
+            stopifnot(!is.na(meta[["engine_sha"]]),
+                      nchar(meta[["highs_version"]]) > 0L)
+            cat("clean-room smoke ok:", version, "\n")'
 
           # No build paths may be referenced by the loaded objects.
           LDD="$(ldd "$RLIB/tauargusengine/libs/tauargusengine.so")"
@@ -141,13 +163,12 @@ jobs:
           echo "clean-room: ok"
 
   publish:
-    name: publish (GitHub Packages + Release)
+    name: publish (GitHub Release)
     needs: build
     if: startsWith(github.ref, 'refs/tags/r-v')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      packages: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -166,34 +187,31 @@ jobs:
           fi
           echo "version: $VER"
 
-      - name: Publish source package to GitHub Packages
-        run: |
-          set -euo pipefail
-          curl -sfS -X POST "https://packages.github.com/trygu" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/json" \
-            --data-binary "@dist/source/tauargusengine_*.tar.gz" > /dev/null
-          echo "published to https://packages.github.com/trygu"
-
       - name: GitHub Release with source + binaries
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/source/*.tar.gz
-            dist/bin-linux-x86_64/*.tar.gz
-            dist/bin-macos-arm64/*.tar.gz
-            dist/bin-windows-x86_64/*.tar.gz
+            dist/bin-linux-x86_64/*
+            dist/bin-macos-arm64/*
+            dist/bin-windows-x86_64/*
           generate_release_notes: true
           body: |
             Self-contained `tauargusengine` R package. `tauargus_engine_meta()`
-            reports the exact engine SHA and HiGHS version this build came from.
+            reports the exact engine SHA and HiGHS version this build came
+            from. These release files are the distribution channel; install
+            the one that matches your platform.
 
-            Install (source; needs CMake >= 3.16 and a C++11 compiler):
+            Binary (no compiler; R 4.4.3):
 
-                install.packages("tauargusengine",
-                    repos = c(trygu = "https://<PAT>@packages.github.com/trygu"))
+                install.packages(
+                  "https://github.com/trygu/tauargus-engine/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z_r4.4.3_linux-x86_64.tar.gz",
+                  repos = NULL, type = "binary")
 
-            Install (binary; no compiler, pick the platform file):
+            (macOS: ..._macos-arm64.tar.gz; Windows: ..._windows-x86_64.zip)
 
-                install.packages("<url of this release's platform tarball>",
-                    repos = NULL, type = "binary")
+            Source (any platform; needs CMake >= 3.16 and a C++11 compiler):
+
+                install.packages(
+                  "https://github.com/trygu/tauargus-engine/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z.tar.gz",
+                  repos = NULL)

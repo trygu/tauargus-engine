@@ -78,19 +78,27 @@ resolves its libraries relative to the installation
 (`@loader_path`/`$ORIGIN`, the DLL directory on Windows). The installed
 package references no build-machine path.
 
-Install the source package (needs CMake >= 3.16 and a C++11 compiler):
+Install from a GitHub Release of this repo. The release files are the
+distribution channel; pick the one that matches your platform (names
+carry version, R version, platform and architecture):
 
-```r
-install.packages("tauargusengine",
-    repos = c(trygu = "https://<PAT>@packages.github.com/trygu"))
-```
-
-Install a binary package (no compiler):
+Binary (no compiler; R 4.4.3):
 
 ```r
 install.packages(
-    "https://github.com/trygu/tauargus-engine/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z_<platform>.tar.gz",
+    "https://github.com/trygu/tauargus-engine/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z_r4.4.3_linux-x86_64.tar.gz",
     repos = NULL, type = "binary")
+```
+
+On macOS use `..._macos-arm64.tar.gz`, on Windows
+`..._windows-x86_64.zip` (the standard R zip binary format).
+
+Source (any platform; needs CMake >= 3.16 and a C++11 compiler):
+
+```r
+install.packages(
+    "https://github.com/trygu/tauargus-engine/releases/download/r-vX.Y.Z/tauargusengine_X.Y.Z.tar.gz",
+    repos = NULL)
 ```
 
 `tauargus_engine_meta()` reports the exact engine SHA, submodule pins
@@ -103,11 +111,13 @@ on `r-v*` tags:
 
 - builds and installs the staged package on ubuntu-24.04, macos-15 and
   windows-2022 (R 4.4.3) and runs the binding smoke test;
-- repackages each installed package as a platform binary tarball;
-- on a tag: publishes the source package to the GitHub Packages
-  registry, attaches source + binaries to a GitHub Release, and runs a
-  clean-room job that installs the Linux binary in a bare container
-  with no checkout and no compiler.
+- repackages each installed package as a platform binary in the
+  standard R format (gzipped tarball on Linux/macOS, zip on Windows),
+  named with version, R version, platform and architecture;
+- on a tag: attaches the source package and the three platform
+  binaries to a GitHub Release, and runs a clean-room job that
+  installs the Linux binary in a bare container with no checkout and
+  no compiler.
 
 ## Releasing (lockstep)
 
@@ -117,8 +127,8 @@ commit:
 
 1. `py-vX.Y.Z` on `pytauargus`: bump `tauargus-engine-rev`, build the
    wheels, publish to PyPI, GitHub Release and GHCR.
-2. `r-vX.Y.Z` on this repo: publish `tauargusengine` X.Y.Z to the
-   GitHub Packages registry and the GitHub Release with the binaries.
+2. `r-vX.Y.Z` on this repo: the GitHub Release with the source package
+   and the three platform binaries.
 
 ## Supported platforms
 

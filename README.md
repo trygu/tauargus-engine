@@ -206,8 +206,8 @@ revision of this repo.
 The distributable R package `tauargusengine` is self-contained:
 `scripts/stage-r-package.sh` assembles it with the engine and HiGHS
 sources, and its configure script builds everything from the package's
-own sources at install time. Releases (source package to GitHub
-Packages, binaries on GitHub Releases) run from `r-v*` tags via
+own sources at install time. Releases (source package plus platform
+binaries as GitHub Release files) run from `r-v*` tags via
 `.github/workflows/r-package.yml`. See
 [Build and distribution](docs/build-and-distribution.md) for the full
 build chain across the three repos.

@@ -81,16 +81,37 @@ local({
   run(c("--install", sl_highs_bld))
 
   # 2) Engine superbuild, installed with a package-relative rpath.
+  # HiGHS installs its CMake package at <prefix>/<LIBDIR>/cmake/highs,
+  # and LIBDIR is lib or lib64 depending on the platform, so locate the
+  # installed config instead of assuming the directory.
+  cfg_hits <- list.files(highs_pre, pattern = "^highs-config\\.cmake$",
+                         recursive = TRUE, full.names = TRUE)
+  stop_if(length(cfg_hits) != 1L,
+          paste("expected exactly one highs-config.cmake under",
+                sl_highs_pre, "; found:", length(cfg_hits)))
+  # The config sits at <prefix>/<LIBDIR>/cmake/highs; derive LIBDIR from it
+  # (it is lib on most platforms, lib64 on some).
+  highs_cmakedir <- dirname(cfg_hits[[1]])
+  highs_libdir <- dirname(dirname(highs_cmakedir))
   engine_rpath <- if (is_mac) "@loader_path" else if (is_win) NULL else "$ORIGIN"
   e_args <- c("-S", sl_engine_src, "-B", sl_engine_bld, gen,
               "-DCMAKE_BUILD_TYPE=Release",
-              paste0("-DHighs_DIR=", file.path(sl_highs_pre, "lib", "cmake", "highs")),
+              paste0("-DHighs_DIR=", sl(highs_cmakedir)),
               paste0("-DCMAKE_INSTALL_PREFIX=", sl_engine_pre))
   if (!is.null(engine_rpath))
     e_args <- c(e_args, paste0("-DCMAKE_INSTALL_RPATH=", engine_rpath))
   run(e_args)
   run(c("--build", sl_engine_bld, "--parallel", jobs))
   run(c("--install", sl_engine_bld))
+
+  # 2b) Relocate the engine sources into the build tree. The Makevars
+  # include paths must point at the build tree, because the bundled
+  # sources are dropped from the package before R compiles src/ (inst/
+  # would otherwise be installed as package data).
+  engine_in_tree <- file.path(build, "engine-src")
+  stop_if(!file.rename(file.path(pkg_root, "inst", "engine"), engine_in_tree),
+          "could not move inst/engine into the build tree")
+  sl_engine_in_tree <- sl(engine_in_tree)
 
   # 3) Stage the engine runtime libs into inst/libs -> installed <pkg>/libs.
   libs_dir <- file.path(pkg_root, "inst", "libs")
@@ -119,7 +140,7 @@ local({
   # 4) Generate src/Makevars. Paths are build-time only; the runtime lookup
   # is relative to the installed package (rpath below / DLL dir on Windows).
   inc <- c(vapply(c("core", "csp", "hitas", "rounder"),
-                  function(m) file.path(sl_engine_src, "native", m, "src"),
+                  function(m) file.path(sl_engine_in_tree, "native", m, "src"),
                   character(1)),
            file.path(sl_highs_pre, "include", "highs"))
 
@@ -143,7 +164,7 @@ local({
              paste(vapply(inc, function(d) paste0("-I", d), character(1)),
                    collapse = " ")),
       paste0("PKG_LIBS = -libpath:", sl_eng_lib, " -libpath:",
-             sl(file.path(highs_pre, "lib")),
+             sl(highs_libdir),
              paste(imp, collapse = " "),
              " -ltauargus_core -lhighs"))
   } else {
@@ -159,11 +180,16 @@ local({
       paste0("PKG_LIBS = ",
              paste(vapply(shared_paths, sl, character(1)), collapse = " "),
              " -L", sl_eng_lib, " -ltauargus_core",
-             " -L", sl(file.path(highs_pre, "lib")), " -lhighs",
+             " -L", sl(highs_libdir), " -lhighs",
              " -Wl,-rpath,", install_rpath,
              if (is_mac) "" else " -pthread"))
   }
   writeLines(mv, file.path(pkg_root, "src", "Makevars"))
+
+  # The bundled HiGHS sources have served their purpose (the engine and
+  # the headers live in the build tree now); drop them from the package
+  # being installed so inst/ is not installed as package data.
+  unlink(file.path(pkg_root, "inst", "highs"), recursive = TRUE)
 
   cat("configure: bundled engine built; Makevars written.\n")
 })

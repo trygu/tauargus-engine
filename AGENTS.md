@@ -98,10 +98,11 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 - Release X.Y.Z = two tags cut from one engine commit:
   1. `py-vX.Y.Z` on the `pytauargus` repo: bump `tauargus-engine-rev` to
      the engine commit; wheels to PyPI, GitHub Release and GHCR.
-  2. `r-vX.Y.Z` on this repo: stage the R package (version X.Y.Z),
-     publish the source package to the GitHub Packages registry and the
-     source + binary packages as a GitHub Release (see
-     `docs/build-and-distribution.md`).
+  2. `r-vX.Y.Z` on this repo: the GitHub Release with the source package
+     and the platform binaries (standard R formats: gzipped tarball on
+     Linux/macOS, zip on Windows; names carry version, R version,
+     platform and architecture). See
+     `docs/build-and-distribution.md`.
 - Commit and push the engine change here first, then cut both tags.
   Release tags are cut by the user, not the agent.
 
