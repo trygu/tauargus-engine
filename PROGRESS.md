@@ -17,11 +17,11 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## In flight: 3-repo restructure (user directive, 2026-10-14)
 
-- [x] P2 R repo: repo + package renamed to `rtauargus.native`; engine as pinned submodule; combined `release.yml` builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set (clean-room two-package install on tags); `docs/compatibility.md`; master pushed.
-- [x] P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev`); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata (`engine_meta()`); local suite green (274 pass).
+- [x] P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev`); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata (`engine_meta()`); CI green at `483d12f`.
+- [x] P2 R repo: repo + package renamed to `rtauargus.native`; engine as pinned submodule; combined `release.yml` builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set (clean-room + publish on tags); `docs/compatibility.md`.
 - [x] P3 engine: `r-package.yml` removed (R releases move to the rtauargus.native pipeline); README/AGENTS/build-and-distribution updated for the 3-repo ownership.
-- [x] P4 re-pin: both front-end submodules at the final engine commit `a68a76f`; pytauargus CI green at `483d12f` (submodule checkout flow proven live).
-- [ ] P5: first green run of the rtauargus.native `release.yml` (linux/macos/windows + full suite); then the user cuts `py-v0.5.3` on pytauargus `483d12f` + `r-v0.5.3` on the rtauargus.native tip from the same engine commit.
+- [x] P4+P5: both front-end submodules at engine `a68a76f`; R release pipeline green on linux/macos/windows with the full test suite (run 38604830619); R release binaries are R 4.5.3 (`..._r4.5.3_...`), chosen so front-end dependencies install as CRAN binaries.
+- Release ready: user cuts `py-v0.5.3` on pytauargus `483d12f` + `r-v0.5.3` on rtauargus.native `ff1c431` (same engine commit; the R tag also runs the clean-room install + the GitHub Release).
 
 ## Watch items
 
