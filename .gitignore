@@ -1,6 +1,7 @@
 /nbproject/private/
 /build/
 /dist/
+/*.tar.gz
 /*.log
 /*.dat
 /*.lp

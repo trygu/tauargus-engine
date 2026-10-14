@@ -29,6 +29,9 @@ SEXP rta_tauargus_new(void);
 SEXP rta_hitas_new(void);
 SEXP rta_rounder_new(void);
 
+/* build provenance (see rta_meta.h) */
+SEXP rta_engine_meta(void);
+
 /* -- TauArgus ----------------------------------------------------------- */
 SEXP rta_tau_version(SEXP self);
 SEXP rta_tau_error_string(SEXP self, SEXP code);

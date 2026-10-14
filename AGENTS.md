@@ -92,12 +92,18 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 
 ## 7. Releasing
 
-- This repo has no package release. Wheels, the PyPI publish, the GitHub
-  Release and the GHCR image are built by the `pytauargus` repo from a pinned
-  revision of this repo.
-- To advance the pin (only when the user asks): commit and push the engine
-  change here first, then update `tauargus-engine-rev` in the pytauargus repo
-  to the new commit and release there.
+- Lockstep versioning: the R package (`tauargusengine`) and the Python
+  wheel (`pytauargus`) always ship the same version, built from the same
+  engine commit. Never release one without the other.
+- Release X.Y.Z = two tags cut from one engine commit:
+  1. `py-vX.Y.Z` on the `pytauargus` repo: bump `tauargus-engine-rev` to
+     the engine commit; wheels to PyPI, GitHub Release and GHCR.
+  2. `r-vX.Y.Z` on this repo: stage the R package (version X.Y.Z),
+     publish the source package to the GitHub Packages registry and the
+     source + binary packages as a GitHub Release (see
+     `docs/build-and-distribution.md`).
+- Commit and push the engine change here first, then cut both tags.
+  Release tags are cut by the user, not the agent.
 
 ## 8. Communication
 

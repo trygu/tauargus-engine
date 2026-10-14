@@ -1,0 +1,5 @@
+^src/\.ta
+^src/.*\.(o|so|dll|dylib|a|lib|obj)$
+^inst/libs
+^.*\.Rproj$
+^\.Rproj\.user

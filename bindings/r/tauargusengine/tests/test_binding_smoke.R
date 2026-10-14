@@ -20,4 +20,9 @@ rounder <- new_rounder()
 stopifnot(inherits(hitas, "hitas_ctrl") || !is.null(hitas))
 stopifnot(!is.null(rounder))
 
+meta <- tauargus_engine_meta()
+stopifnot(is.character(meta), !is.na(meta[["engine_sha"]]))
+stopifnot(!is.na(meta[["highs_version"]]), nchar(meta[["highs_version"]]) > 0L)
+
 cat("tauargusengine binding smoke ok:", version, "\n")
+cat("engine meta:", meta[["engine_sha"]], "| HiGHS", meta[["highs_version"]], "\n")

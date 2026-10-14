@@ -19,6 +19,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"rta_hitas_new",    (DL_FUNC) &rta_hitas_new,    0},
     {"rta_rounder_new",  (DL_FUNC) &rta_rounder_new,  0},
 
+    /* build provenance */
+    {"rta_engine_meta",  (DL_FUNC) &rta_engine_meta,  0},
+
     /* TauArgus: metadata / errors */
     {"rta_tau_version",    (DL_FUNC) &rta_tau_version,    1},
     {"rta_tau_error_string", (DL_FUNC) &rta_tau_error_string, 2},

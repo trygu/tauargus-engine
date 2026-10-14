@@ -4,6 +4,9 @@ export(new_tauargus)
 export(new_hitas)
 export(new_rounder)
 
+# build provenance
+export(tauargus_engine_meta)
+
 # TauArgus
 export(tauargus_version)
 export(tauargus_error_string)

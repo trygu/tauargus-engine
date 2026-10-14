@@ -1,0 +1,15 @@
+@echo off
+rem tauargusengine: build the bundled native sources (see configure.R).
+rem
+rem Runs during R CMD INSTALL, before the package C++ is compiled. R CMD
+rem INSTALL has put the Rtools toolchain (gcc, cmake if present) on PATH.
+setlocal
+
+for /f "usebackq delims=" %%i in (`R RHOME`) do set "R_HOME=%%i"
+if not defined R_HOME set "R_HOME=C:\Program Files\R"
+
+"%R_HOME%\bin\Rscript.exe" configure.R
+if errorlevel 1 (
+    echo configure.win: building the bundled engine failed >&2
+    exit /b 1
+)

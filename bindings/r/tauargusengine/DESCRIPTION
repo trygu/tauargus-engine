@@ -1,9 +1,9 @@
 Package: tauargusengine
 Title: Native R Bindings to the Tau-Argus SDC Engine
-Version: 0.1.0
+Version: 0.5.3
 Authors@R: c(
-    person("Trygve", "Kleven", role = c("aut", "cre"),
-           email = "trygve@example.com")
+    person("Trygve", "Falch", role = c("aut", "cre"),
+           email = "trygve.falch@gmail.com")
   )
 Description: Thin C/C++ interface to the 'tauargus-engine' native
     statistical-disclosure-control libraries (core, csp, hitas, crp,
@@ -15,7 +15,10 @@ License: EUPL-1.2
 Encoding: UTF-8
 NeedsCompilation: yes
 SystemRequirements: A C++ compiler, a prebuilt 'tauargus-engine'
-    (engine/build/lib) and HiGHS (>= 1.x).
+    (engine/build/lib) and HiGHS at the version pinned in
+    engine/HiGHS-VERSION. (The distributable package, staged with
+    scripts/stage-r-package.sh, is self-contained and builds its own
+    copies of the engine and HiGHS.)
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
