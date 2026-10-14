@@ -2,7 +2,9 @@
 
 **Status:** reproduced on published `pytauargus` 0.5.2; the cost
 defaults are identified as a major cause; three residual cell
-differences remain with explicit legacy-equivalent costs. No library
+differences remain with explicit legacy-equivalent costs. Main
+hypothesis (unconfirmed): Modular's integer weight scaling makes
+different costs indistinguishable in the optimization. No library
 fix has been made.
 **Recorded:** 2026-10-14.
 
@@ -146,6 +148,48 @@ INTERMEDIATE values and statuses. Investigate the format-4 export
 path and its arguments separately; this is not evidence of incorrect
 input values in the suppression model.
 
+## Main hypothesis for the residual differences (unconfirmed)
+
+Cost scaling and solution choice inside Modular. The hypothesis is
+concrete but not a confirmed explanation.
+
+The hitas port computes the MIP weights for each subtable in
+`AMiscFunc.cpp`:
+
+- `AdjustMarginalWeights` (lines 267-312): marginal cells get an added
+  weight derived from the largest interior cost and the dimension
+  sizes, so marginals cost more than interior cells.
+- All costs are then scaled by `fac = MAXWEIGHT / Tab.costs[0]`
+  (`ScaleMarginalWeights`, lines 314-330; `MAXWEIGHT` defaults to
+  `20000` in `Amyio.cpp:148`).
+- Each cell's optimization weight is
+  `Tab.weight[m] = (int) ceil(Tab.costs[m])`: the scaled cost rounded
+  **up** to an integer.
+
+Consequences, if this hypothesis holds:
+
+- Different original costs can map to the same integer weight, so the
+  optimization cannot distinguish them.
+- The scaling factor depends on the total cell cost; a small input
+  difference changes `fac` and therefore the rounded weights of every
+  cell in the subtable.
+- The residual aggregate difference is consistent with near-tie
+  solutions: the secondary response sums differ by `149777`, about
+  0.01 percent of `1471468986`.
+
+Because the weights are computed deterministically from the input
+costs, identical input costs should give identical weights and hence
+identical subtable models. The residual difference is then either
+(a) several equally weighted optimal patterns, with CPLEX and HiGHS
+choosing different ones, or (b) a model or computation difference
+between the legacy libTauHiTaS 4.3.2.1 and our port. Step 4 below
+distinguishes the two cases.
+
+Decision: do not force the same three suppressions until the cause is
+known. If the models are identical, accept the differing patterns and
+verify cost and protection; if the models or computations differ, fix
+the port.
+
 ## Comparison caveats from Oyvind
 
 - Different status letters are not themselves suppression
@@ -170,8 +214,9 @@ input values in the suppression model.
    costs before suppression as well as the final result.
 4. Locate the first divergent Modular subproblem around C28 with
    identical cost inputs. Compare subtable ordering, solver models,
-   optimal objectives, bounds, tolerances, time limits, and stop
-   reasons.
+   the integer weights after scaling and `ceil` rounding (see the
+   main hypothesis), optimal objectives, bounds, tolerances, time
+   limits, and stop reasons.
 5. Audit both final patterns with equivalent settings, and audit a
    fixed identical pattern to test interval calculations
    independently of suppression selection.
