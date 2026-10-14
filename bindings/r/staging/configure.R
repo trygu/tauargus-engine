@@ -41,6 +41,23 @@ local({
   is_mac <- identical(Sys.info()[["sysname"]], "Darwin")
   jobs   <- as.character(max(2L, parallel::detectCores()))
 
+  # On Windows the CMake "MinGW Makefiles" generator requires the Rtools
+  # g++ on PATH, and R CMD INSTALL does not always put the compiler
+  # directory there for configure scripts. Add it explicitly.
+  if (is_win && is.null(Sys.which("g++"))) {
+    for (rt in c(Sys.getenv("RTOOLS44_HOME"), Sys.getenv("RTOOLS43_HOME"),
+                 "C:/Rtools44", "C:/Rtools")) {
+      bin <- file.path(rt, "mingw64", "bin")
+      if (nzchar(rt) && dir.exists(bin)) {
+        Sys.setenv(PATH = paste(bin, Sys.getenv("PATH"),
+                                sep = .Platform$path.sep))
+        break
+      }
+    }
+    if (is.null(Sys.which("g++")))
+      stop("g++ (Rtools MinGW toolchain) not found on PATH")
+  }
+
   # Forward slashes everywhere: they survive both the shell and GNU make.
   sl <- function(p) gsub("\\\\", "/", p, fixed = TRUE)
   sl_highs_src  <- sl(highs_src)
@@ -172,6 +189,9 @@ local({
     # R DLL is their install_name (@rpath/...), so the only rpath the
     # installed package needs is the package-relative one below. No
     # build-machine path survives in the binary.
+    # Quoted in the Makevars recipe: make collapses $$ to $, and without
+    # the quotes the shell would expand $ORIGIN to an empty variable
+    # before the linker ever sees it.
     install_rpath <- if (is_mac) "@loader_path" else "$$ORIGIN"
     mv <- c(mv,
       paste0("PKG_CPPFLAGS = ",
@@ -181,7 +201,7 @@ local({
              paste(vapply(shared_paths, sl, character(1)), collapse = " "),
              " -L", sl_eng_lib, " -ltauargus_core",
              " -L", sl(highs_libdir), " -lhighs",
-             " -Wl,-rpath,", install_rpath,
+             " -Wl,-rpath,'", install_rpath, "'",
              if (is_mac) "" else " -pthread"))
   }
   writeLines(mv, file.path(pkg_root, "src", "Makevars"))
