@@ -87,8 +87,8 @@ check "front-end tests kept" \
     '[[ -f $FE/tests/testthat/test_front.R && -f $FE/tests/testthat.R ]]'
 check "NAMESPACE: import(tauargusengine) removed" \
     '! grep -q "^import(tauargusengine)$" $FE/NAMESPACE'
-check "NAMESPACE: useDynLib points at the front-end" \
-    'grep -q "^useDynLib(rtauargus_native, .registration = TRUE)$" $FE/NAMESPACE'
+check "NAMESPACE: useDynLib points at the front-end (dot form)" \
+    'grep -q "^useDynLib(rtauargus.native, .registration = TRUE)$" $FE/NAMESPACE'
 check "NAMESPACE: binding exports kept" \
     'grep -q "^export(new_hitas)$" $FE/NAMESPACE && grep -q "^export(audit_jj)$" $FE/NAMESPACE'
 check "NAMESPACE: front-end exports kept" \
