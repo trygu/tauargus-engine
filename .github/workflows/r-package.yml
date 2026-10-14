@@ -159,7 +159,9 @@ jobs:
             cat("clean-room smoke ok:", version, "\n")'
 
           # No build paths may be referenced by the loaded objects.
-          LDD="$(ldd "$RLIB/tauargusengine/libs/tauargusengine.so")"
+          # libR.so is provided by the R runtime, not the system, so
+          # resolve it against R's own lib directory.
+          LDD="$(LD_LIBRARY_PATH="$(R RHOME)/lib" ldd "$RLIB/tauargusengine/libs/tauargusengine.so")"
           echo "$LDD"
           if echo "$LDD" | grep -E "not found"; then
             echo "clean-room: missing shared object" >&2
