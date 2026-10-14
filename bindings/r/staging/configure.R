@@ -162,7 +162,8 @@ local({
 
   engine_libs <- c("tauargus_csp", "tauargus_hitas", "tauargus_rounder", "CRP")
   if (is_win) {
-    dlls <- list.files(eng_bin, pattern = paste0("^(?:" ,
+    # CMake names MinGW DLLs with the lib prefix (libCRP.dll, ...).
+    dlls <- list.files(eng_bin, pattern = paste0("^lib(?:",
         paste(engine_libs, collapse = "|"), ")\\.dll$"))
     stop_if(length(dlls) != length(engine_libs),
             paste("expected the four engine DLLs in", eng_bin, "; found:", dlls))
