@@ -208,7 +208,7 @@ local({
                    collapse = " ")),
       paste0("PKG_LIBS = -libpath:", sl_eng_lib, " -libpath:",
              sl(highs_libdir),
-             paste(imp, collapse = " "),
+             paste(" ", imp, collapse = " "),
              " -ltauargus_core -lhighs"))
   } else {
     # Link the engine dylibs by explicit path: the reference recorded in the
