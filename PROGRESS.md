@@ -18,9 +18,10 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 ## In flight: R single-package release (user directive, 2026-10-14)
 
 - [ ] Ship one self-contained `rtauargus.native` package per platform in the R release, replacing the separate `tauargusengine` binding package (two-file install removed).
-- [x] Staging: `stage-r-package.sh --merge-into DIR` composes the native layer (binding R/src, configure, vendored engine + HiGHS, provenance) into the front-end; NAMESPACE/DESCRIPTION patched in place; `scripts/test-stage-r-merge.sh` green (20 checks); standalone mode regression-tested.
-- [ ] Local integration: staged merged package builds and installs (configure builds the vendored engine + HiGHS) and passes the full front-end suite.
-- [ ] R repo: `release.yml` single-package flow, one-file clean-room install, README install procedure + docs; branch CI green, then the 0.5.4 tags (user).
+- [x] Staging: `stage-r-package.sh --merge-into DIR` composes the native layer (binding R/src, configure, vendored engine + HiGHS, provenance) into the front-end; NAMESPACE/DESCRIPTION patched in place; `scripts/test-stage-r-merge.sh` green (23 checks); standalone mode regression-tested.
+- [x] Two merge blockers found in local integration and fixed: (1) R CMD build runs configure via its temp install and tars the mutated tree, so the destructive `configure.R` (rename inst/engine, delete inst/highs) produced a non-installable tarball; sources now vendor in top-level `engine/`/`highs/` dirs R never installs, configure is read-only on them; (2) R loads `R_init_<pkgname>`, so merge staging rewrites the binding's `R_init_tauargusengine` to the front-end name.
+- [ ] Local integration green (build + fresh install + full suite + build-path guard), then R repo: branch CI green (3 platforms, R 4.5.3), then the 0.5.4 tags (user).
+- [x] R repo edits: `release.yml` single-package flow (tag vs engine-pin check, merge staging, one binary per platform, one-file clean-room + CRAN deps, static tarball verification), README per-platform install + quick test, `docs/compatibility.md`, `tools/engine-meta-check.R` on the merged package, DESCRIPTION 1.3.7 + NEWS. `audit_jj` (CSP intervalle audit) stays exported in the merged NAMESPACE; the front-end `audit(tab)`/`with_audit` paths are untouched fork code.
 
 ## Watch items
 
