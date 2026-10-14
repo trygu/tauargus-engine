@@ -1,5 +1,6 @@
-# Build the engine and run the full Python test suite on every push and PR.
-# (Wheel building and releasing live in wheels.yml and run only on py-v* tags.)
+# Build the engine and run the binding smoke tests on every push and PR.
+# (Wheel building and releasing live in the pytauargus repo; the R package
+# build and release live in r-package.yml in this repo.)
 
 name: tests
 
@@ -12,9 +13,6 @@ on:
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  HIGHS_TAG: v1.15.1
 
 jobs:
   test:
@@ -31,18 +29,24 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
+      # The HiGHS version is pinned in engine/HiGHS-VERSION (single source of
+      # truth); the CMake build and these workflows read the same file.
+      - name: Read HiGHS pin
+        id: pin
+        run: echo "tag=$(tr -d '[:space:]' < engine/HiGHS-VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: Cache HiGHS
         id: highs-cache
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/highs-prefix
-          key: highs-${{ matrix.os }}-${{ env.HIGHS_TAG }}
+          key: highs-${{ matrix.os }}-${{ steps.pin.outputs.tag }}
 
       - name: Build HiGHS from source
         if: steps.highs-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          git clone --depth 1 --branch "$HIGHS_TAG" https://github.com/ERGO-Code/HiGHS.git highs
+          git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
           cmake -S highs -B highs/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/highs-prefix"
           cmake --build highs/build -j

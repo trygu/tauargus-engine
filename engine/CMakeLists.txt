@@ -17,6 +17,14 @@
 cmake_minimum_required(VERSION 3.16)
 project(tauargus_native C CXX)
 
+# Single source of truth for the HiGHS version: engine/HiGHS-VERSION.
+# Exported to the sub-builds so their find_package(Highs ...) calls require
+# exactly the pinned version. CI and the binding builds read the same file.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/HiGHS-VERSION" _TA_HIGHS_TAG)
+string(STRIP "${_TA_HIGHS_TAG}" _TA_HIGHS_TAG)
+string(REGEX REPLACE "^v" "" TAUARGUS_HIGHS_VERSION "${_TA_HIGHS_TAG}")
+message(STATUS "tauargus: requiring HiGHS ${TAUARGUS_HIGHS_VERSION}")
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

@@ -52,10 +52,14 @@ Port SDC tool to HiGHS solver, portable cloud-native build, and headless Python 
 
 ## 5. Build Commands (macOS / Apple Silicon)
 
-- **Dev loop.** Build the engine superbuild, then run the binding tests
-  (section 6). The `pytauargus` repo has its own `scripts/sync-venv.sh`
-  (pin gate, engine build from the pinned checkout, local wheel,
-  force-install); use that repo's venvs for package work.
+- **Dev loop.** `scripts/dev-test.sh` runs the full one-command dev loop
+  (submodule drift gate, superbuild, native core ctest, Python binding
+  smoke, R binding smoke when R is present). The HiGHS version is pinned
+  in `engine/HiGHS-VERSION` (single source of truth; the CMake build,
+  CI and the binding builds all read it). The `pytauargus` repo has its
+  own `scripts/sync-venv.sh` (pin gate, engine build from the pinned
+  checkout, local wheel, force-install); use that repo's venvs for
+  package work.
 - Highs Brew prefix: `-DHighs_DIR=$(brew --prefix)/lib/cmake/Highs`
 - Submodule build:
   `cmake -S engine/native/<mod> -B engine/native/<mod>/build -DHighs_DIR=$(brew --prefix)/lib/cmake/Highs && cmake --build engine/native/<mod>/build`

@@ -7,27 +7,23 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] OPT/MOD end-to-end protection, audit and masked CSV on ex1 and dominance.
 - [x] Core: WRITETABLE type-5, apriori, MOD/OPT/RND, audit (Intervalle).
 - [x] Headless CLI; wheel + CI to PyPI + GHCR; releases 0.3.2-0.5.0 shipped; lockstep TUI pipeline, 0.5.0 verified, TUI smoke test in CI.
-- [x] Dev loop: `scripts/sync-venv.sh`; venvs run local wheels, not PyPI.
-- [x] TUI on mainline: staged s/r preview, marks u/p/S + undo/redo, audit,
-  workspace save/reopen, replay batch, preview-in-grid; guide `docs/tui.md`.
 - [x] Conventional Commits for new history; agent rule: English replies.
-- [x] `feature/example-tables` merged: `data/examples/ex1` (tabular flow,
-  one manual-U cell; demo: `s` gives the OPT M-pattern, red cell stays).
-- [x] Manual safety margin default 20 (legacy `TableSet.manualMarge`;
-  manual p.123) + OPT contract test.
-- [x] Parquet I/O + S3 URLs: `protect()` reads `.parquet` paths/URLs, `TableResult.to_parquet`, CLI `protect`; pyarrow `parquet` extra.
-- [x] Markdown lint: `.markdownlint.json` (MD013 off), legacy bundle excluded;
-  repo `.md` files clean under `markdownlint-cli2`.
-- [x] 0.5.2 shipped: cp314/cp315 wheels on PyPI; plain `uvx pytauargus-tui` works again.
-- [x] Repo split v1: pytauargus package, CLI, TUI, notebooks, TUI docs and release workflow now live in the `pytauargus` repo (self-contained wheel from a pinned engine revision); this repo keeps the engine + thin Python/R bindings with binding smoke tests (Python and R); new repo's wheel build and 273 package tests verified locally.
+- [x] `data/examples/ex1` demo; manual safety margin default 20; Parquet I/O + S3 URLs; markdown lint clean.
+- [x] 0.5.2 shipped: cp314/cp315 wheels on PyPI; `uvx pytauargus-tui` works.
+- [x] Repo split v1: pytauargus owns package/CLI/TUI/wheel pipeline from a pinned engine revision; this repo keeps engine + thin Python/R bindings.
+- [x] Build mapping done: all local-path/env dependencies catalogued (R Makevars `../../../..` + baked rpaths; HiGHS pin only in CI; Python links `engine/build/lib`).
 
-## In flight
+## In flight: distribution independence (3-repo plan)
 
-- [ ] Repo split (finish): first release from the `pytauargus` repo (wheels workflow verification on the `py-v*` tag; PyPI trusted publishing configured there).
-- [ ] Remaining §B.7/§B.8: export provenance (reuse saved artifacts; record the written revision).
+- [x] A: engine owns the recipe: `engine/HiGHS-VERSION` (v1.15.1), versioned `find_package(Highs)` in csp/crp, CI + `scripts/dev-test.sh` read the file.
+- [ ] B: `scripts/stage-r-package.sh` -> self-contained R source package (engine + HiGHS sources in `inst/`, configure builds in-package, relative rpath, provenance header).
+- [ ] C: `r-package.yml` CI: source + binary packages (ubuntu-24.04 / macos arm64 / windows, R 4.4), publish to GitHub Packages + Release, clean-room install job.
+- [ ] D: pytauargus: HiGHS tag read from pinned engine; pin bump.
+- [ ] E: rtauargus `native-engine`: tauargusengine minimum version, README install docs, CI test workflow installing tauargusengine from GHP (pinned).
+- [ ] F: docs: build chain per repo (engine `docs/build-and-distribution.md`, pytauargus README, rtauargus README); clean-room verification (Linux container).
 
 ## Watch items
 
-- [ ] Rejected-method refs: sdcTools `hypercube` (Fortran GHMIter, EUPL-1.1)
-  for GH; `network` has no code; README points to Castro (UPC 2014) for NET.
-- 5008 on re-OPT w/ secondary suppression (legacy limitation); GHCR/project rename; OPT/MOD deadline expiry; `open_microdata`+`clean_all` note; solver-strategy doc.
+- [ ] Rejected-method refs: sdcTools `hypercube` (Fortran GHMIter, EUPL-1.1) for GH; NET -> Castro (UPC 2014).
+- 5008 on re-OPT w/ secondary suppression; GHCR/project rename; OPT/MOD deadline expiry; solver-strategy doc.
+- Linux binary glibc floor = 24.04 (R 4.4); SSPCloud/Onyxia image to confirm in phase F.
