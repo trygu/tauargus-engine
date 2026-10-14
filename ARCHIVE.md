@@ -746,3 +746,25 @@ the `.rda` writer. No `.tab`/`.hst` generator, no native `.hrc` getter
   clean venv (`4c7725e`).
 - Lockstep bump + `chore(release): 0.5.1` (`e9f413d`), tag `py-v0.5.1`.
   Verified on PyPI: published wheel lists both entry points.
+
+## Distribution independence + release history backfill (2026-10-14)
+
+- Engine owns the recipe: `engine/HiGHS-VERSION` (v1.15.1); versioned
+  `find_package(Highs)` in csp/crp; CI + `scripts/dev-test.sh` read the file.
+- `scripts/stage-r-package.sh` produces a self-contained R source package
+  (engine + HiGHS in `inst/`, in-package build, static HiGHS, 4 bundled
+  engine dylibs, rpath @loader_path only, `tauargus_engine_meta()`
+  provenance). Verified: tarball -> R CMD INSTALL -> smoke green, no build
+  paths in installed binaries.
+- `r-package.yml` CI green on ubuntu-24.04 / macos arm64 / windows (R 4.4.3)
+  + clean-room container (run 13). Release engine commit `dba1a14`. Windows
+  fixes: MinGW CRP exports, cspaudit.h EXPORTFUNC, Makevars -L flag, DLL
+  staging to libs/x64. Clean-room: sudo, bash, libR in the ldd guard.
+- Local release-file install verified: staged pkg -> source tarball +
+  release-format binary -> fresh-library install -> smoke + full rtauargus
+  suite green (386 pass).
+- Release history backfill: the 12 misplaced `py-v*` releases (0.1.0-0.5.2,
+  195 assets, 895 MB) were re-created on the pytauargus repo (tags on the
+  scaffold commit 5c44700, original notes + re-publish header, wheel
+  pipeline paused during the backfill) and deleted from this repo. This
+  repo's release page is clean; PyPI/GHCR still serve all versions.

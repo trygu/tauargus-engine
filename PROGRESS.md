@@ -12,17 +12,14 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 - [x] 0.5.2 shipped: cp314/cp315 wheels on PyPI; `uvx pytauargus-tui` works.
 - [x] Repo split v1: pytauargus owns package/CLI/TUI/wheel pipeline from a pinned engine revision; this repo keeps engine + thin Python/R bindings.
 - [x] Build mapping done: all local-path/env dependencies catalogued (R Makevars `../../../..` + baked rpaths; HiGHS pin only in CI; Python links `engine/build/lib`).
+- [x] Distribution independence: HiGHS pin file, self-contained R staging, r-package.yml green on 3 OSes + clean-room (release commit `dba1a14`), release-file install + full rtauargus suite verified.
+- [x] Release history backfill: 12 `py-v*` releases (0.1.0-0.5.2, 195 assets) moved to the pytauargus repo; this repo's release page clean; wheel pipeline re-enabled.
 
-## In flight: distribution independence (3-repo plan)
+## In flight: 3-repo restructure (user directive, 2026-10-14)
 
-- [x] A: engine owns the recipe: `engine/HiGHS-VERSION` (v1.15.1), versioned `find_package(Highs)` in csp/crp, CI + `scripts/dev-test.sh` read the file.
-- [x] B: `scripts/stage-r-package.sh` -> self-contained R source package (engine + HiGHS sources in `inst/`, configure builds in-package, static HiGHS, 4 bundled engine dylibs, rpath = @loader_path only, `tauargus_engine_meta()` provenance). Verified: tarball -> R CMD INSTALL -> smoke green, no build paths in the installed binaries.
-- [x] C: `r-package.yml` CI: source + binary packages (ubuntu-24.04 / macos arm64 / windows, R 4.4.3), install-from-sources + smoke on each OS, clean-room container job (no checkout/compiler). GitHub Release on `r-v*` is the only R channel (no GitHub Packages): source + binaries in standard R formats (tar.gz on Linux/macOS, zip on Windows), names carry version, R version, platform, arch.
-- [x] D (engine side): pytauargus workflows read the HiGHS tag from the pinned engine checkout; pin bump to this engine commit in the pytauargus repo.
-- [x] E: rtauargus `native-engine`: `tauargusengine (>= 0.5.3)`, README install docs from the engine's GitHub Releases, `tests.yaml` + pkgdown install the pinned engine binary from the release files (no secrets; needs the `r-v*` release to exist). Verified locally: full rtauargus suite against the installed tauargusengine green (386 pass, 0 fail). Branch unpushed (CI red until the release exists).
-- [x] F (local): release-file install verified in a clean local environment: staged pkg -> source tarball + release-format binary -> fresh-library install -> inline smoke + slim installed tree (no bundled sources; configure discovers `highs-config.cmake`, moves engine sources to the build tree) + full rtauargus suite green.
-- [x] F (live): run 13 fully green: linux, macos, windows, clean-room (publish runs only on r-v*). Windows: MinGW CRP exports, cspaudit.h EXPORTFUNC, Makevars -L flag, DLL staging to libs/x64. Clean-room: sudo, bash, libR in the ldd guard. Release engine commit: `dba1a14`.
-- [ ] G: pytauargus pin -> `dba1a14` + 0.5.3 (pyproject.toml, tui/pyproject.toml), push; user cuts `py-v0.5.3` (pytauargus) + `r-v0.5.3` (engine `dba1a14`); then verify clean installs and push the rtauargus `native-engine` branch.
+- [ ] P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev` as source of truth); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata; user then cuts `py-v0.5.3`.
+- [ ] P2 R repo: rename to `rtauargus.native` (repo + package); engine as pinned submodule; combined pipeline builds `tauargusengine` + `rtauargus.native` from the submodule's scripts and publishes both as one GitHub Release set; one tested install procedure for both; branch pushed.
+- [ ] P3 engine: remove `r-package.yml` once P2 is green; README ownership/dependency/install updates in all three repos; superseded docs removed.
 
 ## Watch items
 
