@@ -23,7 +23,7 @@ Branches: `master` (mainline) + short-lived feature branches for fixes.
 
 ## Watch items
 
-- CRAN evaluation for the R packages: `docs/cran-evaluation.md`. Build is fine (1.8 MB source, ~1 min install); hard gate is the license (EUPL-1.2 not in R's accepted list, engine submodules have no license files). Decision: relicense (then B: engine on CRAN first) or stay on GitHub Releases (option A).
+- CRAN evaluation closed (`docs/cran-evaluation.md`): codebase is EUPL-1.2 (sdcTools/tauargus derivation, copyleft), which R/CRAN do not accept; no CRAN submission, GitHub Releases stays the R channel.
 
 - User report: secondary suppression differs from legacy tau-ARGUS on a real dataset (89 of 1631 cells): reproduced; omitted cost/exponent defaults identified as a major cause (89 differences to 3 residual cells, all around C28). Findings + next steps in `docs/secondary-suppression-discrepancy.md`; separate format-4 zero-response export issue noted.
 

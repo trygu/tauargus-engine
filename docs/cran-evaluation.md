@@ -1,7 +1,8 @@
 # CRAN evaluation: the R packages
 
-**Status:** evaluation complete; CRAN is blocked on the license decision,
-not on the build. No submission has been made.
+**Status:** closed; the codebase is EUPL-1.2 (confirmed 2026-10-14), which
+R and CRAN do not accept, so no CRAN submission will be made. Distribution
+stays on GitHub Releases (option A).
 **Recorded:** 2026-10-14.
 
 ## Question
@@ -32,10 +33,13 @@ submitted to CRAN, and what would each require?
   only in the R package's `LICENSE` ("tauargus-engine contributors").
   CRAN review requires a clear license for all bundled code.
 - The bundled HiGHS copy is MIT licensed, which CRAN accepts.
-- Conclusion: a CRAN submission requires a license decision first
-  (relicense or dual-license the engine, e.g. EUPL or Apache-2.0/MIT,
-  and add license files to the submodules). This is a user decision,
-  possibly involving other copyright holders.
+- Decision (2026-10-14): the engine is derived from sdcTools/tauargus,
+  which is EUPL-1.2. EUPL is copyleft, so the derived code stays
+  EUPL-1.2; there is no path to a permissive relicense without the
+  original copyright holders. CRAN is therefore not an option for
+  `tauargusengine` or, by the dependency gate, for `rtauargus.native`.
+  Follow-up hygiene: the five engine submodules carry no LICENSE file
+  of their own (the engine root and the R package do).
 
 ### 2. Build size and time: acceptable
 
@@ -98,19 +102,11 @@ single-package CRAN tarball). Removes the dependency gate and hides
 the low-level package from CRAN, at the cost of maintaining a second
 copy of the engine sources inside the front-end.
 
-## Recommendation
+## Final recommendation
 
-- Do not restructure anything now. The current path (option A) is the
-  distribution until a license decision exists.
-- CRAN is a separate track, gated on the license. The build is not the
-  problem (1.8 MB source, ~1 minute install); the license is.
-- If the engine can be relicensed/dual-licensed, prefer **B** over
-  **C**: no source duplication, and the binding stays independently
-  useful. Choose **C** only if the low-level package should not exist
-  on CRAN at all.
-- Renaming the repos or packages is not required for CRAN (both names
-  are free); treat any rename as cosmetic and separate from the
-  submission work.
-- Submission mechanics: new packages go through CRAN's submission
-  form; the first check takes on the order of a week, followed by the
-  normal review correspondence.
+Option A: keep GitHub Releases as the R distribution channel (prebuilt
+binaries per platform, as the pipeline already produces). If binary
+distribution for R users matters later, Posit Package Manager (P3M) is
+the standard alternative to CRAN for native packages. The build numbers
+above show the source is CRAN-ready on mechanics; only the license
+prevents a submission, and that is fixed by the derivation.
