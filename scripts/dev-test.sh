@@ -53,9 +53,10 @@ ctest --test-dir engine/build/native/core --output-on-failure
 
 # 4) R binding smoke (only when R is installed; skips cleanly otherwise).
 if command -v Rscript >/dev/null 2>&1; then
-    R CMD INSTALL --quiet --library="$(mktemp -d)/Rlib" bindings/r/tauargusengine \
-        > /dev/null
-    Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R
+    Rlib="$(mktemp -d)"
+    mkdir -p "$Rlib"
+    R CMD INSTALL --library="$Rlib" bindings/r/tauargusengine > /dev/null
+    R_LIBS="$Rlib" Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R
 else
     echo "R not found; skipping the R binding smoke test"
 fi
