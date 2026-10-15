@@ -161,9 +161,8 @@ The engine is C++11, built from five git submodules under `engine/native/`:
 ├── bindings/
 │   ├── python/  pybind11 extension (cpp/) + CMake, binding smoke tests
 │   └── r/       tauargusengine, the thin R package + binding smoke test
-├── data/        sample .arb batches and tabular fixtures; also the test
-│                fixtures consumed by the pytauargus repo's package tests
-└── docs/        legacy Tau-Argus 4.1 manual and native debugging notes
+└── data/        sample .arb batches and tabular fixtures; also the test
+                 fixtures consumed by the pytauargus repo's package tests
 ```
 
 ## Building from source
@@ -210,9 +209,7 @@ sources, and its configure script builds everything from the package's
 own sources at install time. The script is reusable: the
 [rtauargus.native](https://github.com/trygu/rtauargus.native) repo pins
 this repo as a submodule and runs its release pipeline from this recipe
-on `r-v*` tags (one GitHub Release set with both R packages). See
-[Build and distribution](docs/build-and-distribution.md) for the full
-build chain across the three repos.
+on `r-v*` tags (one GitHub Release set with both R packages).
 
 ## Testing
 
