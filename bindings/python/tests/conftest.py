@@ -9,6 +9,7 @@ must exist first; build it with the engine repo's normal command:
 """
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -27,7 +28,22 @@ def _pybind11_dir() -> str:
     return pybind11.get_cmake_dir()
 
 
+def _drop_stale_cache() -> None:
+    """A cache configured against a Python that no longer exists (e.g. an
+    earlier ``uv run`` ephemeral env) breaks find_package(Python); drop it."""
+    cache = EXT_DIR / "CMakeCache.txt"
+    if not cache.exists():
+        return
+    for line in cache.read_text().splitlines():
+        if line.startswith("PYTHON_EXECUTABLE:"):
+            value = line.split("=", 1)[1].strip().strip('"')
+            if value and not Path(value).exists():
+                shutil.rmtree(EXT_DIR)
+            return
+
+
 def _build_extension() -> None:
+    _drop_stale_cache()
     PKG_DIR.mkdir(parents=True, exist_ok=True)
     cmd = [
         "cmake",
