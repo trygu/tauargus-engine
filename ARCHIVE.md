@@ -1,5 +1,13 @@
 # Tau-Argus Rewrite: Archive
 
+## R single-package release preparation (2026-10-14/15)
+
+- Single-package `rtauargus.native` release adopted: `stage-r-package.sh --merge-into DIR` patches NAMESPACE/DESCRIPTION in place and injects the native layer at staging time, keeping the fork 1:1 with upstream INSEE on disk.
+- Merge blockers fixed: (1) R CMD build runs configure via its temp install, so sources vendor in top-level `engine/`/`highs/` dirs R never installs and configure is read-only on them; (2) R names the shared object after the package verbatim (`rtauargus.native.so`), so `useDynLib` keeps the dot form and the init symbol is the underscore form `R_init_rtauargus_native`; (3) clean-room installs CRAN deps because binary `R CMD INSTALL` checks Imports.
+- Engine table-mode primary-rule gap fixed: `FillInTable` was writing the caller's `Status` argument unconditionally even when `m_HasStatus` was false, so `ComputeCellStatuses` skipped rule evaluation. The status assignment was moved inside the `m_HasStatus` guard.
+- R front-end fixed: calls `SetTableSafetyInfo` for table-input mode to declare `FREQUENCY`/`MAXSCORE`/`STATUS` presence; TopN order check guarded for single-contributor tables; `tab_rtauargus` type-4 reader made robust to `x` suppressed values and a variable trailing `Dom` column.
+- Local integration verified: 386 PASS / 0 FAIL, binding smoke, README `tab_rtauargus` example, otool build-path guard.
+
 ## 3-repo restructure + 0.5.3 release (2026-10-14)
 
 - P1 pytauargus: engine as pinned git submodule (replaces `tauargus-engine-rev`); TUI depends on the matching pytauargus release, no second engine copy; engine commit + HiGHS version in build metadata (`engine_meta()`); CI green at `483d12f`.
