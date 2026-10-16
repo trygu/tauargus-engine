@@ -37,5 +37,7 @@ ifeq ($(HIGHSPREFIX),)
 HIGHSPREFIX := /usr
 endif
 PKG_CPPFLAGS = -I$(TA_CORE_INC) -I$(TA_CSP_INC) -I$(TA_HITAS_INC) -I$(TA_ROUNDER_INC) -I$(HIGHSPREFIX)/include/highs
-PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB) -Wl,-rpath,$(HIGHSPREFIX)/lib
+# Statically link the C++ runtime: the binding must not depend on the host
+# libstdc++ version (the release binaries target older distros).
+PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB) -Wl,-rpath,$(HIGHSPREFIX)/lib -static-libstdc++ -static-libgcc
 endif

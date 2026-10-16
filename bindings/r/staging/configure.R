@@ -229,12 +229,14 @@ local({
       paste0("PKG_CPPFLAGS = ",
              paste(vapply(inc, function(d) paste0("-I", d), character(1)),
                    collapse = " ")),
+      # Linux: statically link the C++ runtime (see engine/CMakeLists.txt);
+      # the installed package must not depend on the host libstdc++ version.
       paste0("PKG_LIBS = ",
              paste(vapply(shared_paths, sl, character(1)), collapse = " "),
              " -L", sl_eng_lib, " -ltauargus_core",
              " -L", sl(highs_libdir), " -lhighs",
              " -Wl,-rpath,'", install_rpath, "'",
-             if (is_mac) "" else " -pthread"))
+             if (is_mac) "" else " -pthread -static-libstdc++ -static-libgcc"))
   }
   writeLines(mv, file.path(pkg_root, "src", "Makevars"))
   # Echo the generated Makevars: it is the single source of the native
