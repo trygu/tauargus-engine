@@ -231,12 +231,16 @@ local({
                    collapse = " ")),
       # Linux: statically link the C++ runtime (see engine/CMakeLists.txt);
       # the installed package must not depend on the host libstdc++ version.
+      # The --exclude-libs options keep the embedded runtime's symbols local
+      # so they cannot interpose with another C++ runtime in the same R
+      # session. One -Wl per archive: the GCC driver splits -Wl, lists on
+      # commas.
       paste0("PKG_LIBS = ",
              paste(vapply(shared_paths, sl, character(1)), collapse = " "),
              " -L", sl_eng_lib, " -ltauargus_core",
              " -L", sl(highs_libdir), " -lhighs",
              " -Wl,-rpath,'", install_rpath, "'",
-             if (is_mac) "" else " -pthread -static-libstdc++ -static-libgcc"))
+             if (is_mac) "" else " -pthread -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++.a -Wl,--exclude-libs,libsupc++.a -Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libgcc_eh.a"))
   }
   writeLines(mv, file.path(pkg_root, "src", "Makevars"))
   # Echo the generated Makevars: it is the single source of the native

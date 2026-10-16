@@ -105,6 +105,23 @@ target_include_directories(_tauargus
         ${NATIVE_ROUNDER_SRC}
 )
 
+# Linux: hide every symbol except the module init. Without this, the
+# extension's own template instantiations (std::string, std::vector
+# members) are exported as strong global symbols (LTO re-exports them even
+# with hidden visibility). A second C++ runtime in the same process (for
+# example pyarrow's dynamic libstdc++) would then bind to them and the two
+# allocators would corrupt each other (free(): invalid pointer). The
+# version script is the deterministic guarantee: only the module init
+# symbol is exported, everything else is local.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(_tauargus PRIVATE -fvisibility=hidden)
+    set(TAUARGUS_PY_VERSION_SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/_tauargus.vers)
+    file(WRITE ${TAUARGUS_PY_VERSION_SCRIPT}
+        "{ global: PyInit__tauargus; local: *; };\n")
+    target_link_options(_tauargus PRIVATE
+        "LINKER:--version-script=${TAUARGUS_PY_VERSION_SCRIPT}")
+endif()
+
 # Core is a static lib (code copied in). csp/hitas + rounder are shared libs
 # (they pull in HiGHS transitively). csp is linked explicitly for the audit
 # (TauAuditJj) entry point.
@@ -114,10 +131,19 @@ target_link_libraries(_tauargus PRIVATE
 )
 
 # Linux: statically link the C++ runtime into the extension (see the
-# superbuild), so the wheel carries no host libstdc++ dependency.
+# superbuild), so the wheel carries no host libstdc++ dependency. The
+# --exclude-libs options keep the embedded runtime's symbols local to the
+# extension; if exported, a second C++ runtime in the same process (for
+# example pyarrow's dynamic libstdc++) would bind to them and the two
+# runtimes would corrupt each other. One -Wl per archive, because the GCC
+# driver splits -Wl, lists on commas.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_link_options(_tauargus PRIVATE
-        -static-libstdc++ -static-libgcc)
+        -static-libstdc++ -static-libgcc
+        -Wl,--exclude-libs,libstdc++.a
+        -Wl,--exclude-libs,libsupc++.a
+        -Wl,--exclude-libs,libgcc.a
+        -Wl,--exclude-libs,libgcc_eh.a)
 endif()
 
 # Output the extension straight into the python package dir so that a plain

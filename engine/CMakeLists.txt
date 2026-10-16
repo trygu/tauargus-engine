@@ -34,10 +34,19 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Linux: statically link the C++ runtime into the shared libraries so the
 # shipped binaries do not depend on the host libstdc++ version. Without
 # this, a build on a new runner (GLIBCXX_3.4.32 on ubuntu-24.04) fails to
-# load on older distros (missed at 0.5.5).
+# load on older distros (missed at 0.5.5). --exclude-libs keeps the
+# embedded runtime's symbols local to each library: if they were exported,
+# a second C++ runtime in the same process (for example pyarrow's dynamic
+# libstdc++) would bind to them and the two runtimes would corrupt each
+# other (observed as free(): invalid pointer when importing pyarrow after
+# pytauargus).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # Keep a single string: appending a multi-element CMake list leaks
+    # ';' list separators into the link line. One -Wl per archive,
+    # because the GCC driver splits -Wl, lists on commas (a comma-joined
+    # list would pass the extra names to the linker as bare file names).
     set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+        "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++.a -Wl,--exclude-libs,libsupc++.a -Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libgcc_eh.a")
 endif()
 
 # Centralize build outputs: all shared/static libs in <build>/lib, binaries in
