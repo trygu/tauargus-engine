@@ -38,6 +38,10 @@ HIGHSPREFIX := /usr
 endif
 PKG_CPPFLAGS = -I$(TA_CORE_INC) -I$(TA_CSP_INC) -I$(TA_HITAS_INC) -I$(TA_ROUNDER_INC) -I$(HIGHSPREFIX)/include/highs
 # Statically link the C++ runtime: the binding must not depend on the host
-# libstdc++ version (the release binaries target older distros).
-PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB) -Wl,-rpath,$(HIGHSPREFIX)/lib -static-libstdc++ -static-libgcc
+# libstdc++ version (the release binaries target older distros). The
+# --exclude-libs options keep the embedded runtime's symbols local; if
+# exported, another C++ runtime in the same R session would bind to them
+# and the two runtimes would corrupt each other. One -Wl per archive,
+# because the GCC driver splits -Wl, lists on commas.
+PKG_LIBS = -L$(TA_LIB) -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core -L$(HIGHSPREFIX)/lib -lhighs -Wl,-rpath,$(TA_LIB) -Wl,-rpath,$(HIGHSPREFIX)/lib -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++.a -Wl,--exclude-libs,libsupc++.a -Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libgcc_eh.a
 endif
