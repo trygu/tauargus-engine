@@ -113,6 +113,13 @@ target_link_libraries(_tauargus PRIVATE
     ${ENGINE_SHARED}
 )
 
+# Linux: statically link the C++ runtime into the extension (see the
+# superbuild), so the wheel carries no host libstdc++ dependency.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(_tauargus PRIVATE
+        -static-libstdc++ -static-libgcc)
+endif()
+
 # Output the extension straight into the python package dir so that a plain
 # `import pytauargus._tauargus` works both in dev and inside the wheel. The
 # pytauargus repo's wheel build points this at its own src/pytauargus; the

@@ -31,6 +31,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # The static core lib is linked into the Python extension (a shared object).
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Linux: statically link the C++ runtime into the shared libraries so the
+# shipped binaries do not depend on the host libstdc++ version. Without
+# this, a build on a new runner (GLIBCXX_3.4.32 on ubuntu-24.04) fails to
+# load on older distros (missed at 0.5.5).
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_SHARED_LINKER_FLAGS
+        "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+endif()
+
 # Centralize build outputs: all shared/static libs in <build>/lib, binaries in
 # <build>/bin. (Directory-scoped; inherited by the add_subdirectory calls below.)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
