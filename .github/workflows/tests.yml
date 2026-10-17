@@ -40,6 +40,15 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
+      # Same R as the product release builds; setup-r installs Rtools on
+      # Windows. It runs early because the MinGW engine build below needs
+      # the Rtools compiler on PATH.
+      - name: Install R (setup-r)
+        if: runner.os == 'Windows'
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.5.3"
+
       # The HiGHS version is pinned in engine/HiGHS-VERSION (single source of
       # truth); the CMake build and these workflows read the same file.
       - name: Read HiGHS pin
@@ -84,6 +93,35 @@ jobs:
             cmake --build engine/build -j
           fi
 
+      # The R binding is compiled with Rtools' MinGW and uses the engine
+      # core's C++ API, so it must link a core built with the same
+      # toolchain (the MSVC core's C++ symbols are not resolvable from
+      # MinGW). Build a second MinGW copy of HiGHS and the engine for the
+      # R binding check only (the recipe the staged R release build
+      # uses); the MSVC build serves the native tests, the Python
+      # binding and the artifact bundle.
+      - name: Build HiGHS (MinGW, for the R binding)
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          # The MSVC build step clones the HiGHS source only on a cache
+          # miss; make sure the source is present for this build too.
+          [ -d highs ] || git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
+          cmake -S highs -B highs/build-mingw -G "MinGW Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/highs-prefix-mingw"
+          cmake --build highs/build-mingw -j
+          cmake --install highs/build-mingw
+
+      - name: Build engine (MinGW, for the R binding)
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          HIGHS_CFG="$(dirname "$(find "$RUNNER_TEMP/highs-prefix-mingw" -name 'highs-config.cmake' -o -name 'highsConfig.cmake' -o -name 'HighsConfig.cmake' | head -n1)")"
+          cmake -S engine -B engine/build-mingw -G "MinGW Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release -DHighs_DIR="$HIGHS_CFG"
+          cmake --build engine/build-mingw -j
+
       - name: Test native core
         run: |
           set -euo pipefail
@@ -105,14 +143,6 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install r
 
-      # Same R as the product release builds; setup-r installs Rtools on
-      # Windows, which R CMD INSTALL uses to compile the binding.
-      - name: Install R (setup-r)
-        if: runner.os == 'Windows'
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: "4.5.3"
-
       # Install into a temp library: the runner's system R library is not
       # writable by the runner user on Linux. The path deliberately
       # contains a space (a quoting-bug detector, like the product
@@ -121,6 +151,12 @@ jobs:
         env:
           HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
         run: |
+          set -euo pipefail
+          # On Windows the binding links the MinGW engine build.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export TA_ENGINE_BUILD="$GITHUB_WORKSPACE/engine/build-mingw"
+            export HIGHSPREFIX="$RUNNER_TEMP/highs-prefix-mingw"
+          fi
           mkdir -p "${RUNNER_TEMP}/R lib"
           R CMD INSTALL --library="${RUNNER_TEMP}/R lib" bindings/r/tauargusengine
 
@@ -130,9 +166,9 @@ jobs:
           R_LIBS: ${{ runner.temp }}/R lib
         run: |
           set -euo pipefail
-          # The engine DLLs (multi-config VS layout) must be loadable
+          # The engine DLLs (MinGW build on Windows) must be loadable
           # when the binding's DLL is loaded.
           if [ "$RUNNER_OS" = "Windows" ]; then
-            export PATH="$GITHUB_WORKSPACE/engine/build/bin/Release:$RUNNER_TEMP/highs-prefix/bin:$PATH"
+            export PATH="$GITHUB_WORKSPACE/engine/build-mingw/bin:$RUNNER_TEMP/highs-prefix-mingw/bin:$PATH"
           fi
           Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R

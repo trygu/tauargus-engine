@@ -7,7 +7,11 @@
 # is compatible with the engine's C++11 headers.)
 
 TA_ENGINE := $(abspath ../../../..)
-TA_LIB := $(TA_ENGINE)/engine/build/lib
+# The engine build tree. On Windows CI the R binding links a MinGW build
+# (see the workflow), not the MSVC one the Python binding uses, so the
+# directory is overridable via the TA_ENGINE_BUILD environment variable.
+TA_ENGINE_BUILD ?= $(TA_ENGINE)/engine/build
+TA_LIB := $(TA_ENGINE_BUILD)/lib
 TA_CORE_INC := $(TA_ENGINE)/engine/native/core/src
 TA_CSP_INC := $(TA_ENGINE)/engine/native/csp/src
 TA_HITAS_INC := $(TA_ENGINE)/engine/native/hitas/src
@@ -24,18 +28,16 @@ IS_WINDOWS := 1
 endif
 
 ifneq ($(IS_WINDOWS),)
-# Windows CI builds the engine superbuild with the Visual Studio
-# generator (multi-config, the same recipe the Python binding and the
-# pytauargus wheel build assume): import libs in build/lib/Release,
-# runtime DLLs in build/bin/Release. R compiles the package with
-# Rtools' GNU make and MinGW; the binding only touches the engine's
-# extern "C" API (see the note in rta_csp.cpp), so the MSVC import
-# libs link across that boundary. HiGHS is statically linked into the
+# Windows CI builds a second, MinGW copy of the engine for the R
+# binding (TA_ENGINE_BUILD, single-config): the binding is compiled
+# with Rtools' MinGW and uses the core's C++ API, so it must link a
+# core built with the same toolchain (the MSVC core's C++ symbols are
+# not resolvable from MinGW). HiGHS is statically linked into the
 # engine DLLs, so there is no separate HiGHS dependency here. The
-# runtime DLLs (build/bin/Release) must be on PATH when the binding
-# is loaded.
+# runtime DLLs (build-mingw/bin) must be on PATH when the binding is
+# loaded.
 PKG_CPPFLAGS = -I"$(TA_CORE_INC)" -I"$(TA_CSP_INC)" -I"$(TA_HITAS_INC)" -I"$(TA_ROUNDER_INC)"
-PKG_LIBS = -L"$(TA_LIB)/Release" -l:tauargus_csp.lib -l:tauargus_hitas.lib -l:tauargus_rounder.lib -l:CRP.lib -l:tauargus_core.lib
+PKG_LIBS = -L"$(TA_LIB)" -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core
 else ifeq ($(UNAME),Darwin)
 # HIGHSPREFIX may be set in the environment (CI builds HiGHS into a
 # temp prefix); otherwise fall back to the Homebrew install.
