@@ -15,11 +15,19 @@ TA_ROUNDER_INC := $(TA_ENGINE)/engine/native/rounder/src
 
 UNAME := $(shell uname -s 2>/dev/null)
 
-ifeq ($(OS),Windows_NT)
-# Best-effort Windows: link the import libs from build/lib; the runtime DLLs
-# (build/bin) must be on PATH or bundled with the package at install time.
-PKG_CPPFLAGS = /I"$(TA_CORE_INC)" /I"$(TA_CSP_INC)" /I"$(TA_HITAS_INC)" /I"$(TA_ROUNDER_INC)"
-PKG_LIBS = -libpath:$(TA_LIB) tauargus_csp.lib tauargus_hitas.lib tauargus_rounder.lib CRP.lib tauargus_core.lib highs.lib
+ifeq ($(UNAME),Windows_NT)
+# Windows CI builds the engine superbuild with the Visual Studio
+# generator (multi-config, the same recipe the Python binding and the
+# pytauargus wheel build assume): import libs in build/lib/Release,
+# runtime DLLs in build/bin/Release. R compiles the package with
+# Rtools' GNU make and MinGW; the binding only touches the engine's
+# extern "C" API (see the note in rta_csp.cpp), so the MSVC import
+# libs link across that boundary. HiGHS is statically linked into the
+# engine DLLs, so there is no separate HiGHS dependency here. The
+# runtime DLLs (build/bin/Release) must be on PATH when the binding
+# is loaded.
+PKG_CPPFLAGS = -I"$(TA_CORE_INC)" -I"$(TA_CSP_INC)" -I"$(TA_HITAS_INC)" -I"$(TA_ROUNDER_INC)"
+PKG_LIBS = -L"$(TA_LIB)/Release" -l:tauargus_csp.lib -l:tauargus_hitas.lib -l:tauargus_rounder.lib -l:CRP.lib -l:tauargus_core.lib
 else ifeq ($(UNAME),Darwin)
 # HIGHSPREFIX may be set in the environment (CI builds HiGHS into a
 # temp prefix); otherwise fall back to the Homebrew install.
