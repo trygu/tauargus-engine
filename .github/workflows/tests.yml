@@ -1,8 +1,8 @@
-# Build the engine and run the binding smoke tests on every push and PR.
-# (Wheel building and releasing live in the pytauargus repo; the R package
-# build and release live in r-package.yml in this repo.)
+# Build the engine and run the binding tests on every push and PR.
+# (Wheel building and releasing live in the pytauargus repo; the R
+# package build and release live in the rtauargus.native repo.)
 
-name: tests
+name: Engine — Native and binding tests
 
 on:
   push:
@@ -16,12 +16,15 @@ concurrency:
 
 jobs:
   test:
-    name: ${{ matrix.os }}
+    name: Test native code and bindings — ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15]
+        include:
+          - { os: ubuntu-24.04, label: "Linux x86_64" }
+          - { os: ubuntu-24.04-arm, label: "Linux arm64" }
+          - { os: macos-15, label: "macOS arm64" }
     steps:
       - uses: actions/checkout@v4
         with:
