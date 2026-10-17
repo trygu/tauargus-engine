@@ -40,15 +40,6 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
-      # Same R as the product release builds; setup-r installs Rtools on
-      # Windows. It runs early because the MinGW engine build below needs
-      # the Rtools compiler on PATH.
-      - name: Install R (setup-r)
-        if: runner.os == 'Windows'
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: "4.5.3"
-
       # The HiGHS version is pinned in engine/HiGHS-VERSION (single source of
       # truth); the CMake build and these workflows read the same file.
       - name: Read HiGHS pin
@@ -98,6 +89,38 @@ jobs:
             cmake --build engine/build -j
           fi
 
+      - name: Test native core
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ctest --test-dir engine/build/native/core --output-on-failure --build-config Release
+          else
+            ctest --test-dir engine/build/native/core --output-on-failure
+          fi
+
+      - name: Build and test Python binding
+        working-directory: bindings/python
+        run: uv run --with pytest --with pybind11 pytest tests -q
+
+      - name: Install R (apt)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y r-base
+
+      - name: Install R (Homebrew)
+        if: runner.os == 'macOS'
+        run: brew install r
+
+      # Same R as the product release builds; on Windows setup-r also
+      # installs Rtools, which the MinGW engine build below needs. It runs
+      # after the MSVC builds on purpose: its PATH additions put Rtools'
+      # MSYS cmake ahead of the runner's native cmake, and the MSYS cmake
+      # defaults to Unix Makefiles instead of Visual Studio.
+      - name: Install R (setup-r)
+        if: runner.os == 'Windows'
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.5.3"
+
       # The R binding is compiled with Rtools' MinGW and uses the engine
       # core's C++ API, so it must link a core built with the same
       # toolchain (the MSVC core's C++ symbols are not resolvable from
@@ -143,27 +166,6 @@ jobs:
             -DCMAKE_C_COMPILER="$RT_BIN/gcc" \
             -DCMAKE_CXX_COMPILER="$RT_BIN/g++"
           cmake --build engine/build-mingw -j
-
-      - name: Test native core
-        run: |
-          set -euo pipefail
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            ctest --test-dir engine/build/native/core --output-on-failure --build-config Release
-          else
-            ctest --test-dir engine/build/native/core --output-on-failure
-          fi
-
-      - name: Build and test Python binding
-        working-directory: bindings/python
-        run: uv run --with pytest --with pybind11 pytest tests -q
-
-      - name: Install R (apt)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y r-base
-
-      - name: Install R (Homebrew)
-        if: runner.os == 'macOS'
-        run: brew install r
 
       # Install into a temp library: the runner's system R library is not
       # writable by the runner user on Linux. The path deliberately
