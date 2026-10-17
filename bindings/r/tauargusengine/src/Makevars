@@ -13,9 +13,17 @@ TA_CSP_INC := $(TA_ENGINE)/engine/native/csp/src
 TA_HITAS_INC := $(TA_ENGINE)/engine/native/hitas/src
 TA_ROUNDER_INC := $(TA_ENGINE)/engine/native/rounder/src
 
+# Windows detection: on Windows the OS environment variable is
+# Windows_NT and GNU make imports environment variables as variables;
+# uname is not always on the R CMD INSTALL path, so check both.
 UNAME := $(shell uname -s 2>/dev/null)
-
 ifeq ($(UNAME),Windows_NT)
+IS_WINDOWS := 1
+else ifeq ($(OS),Windows_NT)
+IS_WINDOWS := 1
+endif
+
+ifneq ($(IS_WINDOWS),)
 # Windows CI builds the engine superbuild with the Visual Studio
 # generator (multi-config, the same recipe the Python binding and the
 # pytauargus wheel build assume): import libs in build/lib/Release,
