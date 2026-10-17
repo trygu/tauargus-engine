@@ -135,13 +135,22 @@ jobs:
           # Pin the compilers to Rtools' MinGW. CMake's own discovery
           # picks the runner's Clang (C:\Program Files\LLVM), which
           # targets MSVC headers and cannot build the MinGW toolchain.
-          # The same Rtools ladder the staged R release build uses.
+          # The same Rtools ladder the staged R release build uses, plus
+          # the standard install paths (Rtools4* lives in lowercase
+          # C:\rtools4N, older Rtools in C:\Rtools). The RTOOLS4*_HOME
+          # values use backslashes, which bash cannot test as paths, so
+          # they are normalized first.
           RT=""
           for e in RTOOLS45_HOME RTOOLS44_HOME RTOOLS43_HOME; do
             v="${!e}"
+            v="${v//\\//}"
             if [ -n "$v" ] && [ -x "$v/mingw64/bin/gcc.exe" ]; then RT="$v"; break; fi
           done
-          if [ -z "$RT" ] && [ -x "C:/Rtools/mingw64/bin/gcc.exe" ]; then RT="C:/Rtools"; fi
+          if [ -z "$RT" ]; then
+            for v in "C:/rtools45" "C:/rtools44" "C:/rtools43" "C:/Rtools"; do
+              if [ -x "$v/mingw64/bin/gcc.exe" ]; then RT="$v"; break; fi
+            done
+          fi
           [ -n "$RT" ] || { echo "Rtools not found (set RTOOLS4*_HOME)" >&2; exit 1; }
           echo "RT_BIN=$RT/mingw64/bin" >> "$GITHUB_ENV"
           # The MSVC build step clones the HiGHS source only on a cache
