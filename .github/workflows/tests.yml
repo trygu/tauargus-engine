@@ -135,35 +135,43 @@ jobs:
           # Pin the compilers to Rtools' MinGW. CMake's own discovery
           # picks the runner's Clang (C:\Program Files\LLVM), which
           # targets MSVC headers and cannot build the MinGW toolchain.
-          # This step's shell is Rtools' own bash (setup-r puts it on
-          # PATH first), whose file tests do not resolve drive-letter
-          # paths, so Rtools is taken from the RTOOLS4*_HOME env vars
-          # (reliably set for the R that setup-r installs) instead of
-          # probed on disk; CMake resolves the compiler paths itself.
-          # Known install paths are the fallback (Rtools4* lives in
-          # lowercase C:\rtools4N, older Rtools in C:\Rtools).
-          RT=""
-          for v in "${RTOOLS45_HOME:-}" "${RTOOLS44_HOME:-}" "${RTOOLS43_HOME:-}"; do
+          # Rtools45 keeps its MinGW in x86_64-w64-mingw32.static.posix/bin
+          # (older Rtools in mingw64/bin), so both layouts are probed for
+          # each Rtools root, starting from the RTOOLS4*_HOME env vars
+          # (set for the R that setup-r installs); the known install
+          # paths (lowercase C:\rtools4N, older C:\Rtools) are the
+          # fallback. This step's shell is Rtools' own bash (setup-r
+          # puts it on PATH first) and it rejects bashisms such as
+          # ${!e}, so the discovery stays POSIX.
+          RT_BIN=""
+          for v in "${RTOOLS45_HOME:-}" "${RTOOLS44_HOME:-}" "${RTOOLS43_HOME:-}" \
+                   "C:/rtools45" "C:/rtools44" "C:/rtools43" "C:/Rtools"; do
             [ -n "$v" ] || continue
-            RT="$v"; break
+            v=$(printf '%s' "$v" | tr '\\' '/')
+            if [ -x "$v/mingw64/bin/gcc.exe" ]; then RT_BIN="$v/mingw64/bin"; break; fi
+            if [ -x "$v/x86_64-w64-mingw32.static.posix/bin/gcc.exe" ]; then
+              RT_BIN="$v/x86_64-w64-mingw32.static.posix/bin"; break
+            fi
           done
-          if [ -z "$RT" ]; then
-            for v in "C:/rtools45" "C:/rtools44" "C:/rtools43" "C:/Rtools"; do
-              if [ -d "$v/mingw64" ]; then RT="$v"; break; fi
-            done
+          if [ -z "$RT_BIN" ]; then
+            # Last resort: gcc is on PATH (Rtools); cygpath converts the
+            # MSYS form to a Windows path CMake can resolve.
+            g=$(command -v gcc || true)
+            if [ -n "$g" ] && command -v cygpath >/dev/null 2>&1; then
+              RT_BIN=$(dirname "$(cygpath -m "$g")")
+            fi
           fi
-          [ -n "$RT" ] || RT="C:/rtools45"
-          RT=$(printf '%s' "$RT" | tr '\\' '/')
-          echo "Rtools root: $RT (gcc on PATH: $(command -v gcc || echo none))"
-          echo "RT_BIN=$RT/mingw64/bin" >> "$GITHUB_ENV"
+          [ -n "$RT_BIN" ] || { echo "Rtools compiler not found (RTOOLS4*_HOME)" >&2; exit 1; }
+          echo "Rtools bin: $RT_BIN (raw gcc: $(command -v gcc || echo none))"
+          echo "RT_BIN=$RT_BIN" >> "$GITHUB_ENV"
           # The MSVC build step clones the HiGHS source only on a cache
           # miss; make sure the source is present for this build too.
           [ -d highs ] || git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
           cmake -S highs -B highs/build-mingw -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
             -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_C_COMPILER="$RT/mingw64/bin/gcc" \
-            -DCMAKE_CXX_COMPILER="$RT/mingw64/bin/g++" \
+            -DCMAKE_C_COMPILER="$RT_BIN/gcc" \
+            -DCMAKE_CXX_COMPILER="$RT_BIN/g++" \
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/highs-prefix-mingw"
           cmake --build highs/build-mingw -j
           cmake --install highs/build-mingw
