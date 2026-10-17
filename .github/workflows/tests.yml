@@ -204,10 +204,13 @@ jobs:
           HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
         run: |
           set -euo pipefail
-          # On Windows the binding links the MinGW engine build.
+          # On Windows the binding links the MinGW engine build, and
+          # R CMD INSTALL's post-install load test needs the engine
+          # DLLs on PATH.
           if [ "$RUNNER_OS" = "Windows" ]; then
             export TA_ENGINE_BUILD="$GITHUB_WORKSPACE/engine/build-mingw"
             export HIGHSPREFIX="$RUNNER_TEMP/highs-prefix-mingw"
+            export PATH="$GITHUB_WORKSPACE/engine/build-mingw/bin:$PATH"
           fi
           mkdir -p "${RUNNER_TEMP}/R lib"
           R CMD INSTALL --library="${RUNNER_TEMP}/R lib" bindings/r/tauargusengine
