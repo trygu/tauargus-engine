@@ -264,17 +264,22 @@ jobs:
           fi
 
           # Link + load check against the bundled csp library only. On
-          # Windows the Rtools MSYS cmake (on PATH via setup-r) defaults
-          # to Unix Makefiles, so pin the Visual Studio generator for
-          # the bundled MSVC import libs.
+          # Windows use the runner's native cmake (the Rtools MSYS cmake
+          # on PATH via setup-r defaults to Unix Makefiles and its
+          # Visual Studio generator is untested here) and pin the VS
+          # generator for the bundled MSVC import libs.
+          CM=cmake
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake -S ci/linkcheck -B "$RUNNER_TEMP/linkcheck-build" -DBUNDLE_DIR="$BUNDLE" \
+            if [ -x "C:/Program Files/CMake/bin/cmake.exe" ]; then
+              CM="C:/Program Files/CMake/bin/cmake.exe"
+            fi
+            "$CM" -S ci/linkcheck -B "$RUNNER_TEMP/linkcheck-build" -DBUNDLE_DIR="$BUNDLE" \
               -G "Visual Studio 17 2022" -A x64
           else
             cmake -S ci/linkcheck -B "$RUNNER_TEMP/linkcheck-build" -DBUNDLE_DIR="$BUNDLE"
           fi
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake --build "$RUNNER_TEMP/linkcheck-build" --config Release
+            "$CM" --build "$RUNNER_TEMP/linkcheck-build" --config Release
             LC="$RUNNER_TEMP/linkcheck-build/Release/linkcheck.exe"
             export PATH="$BUNDLE/bin:$RUNNER_TEMP/highs-prefix/bin:$PATH"
           else
