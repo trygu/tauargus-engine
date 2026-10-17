@@ -29,16 +29,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04, label: "Linux x86_64" }
-          - { os: ubuntu-24.04-arm, label: "Linux arm64" }
-          - { os: macos-15, label: "macOS arm64" }
-          - { os: windows-2022, label: "Windows x86_64" }
+          - { os: ubuntu-24.04, osname: linux, arch: x86_64, label: "Linux x86_64" }
+          - { os: ubuntu-24.04-arm, osname: linux, arch: arm64, label: "Linux arm64" }
+          - { os: macos-15, osname: macos, arch: arm64, label: "macOS arm64" }
+          - { os: windows-2022, osname: windows, arch: x86_64, label: "Windows x86_64" }
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - uses: astral-sh/setup-uv@v5
+
+      # Short commit for the artifact names; the test-logs directory is
+      # the diagnostics bundle, uploaded on every outcome.
+      - name: Record engine commit
+        id: sha
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/engine-tests"
+          echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
       # The HiGHS version is pinned in engine/HiGHS-VERSION (single source of
       # truth); the CMake build and these workflows read the same file.
@@ -89,18 +98,26 @@ jobs:
             cmake --build engine/build -j
           fi
 
+      # Test outputs are teed into the diagnostics bundle so a failed
+      # run leaves its logs as an artifact (the step still fails with
+      # the original exit code via pipefail).
       - name: Test native core
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = "Windows" ]; then
-            ctest --test-dir engine/build/native/core --output-on-failure --build-config Release
+            ctest --test-dir engine/build/native/core --output-on-failure --build-config Release \
+              2>&1 | tee "${RUNNER_TEMP}/engine-tests/ctest-native-core.txt"
           else
-            ctest --test-dir engine/build/native/core --output-on-failure
+            ctest --test-dir engine/build/native/core --output-on-failure \
+              2>&1 | tee "${RUNNER_TEMP}/engine-tests/ctest-native-core.txt"
           fi
 
       - name: Build and test Python binding
         working-directory: bindings/python
-        run: uv run --with pytest --with pybind11 pytest tests -q
+        run: |
+          set -euo pipefail
+          uv run --with pytest --with pybind11 pytest tests -q \
+            2>&1 | tee "${RUNNER_TEMP}/engine-tests/python-binding-tests.txt"
 
       - name: Install R (apt)
         if: runner.os == 'Linux'
@@ -195,6 +212,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=g++
           cmake --build engine/build-mingw -j
 
+
       # Install into a temp library: the runner's system R library is not
       # writable by the runner user on Linux. The path deliberately
       # contains a space (a quoting-bug detector, like the product
@@ -226,4 +244,97 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             export PATH="$GITHUB_WORKSPACE/engine/build-mingw/bin:$RUNNER_TEMP/highs-prefix-mingw/bin:$PATH"
           fi
-          Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R
+          Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R \
+            2>&1 | tee "${RUNNER_TEMP}/engine-tests/r-binding-smoke.txt"
+
+      # Install the engine into a clean bundle directory, prove the
+      # bundle links and loads from its unpacked location, record its
+      # provenance manifest and verify it (an empty or incomplete
+      # install fails the job).
+      - name: Bundle installed engine and write manifest
+        run: |
+          set -euo pipefail
+          BUNDLE="$RUNNER_TEMP/engine-bundle"
+          TESTS="$RUNNER_TEMP/engine-tests"
+          rm -rf "$BUNDLE"; mkdir -p "$BUNDLE"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --install engine/build --config Release --prefix "$BUNDLE"
+          else
+            cmake --install engine/build --prefix "$BUNDLE"
+          fi
+
+          # Link + load check against the bundled csp library only. On
+          # Windows the Rtools MSYS cmake (on PATH via setup-r) defaults
+          # to Unix Makefiles, so pin the Visual Studio generator for
+          # the bundled MSVC import libs.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake -S ci/linkcheck -B "$RUNNER_TEMP/linkcheck-build" -DBUNDLE_DIR="$BUNDLE" \
+              -G "Visual Studio 17 2022" -A x64
+          else
+            cmake -S ci/linkcheck -B "$RUNNER_TEMP/linkcheck-build" -DBUNDLE_DIR="$BUNDLE"
+          fi
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build "$RUNNER_TEMP/linkcheck-build" --config Release
+            LC="$RUNNER_TEMP/linkcheck-build/Release/linkcheck.exe"
+            export PATH="$BUNDLE/bin:$RUNNER_TEMP/highs-prefix/bin:$PATH"
+          else
+            cmake --build "$RUNNER_TEMP/linkcheck-build"
+            LC="$RUNNER_TEMP/linkcheck-build/linkcheck"
+            if [ "$RUNNER_OS" = "Linux" ]; then
+              export LD_LIBRARY_PATH="$BUNDLE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            else
+              export DYLD_LIBRARY_PATH="$BUNDLE/lib"
+            fi
+          fi
+          "$LC" > "$TESTS/bundle-linkcheck-run.txt" 2>&1
+          echo "bundle link + load check passed"
+
+          # Toolchain recorded in the manifest (from the engine build
+          # tree): generator, C++ compiler id and path.
+          GEN="$(sed -n 's/^CMAKE_GENERATOR:INTERNAL=//p' engine/build/CMakeCache.txt | head -n1)"
+          CID="$(sed -n 's/^set(CMAKE_CXX_COMPILER_ID "\([^"]*\)").*$/\1/p' engine/build/CMakeFiles/*/CMakeCXXCompiler.cmake | head -n1)"
+          CXX_PATH="$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' engine/build/CMakeCache.txt | head -n1)"
+
+          # On Linux, record the dynamic dependencies of the bundled
+          # shared libs (diagnostic only: HiGHS links statically, so no
+          # libhighs should appear).
+          if [ "$RUNNER_OS" = "Linux" ] && command -v ldd >/dev/null 2>&1; then
+            ( cd "$BUNDLE/lib" && ldd ./*.so ) > "$TESTS/bundle-ldd.txt" 2>&1 \
+              || echo "ldd failed (diagnostic only)" >> "$TESTS/bundle-ldd.txt"
+          fi
+
+          uv run --no-project python scripts/engine_manifest.py write "$BUNDLE" \
+            --meta "engine_sha=$(git rev-parse HEAD)" \
+            --meta "highs_version=$(tr -d '[:space:]' < engine/HiGHS-VERSION)" \
+            --meta "highs_link=static" \
+            --meta "os=${{ matrix.osname }}" \
+            --meta "arch=${{ matrix.arch }}" \
+            --meta "config=Release" \
+            --meta "generator=$GEN" \
+            --meta "cxx_compiler_id=$CID" \
+            --meta "cxx_compiler=$CXX_PATH" \
+            --meta "run_id=${GITHUB_RUN_ID}" \
+            --meta "run_attempt=${GITHUB_RUN_ATTEMPT}"
+          uv run --no-project python scripts/engine_manifest.py verify "$BUNDLE"
+
+      # The bundle is the verified install tree (libs, headers,
+      # MANIFEST.json). Uploaded only on success; the manifest's
+      # engine_sha is what makes a bundle reproducible.
+      - name: Upload engine bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-native-${{ matrix.osname }}-${{ matrix.arch }}-${{ steps.sha.outputs.short }}
+          path: ${{ runner.temp }}/engine-bundle
+          retention-days: 14
+
+      # Test diagnostics on every outcome (success, failure, cancel);
+      # missing files are fine (a run that failed before testing has
+      # no logs) and must not mask the original failure.
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-tests-${{ matrix.osname }}-${{ matrix.arch }}-${{ steps.sha.outputs.short }}
+          path: ${{ runner.temp }}/engine-tests
+          if-no-files-found: ignore
+          retention-days: 14
