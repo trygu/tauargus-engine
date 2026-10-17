@@ -167,11 +167,16 @@ jobs:
           # The MSVC build step clones the HiGHS source only on a cache
           # miss; make sure the source is present for this build too.
           [ -d highs ] || git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
+          # The step's cmake is Rtools' MSYS build, which rejects the
+          # compilers as "not a full path to an existing compiler tool"
+          # when given drive-letter paths (it identifies them fine), so
+          # put Rtools' bin first on PATH and pass the bare names.
+          export PATH="$RT_BIN:$PATH"
           cmake -S highs -B highs/build-mingw -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
             -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_C_COMPILER="$RT_BIN/gcc" \
-            -DCMAKE_CXX_COMPILER="$RT_BIN/g++" \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/highs-prefix-mingw"
           cmake --build highs/build-mingw -j
           cmake --install highs/build-mingw
@@ -180,11 +185,14 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           set -euo pipefail
+          # Same MSYS-cmake path quirk as the HiGHS step above: bare
+          # compiler names from PATH, Rtools' bin first.
+          export PATH="$RT_BIN:$PATH"
           HIGHS_CFG="$(dirname "$(find "$RUNNER_TEMP/highs-prefix-mingw" -name 'highs-config.cmake' -o -name 'highsConfig.cmake' -o -name 'HighsConfig.cmake' | head -n1)")"
           cmake -S engine -B engine/build-mingw -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release -DHighs_DIR="$HIGHS_CFG" \
-            -DCMAKE_C_COMPILER="$RT_BIN/gcc" \
-            -DCMAKE_CXX_COMPILER="$RT_BIN/g++"
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++
           cmake --build engine/build-mingw -j
 
       # Install into a temp library: the runner's system R library is not
