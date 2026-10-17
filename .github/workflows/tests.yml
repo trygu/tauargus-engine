@@ -135,22 +135,26 @@ jobs:
           # Pin the compilers to Rtools' MinGW. CMake's own discovery
           # picks the runner's Clang (C:\Program Files\LLVM), which
           # targets MSVC headers and cannot build the MinGW toolchain.
-          # The same Rtools ladder the staged R release build uses, plus
-          # the standard install paths (Rtools4* lives in lowercase
-          # C:\rtools4N, older Rtools in C:\Rtools). The RTOOLS4*_HOME
-          # values use backslashes, which bash cannot test as paths, so
-          # they are normalized with tr. This step's shell is Rtools'
-          # own bash (setup-r puts it on PATH first), which rejects
-          # bashisms such as ${!e} and ${v//..}, so the discovery
-          # stays POSIX.
+          # This step's shell is Rtools' own bash (setup-r puts it on
+          # PATH first), whose file tests do not resolve drive-letter
+          # paths, so Rtools is taken from the RTOOLS4*_HOME env vars
+          # (reliably set for the R that setup-r installs) instead of
+          # probed on disk; CMake resolves the compiler paths itself.
+          # Known install paths are the fallback (Rtools4* lives in
+          # lowercase C:\rtools4N, older Rtools in C:\Rtools).
           RT=""
-          for v in "${RTOOLS45_HOME:-}" "${RTOOLS44_HOME:-}" "${RTOOLS43_HOME:-}" \
-                   "C:/rtools45" "C:/rtools44" "C:/rtools43" "C:/Rtools"; do
+          for v in "${RTOOLS45_HOME:-}" "${RTOOLS44_HOME:-}" "${RTOOLS43_HOME:-}"; do
             [ -n "$v" ] || continue
-            v=$(printf '%s' "$v" | tr '\\' '/')
-            if [ -x "$v/mingw64/bin/gcc.exe" ]; then RT="$v"; break; fi
+            RT="$v"; break
           done
-          [ -n "$RT" ] || { echo "Rtools not found (set RTOOLS4*_HOME)" >&2; exit 1; }
+          if [ -z "$RT" ]; then
+            for v in "C:/rtools45" "C:/rtools44" "C:/rtools43" "C:/Rtools"; do
+              if [ -d "$v/mingw64" ]; then RT="$v"; break; fi
+            done
+          fi
+          [ -n "$RT" ] || RT="C:/rtools45"
+          RT=$(printf '%s' "$RT" | tr '\\' '/')
+          echo "Rtools root: $RT (gcc on PATH: $(command -v gcc || echo none))"
           echo "RT_BIN=$RT/mingw64/bin" >> "$GITHUB_ENV"
           # The MSVC build step clones the HiGHS source only on a cache
           # miss; make sure the source is present for this build too.
