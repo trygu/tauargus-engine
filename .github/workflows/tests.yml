@@ -55,12 +55,16 @@ jobs:
         id: pin
         run: echo "tag=$(tr -d '[:space:]' < engine/HiGHS-VERSION)" >> "$GITHUB_OUTPUT"
 
+      # HiGHS is built static (as the staged R release build does) so the
+      # engine libraries are self-contained: the bundle step must not
+      # ship a separate HiGHS runtime. The cache key carries the "static"
+      # qualifier so a stale shared-library cache entry is never hit.
       - name: Cache HiGHS
         id: highs-cache
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/highs-prefix
-          key: highs-${{ matrix.os }}-${{ steps.pin.outputs.tag }}
+          key: highs-static-${{ matrix.os }}-${{ steps.pin.outputs.tag }}
 
       # On Windows CMake picks the multi-config Visual Studio generator
       # (the same recipe the pytauargus wheel build uses); Release must
@@ -72,6 +76,7 @@ jobs:
           set -euo pipefail
           git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
           cmake -S highs -B highs/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/highs-prefix"
           if [ "$RUNNER_OS" = "Windows" ]; then
             cmake --build highs/build -j --config Release
@@ -104,11 +109,26 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           set -euo pipefail
+          # Pin the compilers to Rtools' MinGW. CMake's own discovery
+          # picks the runner's Clang (C:\Program Files\LLVM), which
+          # targets MSVC headers and cannot build the MinGW toolchain.
+          # The same Rtools ladder the staged R release build uses.
+          RT=""
+          for e in RTOOLS45_HOME RTOOLS44_HOME RTOOLS43_HOME; do
+            v="${!e}"
+            if [ -n "$v" ] && [ -x "$v/mingw64/bin/gcc.exe" ]; then RT="$v"; break; fi
+          done
+          if [ -z "$RT" ] && [ -x "C:/Rtools/mingw64/bin/gcc.exe" ]; then RT="C:/Rtools"; fi
+          [ -n "$RT" ] || { echo "Rtools not found (set RTOOLS4*_HOME)" >&2; exit 1; }
+          echo "RT_BIN=$RT/mingw64/bin" >> "$GITHUB_ENV"
           # The MSVC build step clones the HiGHS source only on a cache
           # miss; make sure the source is present for this build too.
           [ -d highs ] || git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
           cmake -S highs -B highs/build-mingw -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_C_COMPILER="$RT/mingw64/bin/gcc" \
+            -DCMAKE_CXX_COMPILER="$RT/mingw64/bin/g++" \
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/highs-prefix-mingw"
           cmake --build highs/build-mingw -j
           cmake --install highs/build-mingw
@@ -119,7 +139,9 @@ jobs:
           set -euo pipefail
           HIGHS_CFG="$(dirname "$(find "$RUNNER_TEMP/highs-prefix-mingw" -name 'highs-config.cmake' -o -name 'highsConfig.cmake' -o -name 'HighsConfig.cmake' | head -n1)")"
           cmake -S engine -B engine/build-mingw -G "MinGW Makefiles" \
-            -DCMAKE_BUILD_TYPE=Release -DHighs_DIR="$HIGHS_CFG"
+            -DCMAKE_BUILD_TYPE=Release -DHighs_DIR="$HIGHS_CFG" \
+            -DCMAKE_C_COMPILER="$RT_BIN/gcc" \
+            -DCMAKE_CXX_COMPILER="$RT_BIN/g++"
           cmake --build engine/build-mingw -j
 
       - name: Test native core
