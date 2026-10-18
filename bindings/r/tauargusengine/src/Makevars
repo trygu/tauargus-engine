@@ -7,19 +7,37 @@
 # is compatible with the engine's C++11 headers.)
 
 TA_ENGINE := $(abspath ../../../..)
-TA_LIB := $(TA_ENGINE)/engine/build/lib
+# The engine build tree. On Windows CI the R binding links a MinGW build
+# (see the workflow), not the MSVC one the Python binding uses, so the
+# directory is overridable via the TA_ENGINE_BUILD environment variable.
+TA_ENGINE_BUILD ?= $(TA_ENGINE)/engine/build
+TA_LIB := $(TA_ENGINE_BUILD)/lib
 TA_CORE_INC := $(TA_ENGINE)/engine/native/core/src
 TA_CSP_INC := $(TA_ENGINE)/engine/native/csp/src
 TA_HITAS_INC := $(TA_ENGINE)/engine/native/hitas/src
 TA_ROUNDER_INC := $(TA_ENGINE)/engine/native/rounder/src
 
+# Windows detection: on Windows the OS environment variable is
+# Windows_NT and GNU make imports environment variables as variables;
+# uname is not always on the R CMD INSTALL path, so check both.
 UNAME := $(shell uname -s 2>/dev/null)
+ifeq ($(UNAME),Windows_NT)
+IS_WINDOWS := 1
+else ifeq ($(OS),Windows_NT)
+IS_WINDOWS := 1
+endif
 
-ifeq ($(OS),Windows_NT)
-# Best-effort Windows: link the import libs from build/lib; the runtime DLLs
-# (build/bin) must be on PATH or bundled with the package at install time.
-PKG_CPPFLAGS = /I"$(TA_CORE_INC)" /I"$(TA_CSP_INC)" /I"$(TA_HITAS_INC)" /I"$(TA_ROUNDER_INC)"
-PKG_LIBS = -libpath:$(TA_LIB) tauargus_csp.lib tauargus_hitas.lib tauargus_rounder.lib CRP.lib tauargus_core.lib highs.lib
+ifneq ($(IS_WINDOWS),)
+# Windows CI builds a second, MinGW copy of the engine for the R
+# binding (TA_ENGINE_BUILD, single-config): the binding is compiled
+# with Rtools' MinGW and uses the core's C++ API, so it must link a
+# core built with the same toolchain (the MSVC core's C++ symbols are
+# not resolvable from MinGW). HiGHS is statically linked into the
+# engine DLLs, so there is no separate HiGHS dependency here. The
+# runtime DLLs (build-mingw/bin) must be on PATH when the binding is
+# loaded.
+PKG_CPPFLAGS = -I"$(TA_CORE_INC)" -I"$(TA_CSP_INC)" -I"$(TA_HITAS_INC)" -I"$(TA_ROUNDER_INC)"
+PKG_LIBS = -L"$(TA_LIB)" -ltauargus_csp -ltauargus_hitas -ltauargus_rounder -lCRP -ltauargus_core
 else ifeq ($(UNAME),Darwin)
 # HIGHSPREFIX may be set in the environment (CI builds HiGHS into a
 # temp prefix); otherwise fall back to the Homebrew install.

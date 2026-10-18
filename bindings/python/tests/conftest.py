@@ -42,6 +42,20 @@ def _drop_stale_cache() -> None:
             return
 
 
+def _run(cmd: list[str]) -> None:
+    """Run a cmake step; on failure surface the captured output, not just
+    the exit code (the CI log otherwise shows no actionable error)."""
+    try:
+        subprocess.run(
+            cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as exc:
+        tail = (exc.stderr or b"").decode(errors="replace")[-4000:]
+        raise RuntimeError(
+            f"command failed ({exc.returncode}): {' '.join(cmd)}\n{tail}"
+        ) from None
+
+
 def _build_extension() -> None:
     _drop_stale_cache()
     PKG_DIR.mkdir(parents=True, exist_ok=True)
@@ -52,14 +66,15 @@ def _build_extension() -> None:
         f"-DTAUARGUS_PY_PKG_DIR={PKG_DIR}",
         f"-Dpybind11_DIR={_pybind11_dir()}",
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    jobs = str(os.cpu_count() or 4)
-    subprocess.run(
-        ["cmake", "--build", str(EXT_DIR), "-j", jobs],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    _run(cmd)
+    build = ["cmake", "--build", str(EXT_DIR), "-j", str(os.cpu_count() or 4)]
+    if os.name == "nt":
+        # The Visual Studio generator is multi-config and defaults to
+        # Debug, which needs the (unshipped) debug Python import lib and
+        # does not match the Release engine libs we link. Select Release
+        # explicitly, like the engine build and the wheel build do.
+        build += ["--config", "Release"]
+    _run(build)
 
 
 @pytest.fixture(scope="session", autouse=True)
