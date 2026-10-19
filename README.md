@@ -162,8 +162,9 @@ The engine is C++11, built from five git submodules under `engine/native/`:
 
 ```text
 .
-├── engine/      C/C++ engine; CMakeLists.txt is a superbuild of the 5 submodules
-├── bindings/
+├── engine/      C/C++ engine; CMakeLists.txt is a superbuild of the 5
+│                submodules (see engine/README.md for the module map)
+├── bindings/    thin Python and R bindings (see bindings/README.md)
 │   ├── python/  pybind11 extension (cpp/) + CMake, binding smoke tests
 │   └── r/       tauargusengine, the thin R package + binding smoke test
 └── data/        sample .arb batches and tabular fixtures; also the test
