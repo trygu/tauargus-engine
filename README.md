@@ -32,23 +32,28 @@ The user-facing front-ends live in separate repos:
 
 ## Relationship to the original Tau-Argus
 
-This is the original Tau-Argus solver code, not a reimplementation. The
-legacy open-source τ-ARGUS is maintained by Statistics Netherlands (EUPL) at
-[sdcTools/tauargus](https://github.com/sdcTools/tauargus). Version marking in
-that code is inconsistent (the inherited `core` module reports `1.1.4.11`,
-`hitas` says `4.3.1.1`), so this project calls the code line "τ-ARGUS 4.x"
-and uses the bundled 4.1 manual as the behavioural reference.
+The legacy open-source τ-ARGUS is maintained by Statistics Netherlands
+(EUPL) at [sdcTools/tauargus](https://github.com/sdcTools/tauargus). This
+project starts from its C/C++ solver code and changes four things:
 
-- **Engine:** the C/C++ code is largely unchanged. The changes make it build
-  with a modern toolchain (CMake, current GCC/Clang/MSVC), switch the solver
-  backend to HiGHS, and make it self-contained.
-- **Audit:** the standalone `intervalle.exe` audit program (Delphi, i.e. modern Pascal) is ported
-  into the `csp` engine module, so the feasibility-interval audit runs in-process
-  instead of as a separate executable.
-- **Python package:** `pytauargus` is new. Its file-generation workflow builds
-  on [rtauargus](https://github.com/InseeFrLab/rtauargus), the R wrapper around
-  Tau-Argus. Its DataFrame and result API is inspired by
-  [PiArgus (`piargus`)](https://github.com/lverweijen/piargus).
+- **Builds on a modern toolchain.** The code is reorganised into five CMake
+  modules and compiles with current GCC, Clang and MSVC.
+- **Solves with an open-source solver.** The
+  [HiGHS](https://github.com/ERGO-Code/HiGHS) solver replaces the legacy
+  CPLEX, XPRESS and free-solver backends.
+- **Audits in-process.** The feasibility-interval audit used to be a
+  separate `intervalle.exe` (Delphi) executable. Its logic is ported into
+  the `csp` module, so the whole pipeline runs without anything external.
+- **Binds to Python and R.** Thin pybind11 and R bindings wrap the five
+  engine libraries for the front-end repos.
+
+The front-ends that use this engine are
+[pytauargus](https://github.com/trygu/pytauargus) (Python package, CLI and
+terminal UI) and
+[rtauargus.native](https://github.com/trygu/rtauargus.native) (R front-end,
+a fork of INSEE's [rtauargus](https://github.com/InseeFrLab/rtauargus)).
+Both pin this repo as a git submodule and ship self-contained builds of the
+engine with their releases.
 
 ## Compatibility and validation
 
