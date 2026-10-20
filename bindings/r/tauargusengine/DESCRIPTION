@@ -1,6 +1,6 @@
 Package: tauargusengine
 Title: Native R Bindings to the Tau-Argus SDC Engine
-Version: 0.5.7
+Version: 0.6.0
 Authors@R: c(
     person("Trygve", "Falch", role = c("aut", "cre"),
            email = "trygve.falch@gmail.com")
