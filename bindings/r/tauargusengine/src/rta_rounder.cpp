@@ -11,8 +11,9 @@
 #include "rta_cpp.h"
 
 extern "C" SEXP rta_rounder_new(void) {
+    return rta_call([&]() -> SEXP {
     RounderCtrl *obj = new RounderCtrl();
-    SEXP ext = PROTECT(R_MakeExternalPtr(obj, R_NilValue, R_NilValue));
+    SEXP ext = PROTECT(R_MakeExternalPtr(obj, Rf_install("tauargusengine::RounderCtrl"), R_NilValue));
     R_RegisterCFinalizerEx(
         ext,
         +[](SEXP e) {
@@ -25,13 +26,16 @@ extern "C" SEXP rta_rounder_new(void) {
         TRUE);
     UNPROTECT(1);
     return ext;
+    });
 }
 
 extern "C" SEXP rta_rounder_set_double_constant(SEXP self, SEXP variable,
                                                 SEXP value) {
-    RounderCtrl &r = *static_cast<RounderCtrl *>(R_ExternalPtrAddr(self));
+    return rta_call([&]() -> SEXP {
+    RounderCtrl &r = rta_object<RounderCtrl>(self, "tauargusengine::RounderCtrl");
     r.SetDoubleConstant((int) rta_long(variable), rta_dbl(value));
     return R_NilValue;
+    });
 }
 
 extern "C" SEXP rta_rounder_do_round(SEXP self, SEXP solver, SEXP in_file,
@@ -39,7 +43,8 @@ extern "C" SEXP rta_rounder_do_round(SEXP self, SEXP solver, SEXP in_file,
                                      SEXP auditing, SEXP solution,
                                      SEXP statistics, SEXP max_time,
                                      SEXP zero_restricted) {
-    RounderCtrl &r = *static_cast<RounderCtrl *>(R_ExternalPtrAddr(self));
+    return rta_call([&]() -> SEXP {
+    RounderCtrl &r = rta_object<RounderCtrl>(self, "tauargusengine::RounderCtrl");
     std::vector<double> u = rta_dbl_vec(upper);
     std::vector<double> l = rta_dbl_vec(lower);
 
@@ -70,4 +75,5 @@ extern "C" SEXP rta_rounder_do_round(SEXP self, SEXP solver, SEXP in_file,
     REAL(v)[4] = (double) ec;
     UNPROTECT(1);
     return v;
+    });
 }

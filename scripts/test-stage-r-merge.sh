@@ -91,6 +91,8 @@ check "front-end package help preserved" \
     'grep -qx "front-end package documentation" "$FE/man/rtauargus.native-package.Rd" && [[ ! -f $FE/man/tauargusengine-package.Rd ]]'
 check "binding smoke test copied" \
     '[[ -f $FE/tests/test_binding_smoke.R ]]'
+check "native error test copied and loads the front-end" \
+    '[[ -f $FE/tests/test_native_errors.R ]] && grep -q "library(rtauargus.native)" $FE/tests/test_native_errors.R'
 check "binding smoke test loads the front-end" \
     'grep -q "library(rtauargus.native)" $FE/tests/test_binding_smoke.R && ! grep -q "library(tauargusengine)" $FE/tests/test_binding_smoke.R'
 check "front-end tests kept" \

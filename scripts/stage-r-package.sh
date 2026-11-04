@@ -119,8 +119,10 @@ if [[ -n "$MERGE_INTO" ]]; then
     done
     mkdir -p "$PKG_DIR/tests"
     # Point the smoke test at the front-end package name.
-    sed 's/library(tauargusengine)/library('"$PKG_NAME"')/' \
-        "$BINDING/tests/test_binding_smoke.R" > "$PKG_DIR/tests/test_binding_smoke.R"
+    for f in "$BINDING"/tests/*.R; do
+        sed 's/library(tauargusengine)/library('"$PKG_NAME"')/' \
+            "$f" > "$PKG_DIR/tests/$(basename "$f")"
+    done
 else
     cp -R "$BINDING/R" "$PKG_DIR/R"
     cp "$BINDING/NAMESPACE" "$BINDING/LICENSE" "$PKG_DIR/"

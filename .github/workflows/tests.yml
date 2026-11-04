@@ -1,4 +1,4 @@
-# Build the engine and run the binding tests on every push and PR.
+# Build the engine and run the binding tests on master pushes and PRs.
 # (Wheel building and releasing live in the pytauargus repo; the R
 # package build and release live in the rtauargus.native repo.)
 
@@ -6,7 +6,7 @@ name: Engine — Native and binding tests
 
 on:
   push:
-    branches: ["**"]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -282,6 +282,7 @@ jobs:
             }
           Rscript scripts/test-r-installed.R "$LIB" tauargusengine
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_binding_smoke.R"
+          R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_errors.R"
 
       # Install the engine into a clean bundle directory, prove the
       # bundle links and loads from its unpacked location, record its

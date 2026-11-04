@@ -18,6 +18,7 @@ void TauAuditJjFree(int n, long *cell_idx, double *a_min, double *a_max,
 }
 
 extern "C" SEXP rta_audit_jj(SEXP jjfile) {
+    return rta_call([&]() -> SEXP {
     std::string f = rta_str(jjfile);
 
     int n = 0;
@@ -82,4 +83,5 @@ extern "C" SEXP rta_audit_jj(SEXP jjfile) {
 
     UNPROTECT(10);
     return df;
+    });
 }

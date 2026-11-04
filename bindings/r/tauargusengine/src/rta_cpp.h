@@ -15,6 +15,35 @@
 #include <string>
 #include <vector>
 #include <cstdarg>
+#include <cstdio>
+#include <exception>
+#include <stdexcept>
+
+// Catch native exceptions after C++ temporaries have been unwound, then
+// signal an R error outside the catch block (Rf_error uses a long jump).
+template <typename Function>
+static SEXP rta_call(Function function) {
+    char message[1024];
+    try {
+        return function();
+    } catch (const std::exception &e) {
+        std::snprintf(message, sizeof(message), "Tau-Argus native error: %s", e.what());
+    } catch (int code) {
+        std::snprintf(message, sizeof(message), "Tau-Argus native error (code %d)", code);
+    } catch (...) {
+        std::snprintf(message, sizeof(message), "Unknown Tau-Argus native error");
+    }
+    Rf_error("%s", message);
+    return R_NilValue;
+}
+
+template <typename Object>
+static Object &rta_object(SEXP self, const char *type) {
+    if (TYPEOF(self) != EXTPTRSXP || R_ExternalPtrTag(self) != Rf_install(type) ||
+        R_ExternalPtrAddr(self) == NULL)
+        throw std::invalid_argument(std::string("Invalid or expired ") + type + " object");
+    return *static_cast<Object *>(R_ExternalPtrAddr(self));
+}
 
 static inline std::string rta_str(SEXP x) {
     if (x == R_NilValue) return std::string();
