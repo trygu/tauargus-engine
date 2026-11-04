@@ -46,7 +46,11 @@ EOF
 # --- fixture HiGHS dir (the real clone is skipped via --highs-src) ----------
 HIGHS="$WORK/highs-fixture"
 mkdir -p "$HIGHS/cmake" "$HIGHS/highs" "$HIGHS/extern" "$HIGHS/app" "$HIGHS/examples"
+git init -q "$HIGHS"
 touch "$HIGHS/CMakeLists.txt"
+printf 'MIT License\nCopyright fixture HiGHS\n' > "$HIGHS/LICENSE.txt"
+mkdir -p "$HIGHS/extern/example"
+printf 'Third-party fixture license\n' > "$HIGHS/extern/example/LICENSE"
 
 # --- stage ------------------------------------------------------------------
 if ! "$ROOT/scripts/stage-r-package.sh" --merge-into "$FE" --highs-src "$HIGHS" \
@@ -104,8 +108,18 @@ check "DESCRIPTION: SystemRequirements added" \
     'grep -q "^SystemRequirements:" $FE/DESCRIPTION'
 check "DESCRIPTION: provenance comment added" \
     'grep -q "^Comment: Staged native layer from tauargus-engine " $FE/DESCRIPTION'
-check "LICENSE: engine notice appended" \
-    'grep -q "EUPL-1.2" $FE/LICENSE'
+check "DESCRIPTION: combined package uses EUPL" \
+    'grep -qx "License: EUPL-1.2" $FE/DESCRIPTION'
+check "full EUPL text installed" \
+    'grep -q "This European Union Public Licence" $FE/inst/LICENSES/EUPL-1.2.txt'
+check "front-end MIT notice retained" \
+    'grep -q "Copyright (c) 2026 fixture" $FE/inst/LICENSES/MIT-frontend.txt && grep -q "Permission is hereby granted" $FE/inst/LICENSES/MIT-frontend.txt'
+check "HiGHS keeps its MIT license" \
+    'cmp $HIGHS/LICENSE.txt $FE/inst/LICENSES/HiGHS/LICENSE.txt'
+check "HiGHS third-party licenses installed" \
+    'cmp $HIGHS/extern/example/LICENSE $FE/inst/LICENSES/HiGHS/extern/example/LICENSE'
+check "MIT stub is not mislabeled as EUPL" \
+    '[[ ! -f $FE/LICENSE ]]'
 check "Rbuildignore: native build artifacts ignored" \
     'grep -qxF "^src/\.ta" $FE/.Rbuildignore'
 

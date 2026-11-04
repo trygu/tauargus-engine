@@ -36,6 +36,7 @@ OUT=""
 HIGHS_SRC=""
 VERSION=""
 MERGE_INTO=""
+FRONT_MIT=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --out) OUT="$2"; shift 2 ;;
@@ -91,6 +92,9 @@ if [[ -n "$MERGE_INTO" ]]; then
     done
     [[ -d "$PKG_DIR/R" ]] || { echo "merge target missing R/: $PKG_DIR" >&2; exit 1; }
     PKG_NAME="$(awk -F': *' '/^Package:/{print $2; exit}' "$PKG_DIR/DESCRIPTION")"
+    if grep -qx 'License: MIT + file LICENSE' "$PKG_DIR/DESCRIPTION"; then
+        FRONT_MIT=1
+    fi
     # R names the shared object after the package verbatim (dots kept:
     # rtauargus.native.so), so useDynLib must use the dot form. The
     # init symbol cannot contain dots (C identifier), but R's dynload
@@ -184,19 +188,12 @@ if [[ -n "$MERGE_INTO" ]]; then
             print "    and HiGHS (" highs ") from its own sources at install time."
             print "NeedsCompilation: yes"
             print "Comment: Staged native layer from tauargus-engine " engsha " (HiGHS " highs ")"
+            print "License: EUPL-1.2"
+            next
         }
         { print }
     ' "$PKG_DIR/DESCRIPTION" > "$PKG_DIR/.DESCRIPTION.staged"
     mv "$PKG_DIR/.DESCRIPTION.staged" "$PKG_DIR/DESCRIPTION"
-
-    # LICENSE: note the engine-licensed portion.
-    cat >> "$PKG_DIR/LICENSE" <<EOF
-
----
-The bundled native sources (src/, engine/, highs/, configure,
-configure.win, configure.R) belong to tauargus-engine
-(https://github.com/trygu/tauargus-engine) and are licensed under EUPL-1.2.
-EOF
 
     # .Rbuildignore: keep the native build artifacts out of the tarball.
     for pat in '^src/\.ta' '^src/.*\.(o|so|dll|dylib|a|lib|obj)$' '^inst/libs'; do
@@ -255,6 +252,42 @@ for f in CMakeLists.txt Version.txt highs.pc.in LICENSE.txt AUTHORS \
 done
 cp -R "$HIGHS_SRC/cmake" "$HIGHS_SRC/highs" "$HIGHS_SRC/extern" \
    "$HIGHS_SRC/app" "$HIGHS_SRC/examples" "$PKG_DIR/highs/"
+
+# 7) Ship license texts in inst/ so both source and installed packages
+# carry them. The combined package is EUPL; the MIT front-end and HiGHS
+# retain their original permissions and attribution.
+LICENSES="$PKG_DIR/inst/LICENSES"
+mkdir -p "$LICENSES/HiGHS"
+cp "$ENGINE_DIR/LICENSE" "$LICENSES/EUPL-1.2.txt"
+if [[ -f "$PKG_DIR/LICENSE" ]]; then
+    if [[ "$FRONT_MIT" == 1 ]]; then
+        year="$(sed -n 's/^YEAR: *//p' "$PKG_DIR/LICENSE")"
+        holder="$(sed -n 's/^COPYRIGHT HOLDER: *//p' "$PKG_DIR/LICENSE")"
+        [[ -n "$year" && -n "$holder" ]] || {
+            echo "front-end MIT license is missing its year or holder" >&2
+            exit 1
+        }
+        {
+            printf 'MIT License\n\nCopyright (c) %s %s\n\n' "$year" "$holder"
+            cat "$STAGING/MIT-LICENSE"
+        } > "$LICENSES/MIT-frontend.txt"
+    else
+        cp "$PKG_DIR/LICENSE" "$LICENSES/binding-attribution.txt"
+    fi
+    # A MIT stub is not the license of the combined EUPL package.
+    rm "$PKG_DIR/LICENSE"
+fi
+find "$HIGHS_SRC" -type f \( -iname '*license*' -o -iname '*licence*' \
+    -o -iname 'copying*' -o -iname 'copyright*' -o -iname 'notice*' \) \
+    -not -path '*/.git/*' | while IFS= read -r license; do
+    relative="${license#"$HIGHS_SRC"/}"
+    destination="$LICENSES/HiGHS/$relative"
+    mkdir -p "$(dirname "$destination")"
+    cp "$license" "$destination"
+done
+if [[ -f "$HIGHS_SRC/THIRD_PARTY_NOTICES.md" ]]; then
+    cp "$HIGHS_SRC/THIRD_PARTY_NOTICES.md" "$LICENSES/HiGHS/"
+fi
 
 echo "staged: $PKG_DIR"
 echo "  engine: $ENGINE_SHA (HiGHS $HIGHS_TAG)"
