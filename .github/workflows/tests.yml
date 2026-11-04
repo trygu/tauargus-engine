@@ -40,6 +40,9 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
+      - name: Test self-contained R package staging
+        run: bash scripts/test-stage-r-merge.sh
+
       # Short commit for the artifact names; the test-logs directory is
       # the diagnostics bundle, uploaded on every outcome.
       - name: Record engine commit
