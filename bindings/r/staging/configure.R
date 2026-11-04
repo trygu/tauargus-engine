@@ -7,14 +7,9 @@
 #   1. HiGHS, static and minimal            -> src/.ta/highs
 #   2. the five tauargus-engine libraries    -> src/.ta/engine
 #
-# with install rpaths relative to the package (@loader_path / $ORIGIN), so
-# nothing in the installed package points at the build machine. The engine
-# shared libraries are staged into inst/libs (installed as the package
-# `libs/` directory, next to the compiled R DLL), and src/Makevars is
-# generated with the platform compile/link flags.
-#
-# Requires: cmake >= 3.16 and a C++11 compiler on PATH. On Windows the
-# Rtools toolchain that R itself uses (R CMD INSTALL sets up the PATH).
+# The engine and solver are static archives linked into the R DLL. No
+# engine shared libraries or build-machine runtime paths are installed.
+# Requires CMake >= 3.16 and the C/C++ toolchain used by R.
 
 local({
   stop_if <- function(cond, msg) if (cond) stop("\nconfigure: ", msg, call. = FALSE)
@@ -35,21 +30,20 @@ local({
   highs_pre  <- file.path(build, "highs")
   engine_pre <- file.path(build, "engine")
   eng_lib    <- file.path(engine_pre, "lib")
-  eng_bin    <- file.path(engine_pre, "bin")
 
   stop_if(!dir.exists(highs_src), "highs/ (bundled HiGHS sources) is missing")
   stop_if(!dir.exists(engine_src), "engine/ (bundled engine sources) is missing")
-  if (is.null(Sys.which("cmake")))
+  if (!nzchar(Sys.which("cmake")))
     stop("cmake not found on PATH; install CMake >= 3.16 first")
 
   is_win <- .Platform$OS.type == "windows"
   is_mac <- identical(Sys.info()[["sysname"]], "Darwin")
-  jobs   <- as.character(max(2L, parallel::detectCores()))
+  jobs   <- "2"
 
   # On Windows the CMake "MinGW Makefiles" generator requires the Rtools
   # g++ on PATH, and R CMD INSTALL does not always put the compiler
   # directory there for configure scripts. Add it explicitly.
-  if (is_win && is.null(Sys.which("g++"))) {
+  if (is_win && !nzchar(Sys.which("g++"))) {
     for (rt in c(Sys.getenv("RTOOLS44_HOME"), Sys.getenv("RTOOLS43_HOME"),
                  "C:/Rtools44", "C:/Rtools")) {
       bin <- file.path(rt, "mingw64", "bin")
@@ -59,17 +53,37 @@ local({
         break
       }
     }
-    if (is.null(Sys.which("g++")))
+    if (!nzchar(Sys.which("g++")))
       stop("g++ (Rtools MinGW toolchain) not found on PATH")
   }
 
-  # R CMD INSTALL exports CC/CFLAGS/CXX/CXXFLAGS/... from its own build for
-  # the configure script. The nested CMake builds must not inherit the flag
-  # variables: a distro-built R bakes in flags such as
-  # -Werror=format-security and -D_FORTIFY_SOURCE=3, which break the legacy
-  # engine sources. The compiler choices (CC/CXX) are kept.
-  for (v in c("CFLAGS", "CXXFLAGS", "FFLAGS", "FLIBS", "LDFLAGS", "CPPFLAGS"))
-    Sys.unsetenv(v)
+  # Use R's compiler choices and flags, preserving explicit installer
+  # environment settings. Do not discard hardening or user flags.
+  r_config <- function(name) {
+    value <- Sys.getenv(name)
+    if (nzchar(value)) return(value)
+    value <- system2(file.path(R.home("bin"), "R"),
+                     c("CMD", "config", name), stdout = TRUE)
+    stop_if(!is.null(attr(value, "status")), paste("R CMD config failed for", name))
+    paste(value, collapse = " ")
+  }
+  cc <- r_config("CC")
+  cxx <- r_config("CXX")
+  Sys.setenv(CC = cc, CXX = cxx)
+  cppflags <- r_config("CPPFLAGS")
+  toolchain <- c(paste0("-DCMAKE_C_FLAGS=", r_config("CFLAGS"), " ", cppflags),
+                 paste0("-DCMAKE_CXX_FLAGS=", r_config("CXXFLAGS"), " ", cppflags),
+                 paste0("-DCMAKE_EXE_LINKER_FLAGS=", r_config("LDFLAGS")),
+                 paste0("-DCMAKE_SHARED_LINKER_FLAGS=", r_config("LDFLAGS")),
+                 "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+                 "-DCMAKE_C_FLAGS_RELEASE=-DNDEBUG",
+                 "-DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG")
+  # Match an explicit standard selected by R instead of overriding it with
+  # the standalone engine's C++11 default.
+  if (grepl("-std=(gnu|c)\\+\\+[0-9]+", cxx)) {
+    standard <- sub(".*-std=(gnu|c)\\+\\+([0-9]+).*", "\\2", cxx)
+    toolchain <- c(toolchain, paste0("-DCMAKE_CXX_STANDARD=", standard))
+  }
 
   # Forward slashes everywhere: they survive both the shell and GNU make.
   sl <- function(p) gsub("\\\\", "/", p, fixed = TRUE)
@@ -79,8 +93,6 @@ local({
   sl_engine_bld <- sl(engine_bld)
   sl_highs_pre  <- sl(highs_pre)
   sl_engine_pre <- sl(engine_pre)
-  sl_eng_lib    <- sl(eng_lib)
-  sl_eng_bin    <- sl(eng_bin)
 
   # R's system2 is unsafe for both platforms: on Unix it only shQuotes
   # the command and passes the args to the shell unquoted (a -D flag
@@ -111,11 +123,9 @@ local({
   unlink(build, recursive = TRUE)
   dir.create(build, recursive = TRUE, showWarnings = FALSE)
 
-  # 1) HiGHS: static, no tests/examples/exe/extras/zlib. (HiGHS >= 1.15
-  # defaults to a shared library on Unix; force static so the package
-  # runtime libs are exactly the four engine libraries.)
+  # 1) HiGHS: static, no tests/examples/exe/extras/zlib.
   run(c("-S", sl_highs_src, "-B", sl_highs_bld, gen,
-        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_BUILD_TYPE=Release", toolchain,
         "-DBUILD_SHARED_LIBS=OFF",
         "-DFAST_BUILD=ON",
         "-DBUILD_TESTING=OFF",
@@ -127,7 +137,7 @@ local({
   run(c("--build", sl_highs_bld, "--parallel", jobs))
   run(c("--install", sl_highs_bld))
 
-  # 2) Engine superbuild, installed with a package-relative rpath.
+  # 2) Engine superbuild, with static libraries for the R DLL.
   # HiGHS installs its CMake package at <prefix>/<LIBDIR>/cmake/highs,
   # and LIBDIR is lib or lib64 depending on the platform, so locate the
   # installed config instead of assuming the directory.
@@ -140,108 +150,31 @@ local({
   # (it is lib on most platforms, lib64 on some).
   highs_cmakedir <- dirname(cfg_hits[[1]])
   highs_libdir <- dirname(dirname(highs_cmakedir))
-  engine_rpath <- if (is_mac) "@loader_path" else if (is_win) NULL else "$ORIGIN"
   e_args <- c("-S", sl_engine_src, "-B", sl_engine_bld, gen,
-              "-DCMAKE_BUILD_TYPE=Release",
+              "-DCMAKE_BUILD_TYPE=Release", toolchain,
+              "-DBUILD_SHARED_LIBS=OFF",
               paste0("-DHighs_DIR=", sl(highs_cmakedir)),
               paste0("-DCMAKE_INSTALL_PREFIX=", sl_engine_pre))
-  if (!is.null(engine_rpath))
-    e_args <- c(e_args, paste0("-DCMAKE_INSTALL_RPATH=", engine_rpath))
   run(e_args)
   run(c("--build", sl_engine_bld, "--parallel", jobs))
   run(c("--install", sl_engine_bld))
 
-  # 2b) The bundled engine sources stay where they are; the Makevars
-  # include paths point at the sources directly (configure is read-only
-  # on them, so the tree survives R CMD build's temporary install).
-  engine_in_tree <- sl_engine_src
-
-  # 3) Stage the engine runtime libs into inst/libs -> installed <pkg>/libs.
-  # On Windows R installs the package DLL into libs/x64/ and, when it
-  # loads the DLL, searches that directory for the DLL's dependencies
-  # (it prepends the DLL's own directory to PATH and passes it as the
-  # dyn.load DLLpath). The engine DLLs must sit next to it.
-  libs_dir <- if (is_win) file.path(pkg_root, "inst", "libs", "x64")
-              else file.path(pkg_root, "inst", "libs")
-  unlink(libs_dir, recursive = TRUE)
-  dir.create(libs_dir, recursive = TRUE, showWarnings = FALSE)
-
-  engine_libs <- c("tauargus_csp", "tauargus_hitas", "tauargus_rounder", "CRP")
-  if (is_win) {
-    # CMake names MinGW DLLs with the lib prefix (libCRP.dll, ...).
-    dlls <- list.files(eng_bin, pattern = paste0("^lib(?:",
-        paste(engine_libs, collapse = "|"), ")\\.dll$"))
-    stop_if(length(dlls) != length(engine_libs),
-            paste("expected the four engine DLLs in", eng_bin, "; found:", dlls))
-    file.copy(file.path(eng_bin, dlls), libs_dir, overwrite = TRUE)
-  } else {
-    ext <- if (is_mac) "\\.dylib$" else "\\.so$"
-    shared <- list.files(eng_lib,
-                         pattern = paste0("^lib(?:", paste(engine_libs,
-                                                           collapse = "|"), ")", ext))
-    stop_if(length(shared) != length(engine_libs),
-            paste("expected the four engine shared libs in", eng_lib,
-                  "; found:", shared))
-    file.copy(file.path(eng_lib, shared), libs_dir, overwrite = TRUE)
-    shared_paths <- file.path(eng_lib, shared)
-  }
-
-  # 4) Generate src/Makevars. Paths are build-time only; the runtime lookup
-  # is relative to the installed package (rpath below / DLL dir on Windows).
-  inc <- c(vapply(c("core", "csp", "hitas", "rounder"),
-                  function(m) file.path(sl_engine_src, "native", m, "src"),
-                  character(1)),
-           file.path(sl_highs_pre, "include", "highs"))
-
+  # 3) Link static archives in dependency order. Relative paths keep the
+  # generated Makevars independent of the staging directory, including
+  # when its name contains spaces.
+  unlink(file.path(pkg_root, "inst", "libs"), recursive = TRUE)
+  engine_libs <- c("tauargus_hitas", "tauargus_csp", "tauargus_rounder", "CRP", "tauargus_core")
+  archives <- file.path(".ta", "engine", "lib", paste0("lib", engine_libs, ".a"))
+  highs_archive <- file.path(".ta", "highs", basename(highs_libdir),
+                             c("libhighs.a", "libhighs_extras.a"))
+  stop_if(!all(file.exists(file.path(pkg_root, "src", c(archives, highs_archive)))),
+          "expected static engine and HiGHS archives are missing")
+  inc <- file.path("..", "engine", "native", c("core", "csp", "hitas", "rounder"), "src")
+  inc <- c(inc, file.path(".ta", "highs", "include", "highs"))
   mv <- c("# Generated by configure (configure.R); do not edit.",
-          "# Build-time flags only: the installed package resolves its own",
-          "# libraries relative to the installation, not to these paths.",
-          "")
-  if (is_win) {
-    # MinGW g++: import libs by exact file name, static libs by -l.
-    imp <- character(0)
-    for (name in engine_libs) {
-      hit <- list.files(eng_lib,
-                        pattern = paste0("^(?:lib", name, "\\.dll\\.a|", name, "\\.lib)$"))
-      stop_if(length(hit) != 1L,
-              paste("expected one import lib for", name, "in", eng_lib,
-                    "; found:", hit))
-      imp <- c(imp, paste0("-l:", hit))
-    }
-    mv <- c(mv,
-      paste0("PKG_CPPFLAGS = ",
-             paste(vapply(inc, function(d) paste0("-I", d), character(1)),
-                   collapse = " ")),
-      paste0("PKG_LIBS = -L", sl_eng_lib, " -L",
-             sl(highs_libdir),
-             " ", paste(imp, collapse = " "),
-             " -ltauargus_core -lhighs"))
-  } else {
-    # Link the engine dylibs by explicit path: the reference recorded in the
-    # R DLL is their install_name (@rpath/...), so the only rpath the
-    # installed package needs is the package-relative one below. No
-    # build-machine path survives in the binary.
-    # Quoted in the Makevars recipe: make collapses $$ to $, and without
-    # the quotes the shell would expand $ORIGIN to an empty variable
-    # before the linker ever sees it.
-    install_rpath <- if (is_mac) "@loader_path" else "$$ORIGIN"
-    mv <- c(mv,
-      paste0("PKG_CPPFLAGS = ",
-             paste(vapply(inc, function(d) paste0("-I", d), character(1)),
-                   collapse = " ")),
-      # Linux: statically link the C++ runtime (see engine/CMakeLists.txt);
-      # the installed package must not depend on the host libstdc++ version.
-      # The --exclude-libs options keep the embedded runtime's symbols local
-      # so they cannot interpose with another C++ runtime in the same R
-      # session. One -Wl per archive: the GCC driver splits -Wl, lists on
-      # commas.
-      paste0("PKG_LIBS = ",
-             paste(vapply(shared_paths, sl, character(1)), collapse = " "),
-             " -L", sl_eng_lib, " -ltauargus_core",
-             " -L", sl(highs_libdir), " -lhighs",
-             " -Wl,-rpath,'", install_rpath, "'",
-             if (is_mac) "" else " -pthread -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++.a -Wl,--exclude-libs,libsupc++.a -Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libgcc_eh.a"))
-  }
+          paste0("PKG_CPPFLAGS = -DTAUARGUS_STATIC ", paste0("-I", inc, collapse = " ")),
+          paste0("PKG_LIBS = ", paste(c(archives, highs_archive), collapse = " "),
+                 if (is_win) "" else if (is_mac) " -pthread" else " -pthread -ldl"))
   writeLines(mv, file.path(pkg_root, "src", "Makevars"))
   # Echo the generated Makevars: it is the single source of the native
   # build flags, and install link/load failures without it are hard to

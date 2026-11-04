@@ -105,6 +105,16 @@ jobs:
             cmake --build engine/build -j
           fi
 
+      - name: Test static engine linkage for R
+        run: |
+          set -euo pipefail
+          HIGHS_CFG="$(dirname "$(find "$RUNNER_TEMP/highs-prefix" -name 'highs-config.cmake' | head -n1)")"
+          bash scripts/test-r-static-build.sh "$HIGHS_CFG" "$RUNNER_TEMP/r-static-test" \
+            > "$RUNNER_TEMP/engine-tests/r-static-build.txt" 2>&1 || {
+              tail -n 60 "$RUNNER_TEMP/engine-tests/r-static-build.txt"
+              exit 1
+            }
+
       # Test outputs are teed into the diagnostics bundle so a failed
       # run leaves its logs as an artifact (the step still fails with
       # the original exit code via pipefail).
@@ -253,6 +263,25 @@ jobs:
           fi
           Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R \
             2>&1 | tee "${RUNNER_TEMP}/engine-tests/r-binding-smoke.txt"
+
+      - name: Test self-contained R source installation
+        run: |
+          set -euo pipefail
+          [ -d highs/.git ] || git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export PATH="$RT_BIN:$PATH"
+          fi
+          STAGE="$RUNNER_TEMP/r-source-stage"
+          LIB="$RUNNER_TEMP/R source lib"
+          bash scripts/stage-r-package.sh --out "$STAGE" --highs-src "$GITHUB_WORKSPACE/highs"
+          mkdir -p "$LIB"
+          R CMD INSTALL --library="$LIB" "$STAGE/tauargusengine" \
+            > "$RUNNER_TEMP/engine-tests/r-source-install.txt" 2>&1 || {
+              tail -n 60 "$RUNNER_TEMP/engine-tests/r-source-install.txt"
+              exit 1
+            }
+          Rscript scripts/test-r-installed.R "$LIB" tauargusengine
+          R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_binding_smoke.R"
 
       # Install the engine into a clean bundle directory, prove the
       # bundle links and loads from its unpacked location, record its
