@@ -34,7 +34,7 @@ EOF
 echo 'frontrun <- function(...) invisible(list(...))' > "$FE/R/front.R"
 echo '"_PACKAGE"' > "$FE/R/rtauargus.native-package.R"
 printf 'YEAR: 2026\nCOPYRIGHT HOLDER: fixture\n' > "$FE/LICENSE"
-echo '^docs$' > "$FE/.Rbuildignore"
+printf '^docs$\n^tools$\n' > "$FE/.Rbuildignore"
 printf 'front-end package documentation\n' > "$FE/man/rtauargus.native-package.Rd"
 echo 'test_that("front", expect_true(TRUE))' > "$FE/tests/testthat/test_front.R"
 echo 'tauargusengine::tauargus_example(1L)' >> "$FE/tests/testthat/test_front.R"
@@ -75,16 +75,22 @@ check "binding package doc not copied" \
     '[[ ! -f $FE/R/tauargusengine-package.R ]]'
 check "binding src injected" \
     '[[ -f $FE/src/init.c && -f $FE/src/rta_engine.cpp && -f $FE/src/rta_meta.cpp && -f $FE/src/rta_csp.cpp && -f $FE/src/rta_hitas.cpp && -f $FE/src/rta_rounder.cpp ]]'
+check "git worktree files excluded from vendored sources" \
+    '! find "$FE/tools/engine" -name .git -print | grep -q .'
+check "custom metadata uses a Config field" \
+    'grep -q "^Config/tauargus/engine:" "$FE/DESCRIPTION" && ! grep -q "^Comment:" "$FE/DESCRIPTION"'
+check "tools are retained and generated Makevars ignored" \
+    '! grep -qxF "^tools$" "$FE/.Rbuildignore" && grep -qxF "^src/Makevars" "$FE/.Rbuildignore"'
 check "provenance meta header generated" \
     'grep -q "RTA_META_ENGINE_SHA " $FE/src/rta_meta.h'
 check "init symbol renamed to the front-end" \
     'grep -q "R_init_rtauargus_native" $FE/src/init.c && ! grep -q "R_init_tauargusengine" $FE/src/init.c'
 check "engine sources vendored" \
-    '[[ -d $FE/engine/native/core/src && -d $FE/engine/native/rounder/src && -f $FE/engine/HiGHS-VERSION ]]'
+    '[[ -d $FE/tools/engine/native/core/src && -d $FE/tools/engine/native/rounder/src && -f $FE/tools/engine/HiGHS-VERSION ]]'
 check "highs sources vendored" \
-    '[[ -d $FE/highs/highs && -d $FE/highs/extern ]]'
+    '[[ -d $FE/tools/highs/highs && -d $FE/tools/highs/extern ]]'
 check "configure set in place" \
-    '[[ -x $FE/configure && -f $FE/configure.win && -f $FE/configure.R ]]'
+    '[[ -x $FE/configure && -f $FE/configure.win && -f $FE/tools/configure.R ]]'
 check "native help pages copied unchanged" \
     'cmp "$ROOT/bindings/r/tauargusengine/man/new_tauargus.Rd" "$FE/man/new_tauargus.Rd" && cmp "$ROOT/bindings/r/tauargusengine/man/tauargus_set_cell_key_values_cont.Rd" "$FE/man/tauargus_set_cell_key_values_cont.Rd"'
 check "front-end package help preserved" \
@@ -113,8 +119,6 @@ check "DESCRIPTION: front-end version kept" \
     'grep -q "^Version: 1.3.7$" $FE/DESCRIPTION'
 check "DESCRIPTION: SystemRequirements added" \
     'grep -q "^SystemRequirements:" $FE/DESCRIPTION'
-check "DESCRIPTION: provenance comment added" \
-    'grep -q "^Comment: Staged native layer from tauargus-engine " $FE/DESCRIPTION'
 check "DESCRIPTION: combined package uses EUPL" \
     'grep -qx "License: EUPL-1.2" $FE/DESCRIPTION'
 check "full EUPL text installed" \

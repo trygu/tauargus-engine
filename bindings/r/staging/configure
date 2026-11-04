@@ -2,8 +2,8 @@
 # tauargusengine: build the bundled native sources (see configure.R).
 #
 # Runs during R CMD INSTALL, before the package C++ is compiled. Requires
-# cmake >= 3.16 and a C++11 compiler on PATH.
+# cmake >= 3.16 and a C++ compiler on PATH.
 set -e
 
 : "${R_HOME:?R_HOME must be set by R CMD INSTALL}"
-exec "$R_HOME/bin/Rscript" configure.R "$@"
+exec "$R_HOME/bin/Rscript" tools/configure.R "$@"

@@ -19,7 +19,7 @@ exit 1
 EOF
     chmod +x "$WORK/wrappers/$command"
 done
-printf '%s\n' configure.R 'argument with spaces' --test > "$WORK/expected"
+printf '%s\n' tools/configure.R 'argument with spaces' --test > "$WORK/expected"
 for launcher in configure configure.win; do
     CONFIGURE_TEST_ARGS="$WORK/args" R_HOME="$WORK/R home" \
         PATH="$WORK/wrappers:$PATH" \

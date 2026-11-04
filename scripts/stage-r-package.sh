@@ -23,7 +23,7 @@
 #
 # Merge mode (--merge-into): instead of assembling a standalone
 # tauargusengine package, compose the native layer (binding R code, src/,
-# configure, engine/, highs/, provenance) into an existing
+# configure, tools/engine/, tools/highs/, provenance) into an existing
 # front-end package (the rtauargus.native checkout) so the release ships
 # one self-contained package. The front-end keeps its own name, version
 # and R code; its NAMESPACE and DESCRIPTION are patched in place, and the
@@ -106,7 +106,7 @@ else
     PKG_DIR="$OUT/tauargusengine"
     rm -rf "$OUT"
 fi
-mkdir -p "$PKG_DIR/src" "$PKG_DIR/engine" "$PKG_DIR/highs"
+mkdir -p "$PKG_DIR/src" "$PKG_DIR/tools/engine" "$PKG_DIR/tools/highs"
 
 # 1) Binding: R code, C/C++ sources, tests.
 if [[ -n "$MERGE_INTO" ]]; then
@@ -187,16 +187,16 @@ if [[ -n "$MERGE_INTO" ]]; then
     mv "$PKG_DIR/.NAMESPACE.staged" "$PKG_DIR/NAMESPACE"
 
     # DESCRIPTION: drop the binding import, add the native build
-    # requirements and the provenance comment. The front-end keeps its
+    # requirements and provenance metadata. The front-end keeps its
     # own name and version.
     awk -v highs="$HIGHS_VERSION" -v engsha="$ENGINE_SHA" '
         /^[[:space:]]*tauargusengine[[:space:]]*\(/ { next }
         /^License:/ {
-            print "SystemRequirements: CMake >= 3.16 and a C++11 compiler; the"
+            print "SystemRequirements: CMake >= 3.16 and a C++ compiler; the"
             print "    package builds the bundled tauargus-engine native sources"
             print "    and HiGHS (" highs ") from its own sources at install time."
             print "NeedsCompilation: yes"
-            print "Comment: Staged native layer from tauargus-engine " engsha " (HiGHS " highs ")"
+            print "Config/tauargus/engine: " engsha " (HiGHS " highs ")"
             print "License: EUPL-1.2"
             next
         }
@@ -205,7 +205,10 @@ if [[ -n "$MERGE_INTO" ]]; then
     mv "$PKG_DIR/.DESCRIPTION.staged" "$PKG_DIR/DESCRIPTION"
 
     # .Rbuildignore: keep the native build artifacts out of the tarball.
-    for pat in '^src/\.ta' '^src/.*\.(o|so|dll|dylib|a|lib|obj)$' '^inst/libs'; do
+    touch "$PKG_DIR/.Rbuildignore"
+    awk '$0 != "^tools$"' "$PKG_DIR/.Rbuildignore" > "$PKG_DIR/.Rbuildignore.staged"
+    mv "$PKG_DIR/.Rbuildignore.staged" "$PKG_DIR/.Rbuildignore"
+    for pat in '^src/Makevars' '^tauargus-engine$' '^src/\.ta' '^src/.*\.(o|so|dll|dylib|a|lib|obj)$' '^inst/libs'; do
         grep -qxF "$pat" "$PKG_DIR/.Rbuildignore" 2>/dev/null \
             || echo "$pat" >> "$PKG_DIR/.Rbuildignore"
     done
@@ -216,7 +219,7 @@ else
 awk -v ver="$VERSION" -v highs="$HIGHS_VERSION" -v engsha="$ENGINE_SHA" '
     /^Version:/ { print "Version: " ver; next }
     /^SystemRequirements:/ {
-        print "SystemRequirements: CMake >= 3.16 and a C++11 compiler; the"
+        print "SystemRequirements: CMake >= 3.16 and a C++ compiler; the"
         print "    package builds the bundled tauargus-engine native sources"
         print "    and HiGHS (" highs ") from its own sources at install time."
         in_sysreq = 1; next
@@ -225,7 +228,7 @@ awk -v ver="$VERSION" -v highs="$HIGHS_VERSION" -v engsha="$ENGINE_SHA" '
     /^Suggests:/ {
         print "URL: https://github.com/trygu/tauargus-engine"
         print "BugReports: https://github.com/trygu/tauargus-engine/issues"
-        print "Comment: Staged from tauargus-engine " engsha " (HiGHS " highs ")"
+        print "Config/tauargus/engine: " engsha " (HiGHS " highs ")"
     }
     { print }
 ' "$BINDING/DESCRIPTION" > "$PKG_DIR/DESCRIPTION"
@@ -234,21 +237,22 @@ fi
 # 4) Build system: configure for Unix and Windows + shared configure.R.
 #    In merge mode the front-end keeps its own .Rbuildignore (already
 #    extended in step 3); only the standalone package takes the staged one.
-cp "$STAGING/configure" "$STAGING/configure.win" "$STAGING/configure.R" "$PKG_DIR/"
+cp "$STAGING/configure" "$STAGING/configure.win" "$PKG_DIR/"
+cp "$STAGING/configure.R" "$PKG_DIR/tools/"
 [[ -z "$MERGE_INTO" ]] && cp "$STAGING/.Rbuildignore" "$PKG_DIR/"
 chmod +x "$PKG_DIR/configure"
 
 # 5) Native engine sources (same tree and CMake recipes the superbuild uses).
 cp "$ENGINE_DIR/engine/CMakeLists.txt" "$ENGINE_DIR/engine/HiGHS-VERSION" \
-   "$PKG_DIR/engine/"
+   "$PKG_DIR/tools/engine/"
 for m in core csp hitas crp rounder; do
-    mkdir -p "$PKG_DIR/engine/native/$m"
-    cp "$ENGINE_DIR/engine/native/$m/CMakeLists.txt" "$PKG_DIR/engine/native/$m/"
-    cp -R "$ENGINE_DIR/engine/native/$m/src" "$PKG_DIR/engine/native/$m/src"
+    mkdir -p "$PKG_DIR/tools/engine/native/$m"
+    cp "$ENGINE_DIR/engine/native/$m/CMakeLists.txt" "$PKG_DIR/tools/engine/native/$m/"
+    cp -R "$ENGINE_DIR/engine/native/$m/src" "$PKG_DIR/tools/engine/native/$m/src"
     # Other build-input files at the module top level (e.g. hitas/ErrorStrings.txt)
     find "$ENGINE_DIR/engine/native/$m" -maxdepth 1 -type f \
-        ! -name "CMakeLists.txt" ! -name "README.md" \
-        -exec cp {} "$PKG_DIR/engine/native/$m/" \;
+        ! -name "CMakeLists.txt" ! -name "README.md" ! -name ".git*" \
+        -exec cp {} "$PKG_DIR/tools/engine/native/$m/" \;
 done
 
 # 6) HiGHS sources at the pinned tag (library build subset; the app and
@@ -257,10 +261,10 @@ done
 for f in CMakeLists.txt Version.txt highs.pc.in LICENSE.txt AUTHORS \
          CITATION.cff README.md CODE_OF_CONDUCT.md CONTRIBUTING.md \
          FEATURES.md THIRD_PARTY_NOTICES.md; do
-    [[ -f "$HIGHS_SRC/$f" ]] && cp "$HIGHS_SRC/$f" "$PKG_DIR/highs/" || true
+    [[ -f "$HIGHS_SRC/$f" ]] && cp "$HIGHS_SRC/$f" "$PKG_DIR/tools/highs/" || true
 done
 cp -R "$HIGHS_SRC/cmake" "$HIGHS_SRC/highs" "$HIGHS_SRC/extern" \
-   "$HIGHS_SRC/app" "$HIGHS_SRC/examples" "$PKG_DIR/highs/"
+   "$HIGHS_SRC/app" "$HIGHS_SRC/examples" "$PKG_DIR/tools/highs/"
 
 # 7) Ship license texts in inst/ so both source and installed packages
 # carry them. The combined package is EUPL; the MIT front-end and HiGHS

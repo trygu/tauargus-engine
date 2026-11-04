@@ -8,4 +8,4 @@
 set -e
 
 : "${R_HOME:?R_HOME must be set by R CMD INSTALL}"
-exec "$R_HOME/bin/Rscript" configure.R "$@"
+exec "$R_HOME/bin/Rscript" tools/configure.R "$@"
