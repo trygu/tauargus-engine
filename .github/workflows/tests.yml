@@ -47,6 +47,9 @@ jobs:
       - name: Test self-contained R package staging
         run: bash scripts/test-stage-r-merge.sh
 
+      - name: Test offline R package metadata
+        run: python bindings/r/staging/test-package-metadata.py
+
       # Short commit for the artifact names; the test-logs directory is
       # the diagnostics bundle, uploaded on every outcome.
       - name: Record engine commit
