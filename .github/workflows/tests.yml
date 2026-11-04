@@ -228,6 +228,12 @@ jobs:
             -DCMAKE_C_COMPILER=gcc \
             -DCMAKE_CXX_COMPILER=g++
           cmake --build engine/build-mingw -j
+          # Private static dependencies must not become part of CRP's DLL API.
+          # Otherwise a binding using std::thread conflicts with winpthreads.
+          if nm --defined-only engine/build-mingw/lib/libCRP.dll.a | grep -E ' [IT] (_?pthread_|__imp_pthread_)'; then
+            echo "CRP incorrectly exports private pthread symbols" >&2
+            exit 1
+          fi
 
 
       # Install into a temp library: the runner's system R library is not

@@ -8,7 +8,8 @@ if [[ $# -lt 2 ]]; then trap 'rm -rf "$WORK"' EXIT; fi
 harden=()
 csp_tests=OFF
 if [[ "${RUNNER_OS:-}" != Windows ]]; then
-    harden=("-DCMAKE_CXX_FLAGS=-Wformat -Werror=format-security -Werror=format -Werror=deprecated -Werror=deprecated-declarations -Werror=unused-result")
+    harden=("-DCMAKE_C_FLAGS=-D_FORTIFY_SOURCE=2 -Werror=unused-result"
+            "-DCMAKE_CXX_FLAGS=-D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -Werror=format -Werror=deprecated -Werror=deprecated-declarations -Werror=unused-result")
     csp_tests=ON
 fi
 cmake -S "$ROOT/scripts/r-static-test" -B "$WORK/build" \

@@ -1,13 +1,31 @@
 #include "TauArgus.h"
 #include "HiTaSCtrl.h"
 #include "RounderCtrl.h"
+#include "AMyIO.h"
 #include <iostream>
+#include <stdexcept>
 #include <highs/interfaces/highs_c_api.h>
 extern "C" int S_CRPopenSOLVER(void);
 extern "C" int S_CRPcloseSOLVER(void);
 extern void *CRPenvS;
 
 int main() {
+    FILE *input = tmpfile();
+    if (!input) return 4;
+    fputs("12 3.5\n", input);
+    rewind(input);
+    int integer = 0;
+    double real = 0;
+    ScanFile(input, 2, "%d %lf", &integer, &real);
+    if (integer != 12 || real != 3.5) return 5;
+    ScanFile(input, 0, "\n");
+    try {
+        ScanFile(input, 1, "%d", &integer);
+        fclose(input);
+        return 6;
+    } catch (const std::runtime_error &) {
+        // ScanFile closes a rejected input file before reporting the error.
+    }
     TauArgus core;
     HiTaSCtrl hitas;
     RounderCtrl rounder;
