@@ -25,7 +25,11 @@ string(STRIP "${_TA_HIGHS_TAG}" _TA_HIGHS_TAG)
 string(REGEX REPLACE "^v" "" TAUARGUS_HIGHS_VERSION "${_TA_HIGHS_TAG}")
 message(STATUS "tauargus: requiring HiGHS ${TAUARGUS_HIGHS_VERSION}")
 
-set(CMAKE_CXX_STANDARD 11)
+option(BUILD_SHARED_LIBS "Build shared native libraries" ON)
+
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 11)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # The static core lib is linked into the Python extension (a shared object).
