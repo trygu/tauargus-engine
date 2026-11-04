@@ -290,6 +290,7 @@ jobs:
               exit 1
             }
           Rscript scripts/test-r-installed.R "$LIB" tauargusengine
+          Rscript scripts/test-r-makevars.R "$STAGE/tauargusengine/src/Makevars"
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_binding_smoke.R"
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_errors.R"
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_output.R"

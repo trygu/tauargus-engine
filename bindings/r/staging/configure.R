@@ -176,7 +176,9 @@ local({
           paste0("PKG_CPPFLAGS = -DTAUARGUS_STATIC ", paste0("-I", inc, collapse = " ")),
           paste0("PKG_LIBS = ", paste(c(archives, highs_archive), collapse = " "),
                  if (is_win) "" else if (is_mac) " -pthread" else " -pthread -ldl"))
-  writeLines(mv, file.path(pkg_root, "src", "Makevars"))
+  # A binary write keeps LF endings on Windows as required by R CMD check.
+  writeBin(charToRaw(paste0(paste(mv, collapse = "\n"), "\n")),
+           file.path(pkg_root, "src", "Makevars"))
   # Echo the generated Makevars: it is the single source of the native
   # build flags, and install link/load failures without it are hard to
   # diagnose.
