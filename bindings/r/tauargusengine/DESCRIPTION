@@ -22,4 +22,4 @@ SystemRequirements: A C++ compiler, a prebuilt 'tauargus-engine'
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
-RoxygenNote: 7.3.1
+Config/roxygen2/version: 8.1.1

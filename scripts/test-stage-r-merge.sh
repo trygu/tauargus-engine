@@ -12,7 +12,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 # --- fixture: a minimal pure-R front-end package ---------------------------
 FE="$WORK/front-end"
-mkdir -p "$FE/R" "$FE/tests/testthat"
+mkdir -p "$FE/R" "$FE/tests/testthat" "$FE/man"
 cat > "$FE/DESCRIPTION" <<'EOF'
 Package: rtauargus.native
 Title: Test Front End
@@ -35,6 +35,7 @@ echo 'frontrun <- function(...) invisible(list(...))' > "$FE/R/front.R"
 echo '"_PACKAGE"' > "$FE/R/rtauargus.native-package.R"
 printf 'YEAR: 2026\nCOPYRIGHT HOLDER: fixture\n' > "$FE/LICENSE"
 echo '^docs$' > "$FE/.Rbuildignore"
+printf 'front-end package documentation\n' > "$FE/man/rtauargus.native-package.Rd"
 echo 'test_that("front", expect_true(TRUE))' > "$FE/tests/testthat/test_front.R"
 echo 'tauargusengine::tauargus_example(1L)' >> "$FE/tests/testthat/test_front.R"
 cat > "$FE/tests/testthat.R" <<'EOF'
@@ -84,6 +85,10 @@ check "highs sources vendored" \
     '[[ -d $FE/highs/highs && -d $FE/highs/extern ]]'
 check "configure set in place" \
     '[[ -x $FE/configure && -f $FE/configure.win && -f $FE/configure.R ]]'
+check "native help pages copied unchanged" \
+    'cmp "$ROOT/bindings/r/tauargusengine/man/new_tauargus.Rd" "$FE/man/new_tauargus.Rd" && cmp "$ROOT/bindings/r/tauargusengine/man/tauargus_set_cell_key_values_cont.Rd" "$FE/man/tauargus_set_cell_key_values_cont.Rd"'
+check "front-end package help preserved" \
+    'grep -qx "front-end package documentation" "$FE/man/rtauargus.native-package.Rd" && [[ ! -f $FE/man/tauargusengine-package.Rd ]]'
 check "binding smoke test copied" \
     '[[ -f $FE/tests/test_binding_smoke.R ]]'
 check "binding smoke test loads the front-end" \

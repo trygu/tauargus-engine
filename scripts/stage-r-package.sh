@@ -126,6 +126,13 @@ else
     cp "$BINDING/NAMESPACE" "$BINDING/LICENSE" "$PKG_DIR/"
     cp -R "$BINDING/tests" "$PKG_DIR/tests"
 fi
+# Install the checked-in help pages with the injected native API. The
+# merged front-end retains its own package-level topic.
+mkdir -p "$PKG_DIR/man"
+for f in "$BINDING"/man/*.Rd; do
+    [[ -n "$MERGE_INTO" && "$(basename "$f")" == tauargusengine-package.Rd ]] && continue
+    cp "$f" "$PKG_DIR/man/"
+done
 cp "$BINDING"/src/init.c "$BINDING"/src/rta.h "$BINDING"/src/rta_cpp.h \
    "$BINDING"/src/rta_engine.cpp "$BINDING"/src/rta_csp.cpp \
    "$BINDING"/src/rta_hitas.cpp "$BINDING"/src/rta_rounder.cpp \
