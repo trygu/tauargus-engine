@@ -15,6 +15,12 @@ version <- tauargus_version(engine)
 stopifnot(is.character(version))
 stopifnot(nchar(version) > 0L)
 
+# Exercise the 17-argument native entry point. A fresh engine has no
+# tables, so the engine must return its invalid-table status before
+# trying to read either ptable file.
+stopifnot(tauargus_set_cell_key_values_cont(
+    engine, 0L, "unused", "unused", "T", 1L) == -1)
+
 hitas <- new_hitas()
 rounder <- new_rounder()
 stopifnot(inherits(hitas, "hitas_ctrl") || !is.null(hitas))
