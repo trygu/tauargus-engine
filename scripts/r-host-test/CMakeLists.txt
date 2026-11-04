@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 project(r_host_io_tests C CXX)
 set(CMAKE_CXX_STANDARD 11)
 find_package(Threads REQUIRED)
+foreach(path_variable FIXTURE_DIR BINDING_SRC R_INCLUDE)
+    file(TO_CMAKE_PATH "${${path_variable}}" ${path_variable})
+endforeach()
 add_executable(r_host_io_tests test.cpp
     "${FIXTURE_DIR}/native.c" "${FIXTURE_DIR}/native.cpp"
     "${BINDING_SRC}/rta_host_io.cpp")
