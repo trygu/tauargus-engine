@@ -8,12 +8,13 @@ if [[ $# -lt 2 ]]; then trap 'rm -rf "$WORK"' EXIT; fi
 harden=()
 csp_tests=OFF
 if [[ "${RUNNER_OS:-}" != Windows ]]; then
-    harden=("-DCMAKE_CXX_FLAGS=-Wformat -Werror=format-security")
+    harden=("-DCMAKE_C_FLAGS=-D_FORTIFY_SOURCE=2 -Werror=unused-result"
+            "-DCMAKE_CXX_FLAGS=-D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -Werror=format -Werror=deprecated -Werror=deprecated-declarations -Werror=unused-result")
     csp_tests=ON
 fi
 cmake -S "$ROOT/scripts/r-static-test" -B "$WORK/build" \
     -DTAUARGUS_ROOT="$ROOT" \
-    -DHighs_DIR="$HIGHS_CONFIG" -DBUILD_SHARED_LIBS=OFF "${harden[@]}" \
+    -DHighs_DIR="$HIGHS_CONFIG" -DBUILD_SHARED_LIBS=OFF -DTAUARGUS_MAX_THREADS=2 "${harden[@]}" \
     -DTAUARGUS_CORE_BUILD_TESTS=ON -DTAUARGUS_CSP_BUILD_TESTS="$csp_tests" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$WORK/install"
 cmake --build "$WORK/build" --config Release --parallel 2

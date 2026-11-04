@@ -9,6 +9,8 @@
 # The package-level R front-end (rtauargus) is tested in its own repo.
 
 library(tauargusengine)
+binding_package <- getNamespaceName(environment(new_tauargus))
+stopifnot(identical(getLoadedDLLs()[[binding_package]][["dynamicLookup"]], FALSE))
 
 engine <- new_tauargus()
 version <- tauargus_version(engine)

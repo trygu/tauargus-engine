@@ -17,6 +17,8 @@ cat > "$FE/DESCRIPTION" <<'EOF'
 Package: rtauargus.native
 Title: Test Front End
 Version: 1.3.7
+Authors@R: person("Trygve", "Falch", role = c("aut", "cre"),
+    email = "trygve.falch@gmail.com")
 Description: Fixture front end for the merge staging test.
 License: MIT + file LICENSE
 Encoding: UTF-8
@@ -34,10 +36,13 @@ EOF
 echo 'frontrun <- function(...) invisible(list(...))' > "$FE/R/front.R"
 echo '"_PACKAGE"' > "$FE/R/rtauargus.native-package.R"
 printf 'YEAR: 2026\nCOPYRIGHT HOLDER: fixture\n' > "$FE/LICENSE"
-echo '^docs$' > "$FE/.Rbuildignore"
+printf '^docs$\n^tools$\n' > "$FE/.Rbuildignore"
 printf 'front-end package documentation\n' > "$FE/man/rtauargus.native-package.Rd"
 echo 'test_that("front", expect_true(TRUE))' > "$FE/tests/testthat/test_front.R"
 echo 'tauargusengine::tauargus_example(1L)' >> "$FE/tests/testthat/test_front.R"
+cat > "$FE/upstream.json" <<'EOF'
+{"repository":"InseeFrLab/rtauargus","revision":"2222222222222222222222222222222222222222","version":"1.3.6","description_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+EOF
 cat > "$FE/tests/testthat.R" <<'EOF'
 library(testthat)
 library(rtauargus.native)
@@ -50,11 +55,12 @@ mkdir -p "$HIGHS/cmake" "$HIGHS/highs" "$HIGHS/extern" "$HIGHS/app" "$HIGHS/exam
 git init -q "$HIGHS"
 touch "$HIGHS/CMakeLists.txt"
 printf 'MIT License\nCopyright fixture HiGHS\n' > "$HIGHS/LICENSE.txt"
+printf 'cff-version: 1.2.0\n' > "$HIGHS/CITATION.cff"
 mkdir -p "$HIGHS/extern/example"
 printf 'Third-party fixture license\n' > "$HIGHS/extern/example/LICENSE"
 
 # --- stage ------------------------------------------------------------------
-if ! "$ROOT/scripts/stage-r-package.sh" --merge-into "$FE" --highs-src "$HIGHS" \
+if ! "$ROOT/scripts/stage-r-package.sh" --merge-into "$FE" --highs-src "$HIGHS" --version 0.6.1 \
     > "$WORK/stage.log" 2>&1; then
     echo "staging failed:" >&2
     cat "$WORK/stage.log" >&2
@@ -75,22 +81,32 @@ check "binding package doc not copied" \
     '[[ ! -f $FE/R/tauargusengine-package.R ]]'
 check "binding src injected" \
     '[[ -f $FE/src/init.c && -f $FE/src/rta_engine.cpp && -f $FE/src/rta_meta.cpp && -f $FE/src/rta_csp.cpp && -f $FE/src/rta_hitas.cpp && -f $FE/src/rta_rounder.cpp ]]'
+check "git worktree files excluded from vendored sources" \
+    '! find "$FE/tools/engine" -name .git -print | grep -q .'
+check "custom metadata uses a Config field" \
+    'grep -q "^Config/tauargus/engine:" "$FE/DESCRIPTION" && ! grep -q "^Comment:" "$FE/DESCRIPTION"'
+check "tools are retained and generated Makevars ignored" \
+    '! grep -qxF "^tools$" "$FE/.Rbuildignore" && grep -qxF "^src/Makevars" "$FE/.Rbuildignore"'
 check "provenance meta header generated" \
     'grep -q "RTA_META_ENGINE_SHA " $FE/src/rta_meta.h'
 check "init symbol renamed to the front-end" \
     'grep -q "R_init_rtauargus_native" $FE/src/init.c && ! grep -q "R_init_tauargusengine" $FE/src/init.c'
 check "engine sources vendored" \
-    '[[ -d $FE/engine/native/core/src && -d $FE/engine/native/rounder/src && -f $FE/engine/HiGHS-VERSION ]]'
+    '[[ -d $FE/tools/engine/native/core/src && -d $FE/tools/engine/native/rounder/src && -f $FE/tools/engine/HiGHS-VERSION ]]'
 check "highs sources vendored" \
-    '[[ -d $FE/highs/highs && -d $FE/highs/extern ]]'
+    '[[ -d $FE/tools/highs/highs && -d $FE/tools/highs/extern ]]'
+check "HiGHS citation retained outside the R CITATION namespace" \
+    'test -f "$FE/inst/REFERENCES/highs.cff" && test -f "$FE/tools/highs/highs.cff" && test ! -f "$FE/tools/highs/CITATION.cff"'
 check "configure set in place" \
-    '[[ -x $FE/configure && -f $FE/configure.win && -f $FE/configure.R ]]'
+    '[[ -x $FE/configure && -f $FE/configure.win && -f $FE/tools/configure.R ]]'
 check "native help pages copied unchanged" \
     'cmp "$ROOT/bindings/r/tauargusengine/man/new_tauargus.Rd" "$FE/man/new_tauargus.Rd" && cmp "$ROOT/bindings/r/tauargusengine/man/tauargus_set_cell_key_values_cont.Rd" "$FE/man/tauargus_set_cell_key_values_cont.Rd"'
 check "front-end package help preserved" \
     'grep -qx "front-end package documentation" "$FE/man/rtauargus.native-package.Rd" && [[ ! -f $FE/man/tauargusengine-package.Rd ]]'
 check "binding smoke test copied" \
     '[[ -f $FE/tests/test_binding_smoke.R ]]'
+check "native error test copied and loads the front-end" \
+    '[[ -f $FE/tests/test_native_errors.R ]] && grep -q "library(rtauargus.native)" $FE/tests/test_native_errors.R'
 check "binding smoke test loads the front-end" \
     'grep -q "library(rtauargus.native)" $FE/tests/test_binding_smoke.R && ! grep -q "library(tauargusengine)" $FE/tests/test_binding_smoke.R'
 check "front-end tests kept" \
@@ -107,12 +123,14 @@ check "NAMESPACE: front-end exports kept" \
     'grep -q "^export(frontrun)$" $FE/NAMESPACE'
 check "DESCRIPTION: tauargusengine import gone" \
     '! grep -q "tauargusengine (" $FE/DESCRIPTION'
-check "DESCRIPTION: front-end version kept" \
-    'grep -q "^Version: 1.3.7$" $FE/DESCRIPTION'
+check "DESCRIPTION: version combines imported INSEE and native versions" \
+    'grep -qx "Version: 1.3.6-0.6.1" "$FE/DESCRIPTION"'
+check "DESCRIPTION: static linkage and component versions recorded" \
+    'grep -qx "Config/tauargus/linkage: static" "$FE/DESCRIPTION" && grep -qx "Config/rtauargus/upstream-version: 1.3.6" "$FE/DESCRIPTION"'
+check "native attribution installed and included in authors" \
+    'test -f "$FE/inst/COPYRIGHTS" && grep -q "Statistics Netherlands" "$FE/DESCRIPTION" && test -f "$FE/inst/LICENSES/native/csp/README.md"'
 check "DESCRIPTION: SystemRequirements added" \
     'grep -q "^SystemRequirements:" $FE/DESCRIPTION'
-check "DESCRIPTION: provenance comment added" \
-    'grep -q "^Comment: Staged native layer from tauargus-engine " $FE/DESCRIPTION'
 check "DESCRIPTION: combined package uses EUPL" \
     'grep -qx "License: EUPL-1.2" $FE/DESCRIPTION'
 check "full EUPL text installed" \

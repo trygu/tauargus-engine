@@ -3,3 +3,4 @@
 ^inst/libs
 ^.*\.Rproj$
 ^\.Rproj\.user
+^src/Makevars

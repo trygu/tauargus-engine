@@ -1,4 +1,4 @@
-# Build the engine and run the binding tests on every push and PR.
+# Build the engine and run the binding tests on master pushes and PRs.
 # (Wheel building and releasing live in the pytauargus repo; the R
 # package build and release live in the rtauargus.native repo.)
 
@@ -6,7 +6,7 @@ name: Engine — Native and binding tests
 
 on:
   push:
-    branches: ["**"]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -46,6 +46,9 @@ jobs:
 
       - name: Test self-contained R package staging
         run: bash scripts/test-stage-r-merge.sh
+
+      - name: Test offline R package metadata
+        run: python bindings/r/staging/test-package-metadata.py
 
       # Short commit for the artifact names; the test-logs directory is
       # the diagnostics bundle, uploaded on every outcome.
@@ -228,6 +231,12 @@ jobs:
             -DCMAKE_C_COMPILER=gcc \
             -DCMAKE_CXX_COMPILER=g++
           cmake --build engine/build-mingw -j
+          # Private static dependencies must not become part of CRP's DLL API.
+          # Otherwise a binding using std::thread conflicts with winpthreads.
+          if nm --defined-only engine/build-mingw/lib/libCRP.dll.a | grep -E ' [IT] (_?pthread_|__imp_pthread_)'; then
+            echo "CRP incorrectly exports private pthread symbols" >&2
+            exit 1
+          fi
 
 
       # Install into a temp library: the runner's system R library is not
@@ -282,6 +291,21 @@ jobs:
             }
           Rscript scripts/test-r-installed.R "$LIB" tauargusengine
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_binding_smoke.R"
+          R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_errors.R"
+          R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_output.R"
+
+      - name: Test R host I/O and native exception unwinding
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export PATH="$RT_BIN:$PATH"
+            export CC=gcc CXX=g++ CMAKE_GENERATOR="MinGW Makefiles"
+          fi
+          bash scripts/test-r-host-io.sh "$RUNNER_TEMP/r-host-test" \
+            > "$RUNNER_TEMP/engine-tests/r-host-io.txt" 2>&1 || {
+              tail -n 60 "$RUNNER_TEMP/engine-tests/r-host-io.txt"
+              exit 1
+            }
 
       # Install the engine into a clean bundle directory, prove the
       # bundle links and loads from its unpacked location, record its

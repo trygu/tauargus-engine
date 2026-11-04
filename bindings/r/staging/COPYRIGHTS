@@ -1,0 +1,37 @@
+Bundled components and attribution
+
+The combined R distribution is licensed under EUPL-1.2. Each component
+retains its original copyright notices and license permissions.
+
+R frontend (rtauargus.native distributions only)
+  Copyright 2021 INSEE. Original R frontend under the MIT license.
+  The original Authors@R entries are retained in DESCRIPTION.
+  See LICENSES/MIT-frontend.txt.
+
+R bindings and native integration
+  Trygve Falch. See LICENSES/EUPL-1.2.txt.
+
+Tau-Argus core, HiTaS and rounder
+  Copyright 2014 Statistics Netherlands, as stated in the source headers.
+  EUPL v1.1 / EUPL-1.2. See LICENSES/EUPL-1.2.txt and the original sources.
+
+CSP library
+  Copyright M.D. Montes de Oca and J.J. Salazar.
+  EUPL v1.1 / EUPL-1.2. See LICENSES/native/csp/README.md.
+
+CRP library
+  Copyright J.J. Salazar (jjsalaza@ull.es).
+  EUPL v1.1 / EUPL-1.2. See LICENSES/native/crp/README.md.
+
+HiGHS 1.15.1
+  Copyright (c) 2026 HiGHS. MIT license.
+  See LICENSES/HiGHS/LICENSE.txt and its THIRD_PARTY_NOTICES.md for the
+  copyrights and licenses of bundled third-party code. The staging
+  process preserves component license, copying, copyright and notice files.
+
+Changes for native R integration, 2026-11-04
+  Trygve Falch's native fork uses HiGHS and supports static linking.
+  The R distribution adapts console output to the R API, converts native
+  process termination to errors, limits solver threads and checks input
+  reads and formatting. The staged copies record the R host adaptation
+  in their source files. Original component notices are retained.
