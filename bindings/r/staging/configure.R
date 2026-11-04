@@ -153,6 +153,7 @@ local({
   e_args <- c("-S", sl_engine_src, "-B", sl_engine_bld, gen,
               "-DCMAKE_BUILD_TYPE=Release", toolchain,
               "-DBUILD_SHARED_LIBS=OFF",
+              "-DTAUARGUS_MAX_THREADS=2",
               paste0("-DHighs_DIR=", sl(highs_cmakedir)),
               paste0("-DCMAKE_INSTALL_PREFIX=", sl_engine_pre))
   run(e_args)

@@ -13,7 +13,7 @@ if [[ "${RUNNER_OS:-}" != Windows ]]; then
 fi
 cmake -S "$ROOT/scripts/r-static-test" -B "$WORK/build" \
     -DTAUARGUS_ROOT="$ROOT" \
-    -DHighs_DIR="$HIGHS_CONFIG" -DBUILD_SHARED_LIBS=OFF "${harden[@]}" \
+    -DHighs_DIR="$HIGHS_CONFIG" -DBUILD_SHARED_LIBS=OFF -DTAUARGUS_MAX_THREADS=2 "${harden[@]}" \
     -DTAUARGUS_CORE_BUILD_TESTS=ON -DTAUARGUS_CSP_BUILD_TESTS="$csp_tests" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$WORK/install"
 cmake --build "$WORK/build" --config Release --parallel 2
