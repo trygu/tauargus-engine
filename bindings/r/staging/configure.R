@@ -71,7 +71,7 @@ local({
   cxx <- r_config("CXX")
   Sys.setenv(CC = cc, CXX = cxx)
   cppflags <- r_config("CPPFLAGS")
-  toolchain <- c(paste0("-DCMAKE_C_FLAGS=", r_config("CFLAGS"), " ", cppflags),
+  toolchain <- c(paste0("-DCMAKE_C_FLAGS=", r_config("CFLAGS"), " ", cppflags, " -fexceptions"),
                  paste0("-DCMAKE_CXX_FLAGS=", r_config("CXXFLAGS"), " ", cppflags),
                  paste0("-DCMAKE_EXE_LINKER_FLAGS=", r_config("LDFLAGS")),
                  paste0("-DCMAKE_SHARED_LINKER_FLAGS=", r_config("LDFLAGS")),

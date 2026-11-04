@@ -18,14 +18,19 @@
 #include <cstdio>
 #include <exception>
 #include <stdexcept>
+#include "rta_host_io.h"
 
 // Catch native exceptions after C++ temporaries have been unwound, then
 // signal an R error outside the catch block (Rf_error uses a long jump).
 template <typename Function>
 static SEXP rta_call(Function function) {
     char message[1024];
+    SEXP result = R_NilValue;
+    bool failed = true;
+    rta_host_begin();
     try {
-        return function();
+        result = function();
+        failed = false;
     } catch (const std::exception &e) {
         std::snprintf(message, sizeof(message), "Tau-Argus native error: %s", e.what());
     } catch (int code) {
@@ -33,8 +38,11 @@ static SEXP rta_call(Function function) {
     } catch (...) {
         std::snprintf(message, sizeof(message), "Unknown Tau-Argus native error");
     }
-    Rf_error("%s", message);
-    return R_NilValue;
+    PROTECT(result);
+    rta_host_end();
+    UNPROTECT(1);
+    if (failed) Rf_error("%s", message);
+    return result;
 }
 
 template <typename Object>

@@ -283,6 +283,20 @@ jobs:
           Rscript scripts/test-r-installed.R "$LIB" tauargusengine
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_binding_smoke.R"
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_errors.R"
+          R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_output.R"
+
+      - name: Test R host I/O and native exception unwinding
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export PATH="$RT_BIN:$PATH"
+            export CC=gcc CXX=g++ CMAKE_GENERATOR="MinGW Makefiles"
+          fi
+          bash scripts/test-r-host-io.sh "$RUNNER_TEMP/r-host-test" \
+            > "$RUNNER_TEMP/engine-tests/r-host-io.txt" 2>&1 || {
+              tail -n 60 "$RUNNER_TEMP/engine-tests/r-host-io.txt"
+              exit 1
+            }
 
       # Install the engine into a clean bundle directory, prove the
       # bundle links and loads from its unpacked location, record its

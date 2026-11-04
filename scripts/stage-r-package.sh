@@ -138,7 +138,8 @@ done
 cp "$BINDING"/src/init.c "$BINDING"/src/rta.h "$BINDING"/src/rta_cpp.h \
    "$BINDING"/src/rta_engine.cpp "$BINDING"/src/rta_csp.cpp \
    "$BINDING"/src/rta_hitas.cpp "$BINDING"/src/rta_rounder.cpp \
-   "$BINDING"/src/rta_meta.cpp "$PKG_DIR/src/"
+   "$BINDING"/src/rta_meta.cpp "$BINDING"/src/rta_host_io.cpp \
+   "$BINDING"/src/rta_host_io.h "$PKG_DIR/src/"
 
 # In merge mode the DLL entry point must carry the front-end package
 # name in underscore form (the dotted form is not a valid C
@@ -266,12 +267,19 @@ done
 cp -R "$HIGHS_SRC/cmake" "$HIGHS_SRC/highs" "$HIGHS_SRC/extern" \
    "$HIGHS_SRC/app" "$HIGHS_SRC/examples" "$PKG_DIR/tools/highs/"
 
+# R owns console output and the interpreter process. Adapt staged copies;
+# Python and the original native checkouts keep their normal stdio ABI.
+PYTHON=python3
+"$PYTHON" -c 'import sys; assert sys.version_info >= (3, 8)' > /dev/null 2>&1 || PYTHON=python
+"$PYTHON" "$STAGING/patch-host.py" "$PKG_DIR/tools" "$BINDING/src/rta_host_io.h"
+
 # 7) Ship license texts in inst/ so both source and installed packages
 # carry them. The combined package is EUPL; the MIT front-end and HiGHS
 # retain their original permissions and attribution.
 LICENSES="$PKG_DIR/inst/LICENSES"
 mkdir -p "$LICENSES/HiGHS"
 cp "$ENGINE_DIR/LICENSE" "$LICENSES/EUPL-1.2.txt"
+printf '%s\n' 'R host adaptation, 2026-11-04: console calls use the R API; exit/abort become native exceptions. Original solver algorithms and component licenses are retained.' > "$LICENSES/HiGHS/R-host-changes.txt"
 if [[ -f "$PKG_DIR/LICENSE" ]]; then
     if [[ "$FRONT_MIT" == 1 ]]; then
         year="$(sed -n 's/^YEAR: *//p' "$PKG_DIR/LICENSE")"
