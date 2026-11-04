@@ -271,6 +271,9 @@ cp -R "$HIGHS_SRC/cmake" "$HIGHS_SRC/highs" "$HIGHS_SRC/extern" \
 # Python and the original native checkouts keep their normal stdio ABI.
 PYTHON=python3
 "$PYTHON" -c 'import sys; assert sys.version_info >= (3, 8)' > /dev/null 2>&1 || PYTHON=python
+if [[ -f "$HIGHS_SRC/CITATION.cff" ]]; then
+    cp "$HIGHS_SRC/CITATION.cff" "$PKG_DIR/tools/highs/highs.cff"
+fi
 "$PYTHON" "$STAGING/patch-host.py" "$PKG_DIR/tools" "$BINDING/src/rta_host_io.h"
 VERSION="$("$PYTHON" "$STAGING/package-metadata.py" "$PKG_DIR" "$VERSION")"
 

@@ -96,7 +96,7 @@ check "engine sources vendored" \
 check "highs sources vendored" \
     '[[ -d $FE/tools/highs/highs && -d $FE/tools/highs/extern ]]'
 check "HiGHS citation retained outside the R CITATION namespace" \
-    'test -f "$FE/inst/REFERENCES/highs.cff" && test ! -f "$FE/tools/highs/CITATION.cff"'
+    'test -f "$FE/inst/REFERENCES/highs.cff" && test -f "$FE/tools/highs/highs.cff" && test ! -f "$FE/tools/highs/CITATION.cff"'
 check "configure set in place" \
     '[[ -x $FE/configure && -f $FE/configure.win && -f $FE/tools/configure.R ]]'
 check "native help pages copied unchanged" \

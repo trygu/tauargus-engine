@@ -76,6 +76,15 @@ def update(root, native):
         "StagedInstall": None,
     }.items():
         text = set_field(text, name, value)
+    cmake = root / "tools/highs/CMakeLists.txt"
+    if cmake.exists():
+        build = cmake.read_text(encoding="utf-8")
+        if "CITATION.cff" in build:
+            if not (cmake.parent / "highs.cff").is_file():
+                raise ValueError("Missing renamed HiGHS citation metadata")
+            build = ("# R packaging change, 2026-11-04: citation metadata is named highs.cff.\n"
+                     + build.replace("CITATION.cff", "highs.cff"))
+            cmake.write_text(build, encoding="utf-8")
     description.write_text(text, encoding="utf-8")
     return version
 

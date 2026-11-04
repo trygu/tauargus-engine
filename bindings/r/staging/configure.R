@@ -131,7 +131,6 @@ local({
         "-DBUILD_TESTING=OFF",
         "-DBUILD_EXAMPLES=OFF",
         "-DBUILD_CXX_EXE=OFF",
-        "-DCMAKE_INSTALL_DOCDIR=",
         "-DBUILD_SHARED_EXTRAS_LIB=OFF",
         "-DZLIB=OFF",
         paste0("-DCMAKE_INSTALL_PREFIX=", sl_highs_pre)))
