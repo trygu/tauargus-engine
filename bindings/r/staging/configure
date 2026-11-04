@@ -5,5 +5,5 @@
 # cmake >= 3.16 and a C++11 compiler on PATH.
 set -e
 
-R_HOME=`R RHOME 2>/dev/null || echo /usr`
+: "${R_HOME:?R_HOME must be set by R CMD INSTALL}"
 exec "$R_HOME/bin/Rscript" configure.R "$@"

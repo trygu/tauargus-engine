@@ -38,6 +38,10 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Test R configure launchers
+        shell: bash
+        run: bash scripts/test-r-configure.sh
+
       - uses: astral-sh/setup-uv@v5
 
       - name: Test self-contained R package staging

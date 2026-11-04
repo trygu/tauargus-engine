@@ -77,7 +77,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"rta_tau_set_realized_lower_and_upper", (DL_FUNC) &rta_tau_set_realized_lower_and_upper, 5},
     {"rta_tau_set_rounded_response",         (DL_FUNC) &rta_tau_set_rounded_response,         3},
     {"rta_tau_set_cell_key_values_freq",     (DL_FUNC) &rta_tau_set_cell_key_values_freq,     3},
-    {"rta_tau_set_cell_key_values_cont",     (DL_FUNC) &rta_tau_set_cell_key_values_cont,     16},
+    {"rta_tau_set_cell_key_values_cont",     (DL_FUNC) &rta_tau_set_cell_key_values_cont,     17},
 
     /* TauArgus: table input flow */
     {"rta_tau_set_in_table",           (DL_FUNC) &rta_tau_set_in_table,           12},
