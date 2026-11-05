@@ -17,8 +17,8 @@ cat > "$FE/DESCRIPTION" <<'EOF'
 Package: rtauargus.native
 Title: Test Front End
 Version: 1.3.7
-Authors@R: person("Trygve", "Falch", role = c("aut", "cre"),
-    email = "trygve.falch@gmail.com")
+Authors@R: person(given = c("Trygve", "Tatsuya"), family = "Falch",
+    role = c("aut", "cre"), email = "trygve.falch@gmail.com")
 Description: Fixture front end for the merge staging test.
 License: MIT + file LICENSE
 Encoding: UTF-8

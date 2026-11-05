@@ -14,11 +14,11 @@ files, driving a suppression run, writing outputs) lives in the
 `rtauargus` package, which `Imports` this one.
 }
 \author{
-\strong{Maintainer}: Trygve Falch \email{trygve.falch@gmail.com}
+\strong{Maintainer}: Trygve Tatsuya Falch \email{trygve.falch@gmail.com}
 
 Authors:
 \itemize{
-  \item Trygve Falch \email{trygve.falch@gmail.com}
+  \item Trygve Tatsuya Falch \email{trygve.falch@gmail.com}
 }
 
 }
