@@ -199,7 +199,11 @@ if [[ -n "$MERGE_INTO" ]]; then
             print "    and HiGHS (" highs ") from its own sources at install time."
             print "NeedsCompilation: yes"
             print "Config/tauargus/engine: " engsha " (HiGHS " highs ")"
-            print "License: EUPL-1.2"
+            # Bare "EUPL" is the token in the R license database (license.db);
+            # it expands to "EUPL version 1.1 | EUPL version 1.2". The SPDX id
+            # "EUPL-1.2" is not the DESCRIPTION token. CRAN accepts EUPL (see
+            # the ECDC EpiReport / EpiSignalDetection packages).
+            print "License: EUPL"
             next
         }
         { print }
