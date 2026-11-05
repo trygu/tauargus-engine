@@ -132,7 +132,7 @@ check "native attribution installed and included in authors" \
 check "DESCRIPTION: SystemRequirements added" \
     'grep -q "^SystemRequirements:" $FE/DESCRIPTION'
 check "DESCRIPTION: combined package uses EUPL" \
-    'grep -qx "License: EUPL-1.2" $FE/DESCRIPTION'
+    'grep -qx "License: EUPL" $FE/DESCRIPTION'
 check "full EUPL text installed" \
     'grep -q "This European Union Public Licence" $FE/inst/LICENSES/EUPL-1.2.txt'
 check "front-end MIT notice retained" \
