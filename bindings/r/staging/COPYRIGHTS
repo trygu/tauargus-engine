@@ -9,7 +9,7 @@ R frontend (rtauargus.native distributions only)
   See LICENSES/MIT-frontend.txt.
 
 R bindings and native integration
-  Trygve Falch. See LICENSES/EUPL-1.2.txt.
+  Trygve Tatsuya Falch. See LICENSES/EUPL-1.2.txt.
 
 Tau-Argus core, HiTaS and rounder
   Copyright 2014 Statistics Netherlands, as stated in the source headers.
@@ -30,7 +30,7 @@ HiGHS 1.15.1
   process preserves component license, copying, copyright and notice files.
 
 Changes for native R integration, 2026-11-04
-  Trygve Falch's native fork uses HiGHS and supports static linking.
+  Trygve Tatsuya Falch's native fork uses HiGHS and supports static linking.
   The R distribution adapts console output to the R API, converts native
   process termination to errors, limits solver threads and checks input
   reads and formatting. The staged copies record the R host adaptation
