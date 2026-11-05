@@ -67,7 +67,13 @@ def update(root, native):
     authors = original["Authors@R"]
     added = [entry for entry in CONTRIBUTORS if entry not in authors]
     if added:
-        authors = "c(\n" + authors + ",\n" + ",\n".join(added) + "\n)"
+        # CRAN expects person() or a flat c(person(...), person(...)) call.
+        # Retain the original people when appending component attribution.
+        authors = authors.strip()
+        if authors.startswith("c(") and authors.endswith(")"):
+            authors = authors[:-1].rstrip() + ",\n" + ",\n".join(added) + "\n)"
+        else:
+            authors = "c(\n" + authors + ",\n" + ",\n".join(added) + "\n)"
     for name, value in {
         "Version": version,
         "Authors@R": authors,

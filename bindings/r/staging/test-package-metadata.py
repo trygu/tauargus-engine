@@ -44,6 +44,22 @@ class PackageMetadataTests(unittest.TestCase):
             self.fixture(root)
             self.assertEqual(metadata.update(root, "0.6.1"), "1.3.7")
 
+    def test_existing_author_list_stays_a_flat_combination_of_person_calls(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            self.fixture(root)
+            path = root / "DESCRIPTION"
+            text = path.read_text(encoding="utf-8").replace(
+                'person("Original", "Author", role="aut")',
+                'c(person("Original", "Author", role="aut"),\n'
+                '    person("Second", "Author", role="ctb"))')
+            path.write_text(text, encoding="utf-8")
+            metadata.update(root, "0.6.1")
+            authors = metadata.fields(path.read_text(encoding="utf-8"))["Authors@R"]
+            self.assertRegex(authors, r'^c\(\s*person\(')
+            self.assertIn('person("Second", "Author", role="ctb")', authors)
+            self.assertEqual(authors.count("person("), 6)
+
     def test_invalid_lock_or_native_version_leaves_description_unchanged(self):
         with tempfile.TemporaryDirectory() as work:
             root = Path(work)
