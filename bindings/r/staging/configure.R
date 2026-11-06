@@ -40,22 +40,8 @@ local({
   is_mac <- identical(Sys.info()[["sysname"]], "Darwin")
   jobs   <- "2"
 
-  # On Windows the CMake "MinGW Makefiles" generator requires the Rtools
-  # g++ on PATH, and R CMD INSTALL does not always put the compiler
-  # directory there for configure scripts. Add it explicitly.
-  if (is_win && !nzchar(Sys.which("g++"))) {
-    for (rt in c(Sys.getenv("RTOOLS44_HOME"), Sys.getenv("RTOOLS43_HOME"),
-                 "C:/Rtools44", "C:/Rtools")) {
-      bin <- file.path(rt, "mingw64", "bin")
-      if (nzchar(rt) && dir.exists(bin)) {
-        Sys.setenv(PATH = paste(bin, Sys.getenv("PATH"),
-                                sep = .Platform$path.sep))
-        break
-      }
-    }
-    if (!nzchar(Sys.which("g++")))
-      stop("g++ (Rtools MinGW toolchain) not found on PATH")
-  }
+  # Forward slashes everywhere: they survive both the shell and GNU make.
+  sl <- function(p) gsub("\\\\", "/", p, fixed = TRUE)
 
   # Use R's compiler choices and flags, preserving explicit installer
   # environment settings. Do not discard hardening or user flags.
@@ -71,13 +57,120 @@ local({
   cxx <- r_config("CXX")
   Sys.setenv(CC = cc, CXX = cxx)
   cppflags <- r_config("CPPFLAGS")
+
+  # On Windows, hand CMake the exact compiler and make program that R
+  # will use, instead of relying on CMake's own PATH discovery. CMake's
+  # "MinGW Makefiles" generator looks for an unqualified "g++" and for
+  # "mingw32-make" only. The Rtools45 toolchain that R 4.5+ and the
+  # CRAN pretest machines use provides neither on PATH: its compilers
+  # carry the x86_64-w64-mingw32 prefix and it ships no mingw32-make
+  # at all. Older Rtools (44 and earlier) do put an unqualified g++
+  # and a mingw32-make on PATH; resolving the toolchain explicitly
+  # works for both layouts.
+  win_toolchain_args <- character(0)
+  if (is_win) {
+    # CC and CXX from R's config may carry flags; the tool name is the
+    # first token.
+    cc_name  <- basename(sub(" .*", "", cc))
+    cxx_name <- basename(sub(" .*", "", cxx))
+    if (grepl("[/\\\\]", cc)) {
+      # CC was set to a full path (explicit installer environment).
+      cc_path <- sl(cc)
+      if (!grepl("\\.exe$", cc_path, ignore.case = TRUE))
+        cc_path <- paste0(cc_path, ".exe")
+      if (!file.exists(cc_path)) cc_path <- ""
+    } else {
+      cc_path <- Sys.which(cc)
+    }
+    cc_path <- sl(cc_path)
+    rtools_root <- ""
+    if (!nzchar(cc_path)) {
+      # The compiler is not on PATH: locate it in a Rtools
+      # installation. R 4.5+ honours RTOOLS45_HOME (default
+      # c:/rtools45); earlier R honours RTOOLS43/44_HOME or c:/Rtools.
+      roots <- c(Sys.getenv("RTOOLS45_HOME"), Sys.getenv("RTOOLS44_HOME"),
+                 Sys.getenv("RTOOLS43_HOME"), Sys.getenv("RTOOLS40_HOME"),
+                 "C:/rtools45", "C:/rtools44", "C:/rtools43", "C:/Rtools")
+      roots <- unique(roots[nzchar(roots)])
+      # Compiler bin layout per Rtools generation:
+      #   Rtools45:        x86_64-w64-mingw32.static.posix/bin (MXE)
+      #   Rtools43/44:     mingw-<version>-x86_64/bin (MSYS2)
+      #   Rtools40 and
+      #   earlier:         mingw_64/bin, mingw64/bin
+      for (root in roots) {
+        if (!dir.exists(root)) next
+        cands <- c(file.path(root, "x86_64-w64-mingw32.static.posix", "bin"),
+                   file.path(root, "aarch64-w64-mingw32.static.posix", "bin"),
+                   file.path(root, "mingw_64", "bin"),
+                   file.path(root, "mingw64", "bin"),
+                   file.path(root,
+                             list.files(root,
+                                        pattern = "^mingw-[0-9][0-9.]*-(x86_64|aarch64)$"),
+                             "bin"))
+        for (d in cands) {
+          if (dir.exists(d) && file.exists(file.path(d, paste0(cc_name, ".exe")))) {
+            cc_path <- sl(d)
+            rtools_root <- root
+            break
+          }
+        }
+        if (nzchar(rtools_root)) break
+      }
+      stop_if(!nzchar(cc_path),
+              paste("could not locate the MinGW compiler R will use (", cc,
+                    "); install Rtools or set RTOOLS45_HOME so that",
+                    cc_name, ".exe is findable"))
+    }
+    cc_bin <- dirname(cc_path)
+    # Derive the Rtools root when the compiler sits in a Rtools45
+    # (MXE) toolchain directory, so its MSYS2 make is findable even
+    # when the Rtools PATH is not set up.
+    if (rtools_root == "" &&
+        basename(dirname(cc_bin)) %in%
+          c("x86_64-w64-mingw32.static.posix", "aarch64-w64-mingw32.static.posix"))
+      rtools_root <- dirname(dirname(cc_bin))
+    # Prepend the compiler directory so CMake and the generated
+    # makefiles find the compiler and its binutils.
+    Sys.setenv(PATH = paste(cc_bin, Sys.getenv("PATH"),
+                            sep = .Platform$path.sep))
+    # The matching C++ compiler sits next to the C compiler.
+    cxx_path <- file.path(cc_bin, paste0(cxx_name, ".exe"))
+    stop_if(!file.exists(cxx_path),
+            paste("expected the C++ compiler (", cxx,
+                  ") next to the C compiler in ", cc_bin, "; found none"))
+    # CMake's MinGW Makefiles generator searches for "mingw32-make"
+    # only. Find a make it can drive: the toolchain bin (Rtools44 and
+    # earlier ship mingw32-make there), the Rtools MSYS2 directory
+    # (usr/bin), then the PATH.
+    make_cands <- c(file.path(cc_bin, "mingw32-make.exe"),
+                    file.path(cc_bin, "make.exe"),
+                    if (nzchar(rtools_root))
+                      file.path(rtools_root, "usr", "bin",
+                                c("mingw32-make.exe", "make.exe"))
+                    else character(0),
+                    Sys.which("mingw32-make"), Sys.which("make"))
+    make_path <- ""
+    for (p in make_cands)
+      if (nzchar(p) && file.exists(p)) { make_path <- sl(p); break }
+    stop_if(!nzchar(make_path),
+            paste("could not locate a make program for CMake's MinGW",
+                  "Makefiles generator; looked in ", cc_bin,
+                  if (nzchar(rtools_root))
+                    paste(" and", file.path(rtools_root, "usr", "bin")) else "",
+                  " and the PATH"))
+    win_toolchain_args <- c(paste0("-DCMAKE_C_COMPILER=", cc_path),
+                            paste0("-DCMAKE_CXX_COMPILER=", cxx_path),
+                            paste0("-DCMAKE_MAKE_PROGRAM=", make_path))
+  }
+
   toolchain <- c(paste0("-DCMAKE_C_FLAGS=", r_config("CFLAGS"), " ", cppflags, " -fexceptions"),
                  paste0("-DCMAKE_CXX_FLAGS=", r_config("CXXFLAGS"), " ", cppflags),
                  paste0("-DCMAKE_EXE_LINKER_FLAGS=", r_config("LDFLAGS")),
                  paste0("-DCMAKE_SHARED_LINKER_FLAGS=", r_config("LDFLAGS")),
                  "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
                  "-DCMAKE_C_FLAGS_RELEASE=-DNDEBUG",
-                 "-DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG")
+                 "-DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG",
+                 win_toolchain_args)
   # Match an explicit standard selected by R instead of overriding it with
   # the standalone engine's C++11 default.
   if (grepl("-std=(gnu|c)\\+\\+[0-9]+", cxx)) {
@@ -85,8 +178,6 @@ local({
     toolchain <- c(toolchain, paste0("-DCMAKE_CXX_STANDARD=", standard))
   }
 
-  # Forward slashes everywhere: they survive both the shell and GNU make.
-  sl <- function(p) gsub("\\\\", "/", p, fixed = TRUE)
   sl_highs_src  <- sl(highs_src)
   sl_engine_src <- sl(engine_src)
   sl_highs_bld  <- sl(highs_bld)
