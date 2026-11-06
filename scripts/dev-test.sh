@@ -43,12 +43,13 @@ fi
 
 # 1) Release engine superbuild.
 cmake -S engine -B engine/build -DHighs_DIR="$HIGHS_DIR" -DTAUARGUS_CORE_BUILD_TESTS=ON \
-    -DTAUARGUS_CSP_BUILD_TESTS=ON > /dev/null
+    -DTAUARGUS_CSP_BUILD_TESTS=ON -DTAUARGUS_CRP_BUILD_TESTS=ON > /dev/null
 cmake --build engine/build --parallel "$JOBS" > /dev/null
 
-# 2) Native core and csp adapter regression tests.
+# 2) Native core, csp adapter and crp loader regression tests.
 ctest --test-dir engine/build/native/core --output-on-failure
 ctest --test-dir engine/build/native/csp --output-on-failure
+ctest --test-dir engine/build/native/crp --output-on-failure
 
 # 3) Thin Python binding smoke tests (build the extension into scratch/).
 (cd bindings/python && uv run --with pytest --with pybind11 pytest tests -q)
