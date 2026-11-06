@@ -109,7 +109,7 @@ local({
                              "bin"))
         for (d in cands) {
           if (dir.exists(d) && file.exists(file.path(d, paste0(cc_name, ".exe")))) {
-            cc_path <- sl(d)
+            cc_path <- sl(file.path(d, paste0(cc_name, ".exe")))
             rtools_root <- root
             break
           }
