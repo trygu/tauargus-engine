@@ -101,7 +101,7 @@ jobs:
           set -euo pipefail
           HIGHS_CFG="$(dirname "$(find "$RUNNER_TEMP/highs-prefix" -name 'highs-config.cmake' -o -name 'highsConfig.cmake' -o -name 'HighsConfig.cmake' | head -n1)")"
           cmake -S engine -B engine/build -DCMAKE_BUILD_TYPE=Release -DHighs_DIR="$HIGHS_CFG" \
-            -DTAUARGUS_CORE_BUILD_TESTS=ON
+            -DTAUARGUS_CORE_BUILD_TESTS=ON -DTAUARGUS_CSP_BUILD_TESTS=ON
           if [ "$RUNNER_OS" = "Windows" ]; then
             cmake --build engine/build -j --config Release
           else
@@ -130,6 +130,17 @@ jobs:
           else
             ctest --test-dir engine/build/native/core --output-on-failure \
               2>&1 | tee "${RUNNER_TEMP}/engine-tests/ctest-native-core.txt"
+          fi
+
+      - name: Test native csp
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ctest --test-dir engine/build/native/csp --output-on-failure --build-config Release \
+              2>&1 | tee "${RUNNER_TEMP}/engine-tests/ctest-native-csp.txt"
+          else
+            ctest --test-dir engine/build/native/csp --output-on-failure \
+              2>&1 | tee "${RUNNER_TEMP}/engine-tests/ctest-native-csp.txt"
           fi
 
       - name: Build and test Python binding
