@@ -32,5 +32,14 @@ meta <- tauargus_engine_meta()
 stopifnot(is.character(meta), !is.na(meta[["engine_sha"]]))
 stopifnot(!is.na(meta[["highs_version"]]), nchar(meta[["highs_version"]]) > 0L)
 
+# Regression: the embedded error-string table is process-wide.
+# Dropping a hitas object (the R GC finalizer destroys it) must not
+# blank the table for objects created afterwards.
+stopifnot(nchar(hitas_error_string(hitas, 7002L)) > 0L)
+hitas <- NULL
+invisible(gc())
+hitas <- new_hitas()
+stopifnot(nchar(hitas_error_string(hitas, 7002L)) > 0L)
+
 cat("tauargusengine binding smoke ok:", version, "\n")
 cat("engine meta:", meta[["engine_sha"]], "| HiGHS", meta[["highs_version"]], "\n")
