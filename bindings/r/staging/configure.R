@@ -64,9 +64,22 @@ local({
   # "mingw32-make" only. The Rtools45 toolchain that R 4.5+ and the
   # CRAN pretest machines use provides neither on PATH: its compilers
   # carry the x86_64-w64-mingw32 prefix and it ships no mingw32-make
-  # at all. Older Rtools (44 and earlier) do put an unqualified g++
-  # and a mingw32-make on PATH; resolving the toolchain explicitly
-  # works for both layouts.
+  # at all, only the MSYS2 make under <Rtools>/usr/bin.
+  #
+  # The make and the generator must be a matching pair:
+  #   * the MSYS2 make works only with the "Unix Makefiles"
+  #     generator, whose recipes run under /bin/sh inside the MSYS2
+  #     world. The "MinGW Makefiles" generator is broken with it: its
+  #     recipes run under cmd.exe, and the MSYS2 runtime mangles the
+  #     sub-make command line in the handoff to cmd.exe (on the CRAN
+  #     Windows pretest box the command reached cmd as a bare
+  #     "tools45" token and the CMake compiler check failed; the same
+  #     failure reproduces on a GitHub windows-2022 runner).
+  #   * a native mingw32-make (Rtools44 and earlier ship one in the
+  #     toolchain directory; a standalone MinGW may sit on the PATH)
+  #     works only with the "MinGW Makefiles" generator, because the
+  #     "Unix Makefiles" generator drives recipes through /bin/sh,
+  #     which a native make cannot run.
   win_toolchain_args <- character(0)
   if (is_win) {
     # CC and CXX from R's config may carry flags; the tool name is the
@@ -83,16 +96,17 @@ local({
       cc_path <- Sys.which(cc)
     }
     cc_path <- sl(cc_path)
+    # Rtools roots, used by both the compiler and the make lookup
+    # below. R 4.5+ honours RTOOLS45_HOME (default c:/rtools45);
+    # earlier R honours RTOOLS43/44_HOME or c:/Rtools.
+    roots <- c(Sys.getenv("RTOOLS45_HOME"), Sys.getenv("RTOOLS44_HOME"),
+               Sys.getenv("RTOOLS43_HOME"), Sys.getenv("RTOOLS40_HOME"),
+               "C:/rtools45", "C:/rtools44", "C:/rtools43", "C:/Rtools")
+    roots <- unique(roots[nzchar(roots)])
     rtools_root <- ""
     if (!nzchar(cc_path)) {
       # The compiler is not on PATH: locate it in a Rtools
-      # installation. R 4.5+ honours RTOOLS45_HOME (default
-      # c:/rtools45); earlier R honours RTOOLS43/44_HOME or c:/Rtools.
-      roots <- c(Sys.getenv("RTOOLS45_HOME"), Sys.getenv("RTOOLS44_HOME"),
-                 Sys.getenv("RTOOLS43_HOME"), Sys.getenv("RTOOLS40_HOME"),
-                 "C:/rtools45", "C:/rtools44", "C:/rtools43", "C:/Rtools")
-      roots <- unique(roots[nzchar(roots)])
-      # Compiler bin layout per Rtools generation:
+      # installation. Compiler bin layout per Rtools generation:
       #   Rtools45:        x86_64-w64-mingw32.static.posix/bin (MXE)
       #   Rtools43/44:     mingw-<version>-x86_64/bin (MSYS2)
       #   Rtools40 and
@@ -138,29 +152,48 @@ local({
     stop_if(!file.exists(cxx_path),
             paste("expected the C++ compiler (", cxx,
                   ") next to the C compiler in ", cc_bin, "; found none"))
-    # CMake's MinGW Makefiles generator searches for "mingw32-make"
-    # only. Find a make it can drive: the toolchain bin (Rtools44 and
-    # earlier ship mingw32-make there), the Rtools MSYS2 directory
-    # (usr/bin), then the PATH.
-    make_cands <- c(file.path(cc_bin, "mingw32-make.exe"),
-                    file.path(cc_bin, "make.exe"),
-                    if (nzchar(rtools_root))
-                      file.path(rtools_root, "usr", "bin",
-                                c("mingw32-make.exe", "make.exe"))
-                    else character(0),
-                    Sys.which("mingw32-make"), Sys.which("make"))
-    make_path <- ""
-    for (p in make_cands)
-      if (nzchar(p) && file.exists(p)) { make_path <- sl(p); break }
-    stop_if(!nzchar(make_path),
-            paste("could not locate a make program for CMake's MinGW",
-                  "Makefiles generator; looked in ", cc_bin,
-                  if (nzchar(rtools_root))
-                    paste(" and", file.path(rtools_root, "usr", "bin")) else "",
-                  " and the PATH"))
+    # Make and generator, as a matching pair (see above).
+    #
+    # The MSYS2 make lives at <Rtools root>/usr/bin/make.exe. The root
+    # is known when the compiler came from a Rtools scan or sits in a
+    # Rtools45 (MXE) toolchain directory; otherwise it may be a Rtools
+    # root on its own, or the parent of an 8.3 short-alias toolchain
+    # directory (X86_64~1.POS) when R's config carries that form.
+    msys2_make <- ""
+    if (nzchar(rtools_root)) {
+      p <- file.path(rtools_root, "usr", "bin", "make.exe")
+      if (file.exists(p)) msys2_make <- sl(p)
+    }
+    if (msys2_make == "" && grepl("~", basename(dirname(cc_bin)))) {
+      p <- file.path(dirname(dirname(cc_bin)), "usr", "bin", "make.exe")
+      if (file.exists(p)) msys2_make <- sl(p)
+    }
+    if (msys2_make == "") {
+      for (root in roots) {
+        p <- file.path(root, "usr", "bin", "make.exe")
+        if (file.exists(p)) { msys2_make <- sl(p); break }
+      }
+    }
+    native_make <- ""
+    for (p in c(file.path(cc_bin, "mingw32-make.exe"),
+                Sys.which("mingw32-make")))
+      if (nzchar(p) && file.exists(p)) { native_make <- sl(p); break }
+    win_gen <- ""
+    win_make <- ""
+    if (nzchar(msys2_make)) {
+      win_gen <- "Unix Makefiles"
+      win_make <- msys2_make
+    } else if (nzchar(native_make)) {
+      win_gen <- "MinGW Makefiles"
+      win_make <- native_make
+    }
+    stop_if(win_gen == "",
+            paste("could not locate a make program for CMake; looked for",
+                  "the Rtools MSYS2 make (usr/bin/make.exe) and for a",
+                  "native mingw32-make in ", cc_bin, " and on the PATH"))
     win_toolchain_args <- c(paste0("-DCMAKE_C_COMPILER=", cc_path),
                             paste0("-DCMAKE_CXX_COMPILER=", cxx_path),
-                            paste0("-DCMAKE_MAKE_PROGRAM=", make_path))
+                            paste0("-DCMAKE_MAKE_PROGRAM=", win_make))
   }
 
   toolchain <- c(paste0("-DCMAKE_C_FLAGS=", r_config("CFLAGS"), " ", cppflags, " -fexceptions"),
@@ -188,7 +221,7 @@ local({
   # R's system2 is unsafe for both platforms: on Unix it only shQuotes
   # the command and passes the args to the shell unquoted (a -D flag
   # containing $ORIGIN is expanded to an empty variable), and on Windows
-  # it does not quote multi-word args at all ("-G MinGW Makefiles"
+  # it does not quote multi-word args at all ("-G Unix Makefiles"
   # arrives as three arguments). Build the command line by hand with
   # explicit quoting; cmake output streams to the install log and the
   # exit status is returned.
@@ -208,7 +241,7 @@ local({
     stop_if(ok != 0, "cmake failed (see output above)")
   }
 
-  gen <- if (is_win) list("-G", "MinGW Makefiles") else list()
+  gen <- if (is_win) list("-G", win_gen) else list()
 
   # Clean rebuild.
   unlink(build, recursive = TRUE)
