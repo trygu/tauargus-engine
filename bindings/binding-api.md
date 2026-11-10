@@ -90,20 +90,20 @@ names given in the tables. Defaults differ in a few places; see
 | `set_table_cell_protection_levels` | `tauargus_set_table_cell_protection_levels` | `tab`, `cell`, `lpl`, `upl` | bool |
 | `set_protection_levels_dim` | `tauargus_set_protection_levels_dim` | `tab`, `dim_index`, `lpl`, `upl` | bool |
 | `set_all_empty_non_structural` | (Python only) | `tab` | bool |
-| `set_secondary_jjformat` | `tauargus_set_secondary_jjformat` | `tab`, `file`, `with_bogus=False` | code, n_set_secondary (code 0 = success) |
+| `set_secondary_jjformat` | `tauargus_set_secondary_jjformat` | `tab`, `file`, `with_bogus=False` | code, n_set_secondary (code 1 = success; 0 or JJF code 4200+ = error) |
 | `write_jj_format` | `tauargus_write_jj_format` | `tab`, `file`, `lower`, `upper`, `with_bogus=False`, `as_perc=False`, `for_rounding=False` | bool |
 | `prepare_hitas` | `tauargus_prepare_hitas` | `tab`, `name_param_file`, `name_files_file`, `tau_temp` | bool |
 | `set_secondary_hitas` | `tauargus_set_secondary_hitas` | `tab` | ok, n_set_secondary |
 | `write_ghmiter_data_cell` | (Python only) | `file`, `tab`, `is_singleton` | bool |
 | `write_ghmiter_stuer` | (Python only) | `file`, `end1`, `end2`, `tab` | bool |
-| `set_secondary_ghmiter` | (Python only) | `file`, `tab`, `is_singleton=False` | code, n_set_secondary |
+| `set_secondary_ghmiter` | (Python only) | `file`, `tab`, `is_singleton=False` | code, n_set_secondary (code 1 = success; GHM code 4000+ = error) |
 | `set_secondary_from_hierarchical_ampl` | (Python only) | `file`, `tab` | ok, err |
 | `write_hierarchical_table_in_ampl_format` | (Python only) | `ampl_file`, `temp_dir`, `tab`, `max_scale` | ok, err |
-| `set_cta_values` | (Python only) | `tab`, `cell`, `org_val`, `cta_val` | code, n_set_secondary |
+| `set_cta_values` | (Python only) | `tab`, `cell`, `org_val`, `cta_val` | ok, n_set_secondary (ok = index/cell in range) |
 | `set_realized_lower_and_upper` | `tauargus_set_realized_lower_and_upper` | `tab`, `cell`, `upper`, `lower` | bool |
 | `set_rounded_response` | `tauargus_set_rounded_response` | `file`, `tab` | bool |
-| `set_cell_key_values_freq` | `tauargus_set_cell_key_values_freq` | `tab`, `ptable_file` | ok (0 = success), min, max |
-| `set_cell_key_values_cont` | `tauargus_set_cell_key_values_cont` | `tab`, `ptable_file_cont`, `ptable_file_sep`, `ckm_type`, `top_k`, `include_zeros`, `parity`, `separation`, `m1sqr`, `scaling`, `sigma0`, `sigma1`, `xstar`, `q`, `epsilon`, `mu_c` | status code (0 = success) |
+| `set_cell_key_values_freq` | `tauargus_set_cell_key_values_freq` | `tab`, `ptable_file` | code, min_diff, max_diff (code 1 = success; -1 = bad table index, -9 = ptable read failed) |
+| `set_cell_key_values_cont` | `tauargus_set_cell_key_values_cont` | `tab`, `ptable_file_cont`, `ptable_file_sep`, `ckm_type`, `top_k`, `include_zeros`, `parity`, `separation`, `m1sqr`, `scaling`, `sigma0`, `sigma1`, `xstar`, `q`, `epsilon`, `mu_c` | status code (1 = success; -1 bad table, -90/-91/-92/-93/-94 ptable read errors) |
 | `undo_secondary_suppress` | (Python only) | `tab`, `sort=1` | bool |
 | `set_in_table` | `tauargus_set_in_table` | `index`, `codes`, `shadow`, `cost`, `response`, `freq`, `max_score_cell`, `max_score_holding`, `status`, `lpl`, `upl` | ok, err, err_var |
 | `set_in_code_list` | `tauargus_set_in_code_list` | `var_index`, `codes` | ok, err, ev |
