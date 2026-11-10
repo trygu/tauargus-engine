@@ -28,7 +28,9 @@ The user-facing front-ends live in separate repos:
   built from a pinned revision of this repo.
 - **[rtauargus.native](https://github.com/trygu/rtauargus.native)**: the
   R package front-end over the thin R binding (a fork of INSEE's
-  `rtauargus`). It owns the R release pipeline for both R packages.
+  `rtauargus`). It owns the R release pipeline: on `r-v*` tags it merges
+this repo's native binding layer into the fork and ships one
+self-contained R package.
 
 ## Relationship to the original Tau-Argus
 
