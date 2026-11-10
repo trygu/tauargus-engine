@@ -36,6 +36,35 @@ stopifnot(is.character(err))
 stopifnot(grepl("audit_jj failed (rc=-2)", err, fixed = TRUE))
 stopifnot(grepl("/nonexistent-tauargus-audit-xyz.jj", err, fixed = TRUE))
 
+# 0.7.0 error contract: the binding exposes the native success flag and
+# error codes. A declared-but-unprepared engine is the fixture.
+e2 <- new_tauargus()
+stopifnot(isTRUE(tauargus_set_number_var(e2, 1L)))
+stopifnot(isTRUE(tauargus_set_number_tab(e2, 1L)))
+sz <- tauargus_get_var_number_of_codes(e2, 9L)
+stopifnot(identical(sz[["ok"]], FALSE), sz[["n_codes"]] == 0L)
+sz0 <- tauargus_get_var_number_of_codes(e2, 0L)
+stopifnot(identical(sz0[["ok"]], TRUE))
+cv <- tauargus_get_table_cell_value(e2, 0L, 0L)
+stopifnot(identical(cv[["ok"]], FALSE), cv[["value"]] == 0)
+cs <- tauargus_get_table_cell_status(e2, 9L, 0L)
+stopifnot(identical(cs[["ok"]], FALSE), cs[["status"]] == 0L)
+pl <- tauargus_get_table_cell_protection_levels(e2, 0L, 0L)
+stopifnot(identical(pl[["ok"]], FALSE), pl[["lower"]] == 0,
+          pl[["upper"]] == 0)
+tt <- tauargus_get_total_table_size(e2, 0L)
+stopifnot(identical(tt[["ok"]], FALSE), tt[["n_cells"]] == 0L)
+mn <- tauargus_get_minimum_cell_value(e2, 9L)
+stopifnot(identical(mn[["ok"]], FALSE), mn[["min"]] == 0, mn[["max"]] == 0)
+si <- tauargus_set_in_table(e2, 9L, "1", 0, 0, 1, 0, numeric(0),
+                            numeric(0), 0, 0, 1)
+stopifnot(identical(si[["ok"]], FALSE), si[["err"]] != 0L)
+ss <- tauargus_set_table_safety_info(
+    e2, 9L, FALSE, FALSE, integer(0), integer(0), FALSE, integer(0),
+    integer(0), integer(0), FALSE, 0L, 0L, FALSE, 0L, FALSE, 0.0, FALSE,
+    0L)
+stopifnot(identical(ss[["ok"]], FALSE), ss[["errc"]] != 0L)
+
 hitas <- new_hitas()
 rounder <- new_rounder()
 stopifnot(inherits(hitas, "hitas_ctrl") || !is.null(hitas))
