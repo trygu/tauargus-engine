@@ -83,5 +83,20 @@ invisible(gc())
 hitas <- new_hitas()
 stopifnot(nchar(hitas_error_string(hitas, 7002L)) > 0L)
 
+# 0.7.0 error contract: the embedded catalogs translate native codes.
+# core
+stopifnot(tauargus_error_string(engine, 1000L) == "File not found")
+stopifnot(tauargus_error_string(engine, 1015L) == "Table is not set")
+stopifnot(tauargus_error_string(engine, 1017L) == "Code not in code list")
+stopifnot(tauargus_error_string(engine, 1027L) == "Code does not exist")
+stopifnot(tauargus_error_string(engine, 1505L) == "Variable is not hierarchical")
+stopifnot(tauargus_error_string(engine, 999999L) == "UnKnown Error (999999)")
+# hitas: unknown code falls back (not empty)
+stopifnot(hitas_error_string(hitas, 999999L) == "UnKnown Error (999999)")
+# rounder: CRP ErrorTypes 7100-7110
+stopifnot(nchar(rounder_error_string(rounder, 7100L)) > 0L)
+stopifnot(grepl("infeasible", rounder_error_string(rounder, 7105L), ignore.case = TRUE))
+stopifnot(rounder_error_string(rounder, 999999L) == "UnKnown Error (999999)")
+
 cat("tauargusengine binding smoke ok:", version, "\n")
 cat("engine meta:", meta[["engine_sha"]], "| HiGHS", meta[["highs_version"]], "\n")

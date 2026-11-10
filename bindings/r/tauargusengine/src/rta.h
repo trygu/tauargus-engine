@@ -140,6 +140,7 @@ SEXP rta_rounder_do_round(SEXP self, SEXP solver, SEXP in_file, SEXP base,
                           SEXP upper, SEXP lower, SEXP auditing,
                           SEXP solution, SEXP statistics, SEXP max_time,
                           SEXP zero_restricted);
+SEXP rta_rounder_error_string(SEXP self, SEXP code);
 
 /* -- CSP audit ---------------------------------------------------------- */
 SEXP rta_audit_jj(SEXP jjfile);
