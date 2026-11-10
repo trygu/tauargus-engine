@@ -229,13 +229,15 @@ revision of this repo.
 
 ### R package
 
-The distributable R package `tauargusengine` is self-contained:
-`scripts/stage-r-package.sh` assembles it with the engine and HiGHS
-sources, and its configure script builds everything from the package's
-own sources at install time. The script is reusable: the
-[rtauargus.native](https://github.com/trygu/rtauargus.native) repo pins
-this repo as a submodule and runs its release pipeline from this recipe
-on `r-v*` tags (one GitHub Release set with both R packages).
+The native R binding sources live in `bindings/r/tauargusengine` (a local
+dev and test target). For release,
+`scripts/stage-r-package.sh --merge-into` composes that native layer
+(binding R code, `src/`, `configure`, the engine and pinned HiGHS sources)
+into the [rtauargus.native](https://github.com/trygu/rtauargus.native) INSEE
+fork, so the release ships one self-contained `rtauargus.native` package
+that builds everything from its own sources at install time. The
+rtauargus.native repo pins this repo as a submodule and runs its release
+pipeline from this recipe on `r-v*` tags.
 
 ## Testing
 
