@@ -148,28 +148,48 @@ needs nothing external. Use it three ways:
 
 ## Architecture
 
-```text
-.arb batch  ->  tauargus CLI / tauargus-tui  ->  pytauargus  ->  tauargus-engine (C/C++)  ->  HiGHS
-```
-
-The engine is C++11, built from five git submodules under `engine/native/`:
-
-- `core`: Data model, Argus/JJ file I/O, SDC engine entry points
-- `csp`: Cell-suppression LP (branch-and-price) and feasibility audit
-- `hitas`: Hierarchical table suppression (HiTaS); links `csp`
-- `crp`: Controlled rounding (iterative rounding, audit)
-- `rounder`: Dispatch layer over `crp`
+Three layers: the front-ends in separate repos, and the bindings and
+engine in this repo. Each front-end pins this repo as a git submodule
+(the gitlink is the pin) and ships a self-contained build of the engine
+with its releases. The complete project map, including every submodule
+pin:
 
 ```text
-.
-├── engine/      C/C++ engine; CMakeLists.txt is a superbuild of the 5
-│                submodules (see engine/README.md for the module map)
-├── bindings/    thin Python and R bindings (see bindings/README.md)
-│   ├── python/  pybind11 extension (cpp/) + CMake, binding smoke tests
-│   └── r/       tauargusengine, the thin R package + binding smoke test
-└── data/        sample .arb batches and tabular fixtures; also the test
-                 fixtures consumed by the pytauargus repo's package tests
+tauargus-engine                   this repository: engine + bindings
+├── engine/native/                five solver modules, each a git
+│   ├── core                      submodule; C++11; all built
+│   ├── csp                       against HiGHS (version pinned in
+│   ├── hitas                     engine/HiGHS-VERSION; HiGHS is an
+│   ├── crp                       external dependency, not a submodule)
+│   └── rounder
+├── bindings/python               pybind11 _tauargus extension
+├── bindings/r/tauargusengine     thin R package (R .Call over C++)
+└── data/                         sample .arb batches and tabular
+                                  fixtures; also the fixtures consumed
+                                  by the pytauargus package tests
+
+pytauargus                        Python front-end (separate repo):
+└── tauargus-engine               DataFrame API, batch API, tauargus
+                                  CLI and the pytauargus-tui terminal
+                                  UI; pins this repo as a git
+                                  submodule; the wheel bundles the
+                                  extension, the five engine libraries
+                                  and HiGHS
+
+rtauargus.native                  R front-end (separate repo), a fork
+└── tauargus-engine               of INSEE rtauargus; pins this repo
+                                  as a git submodule; the release
+                                  stages bindings/r into the package
 ```
+
+The five modules (see `engine/README.md` for the module map):
+
+- `core`: data model, Argus/JJ file I/O, SDC entry points
+- `csp`: cell-suppression LP (branch-and-price) and the feasibility
+  audit (the legacy intervalle port)
+- `hitas`: hierarchical table suppression (links `csp`)
+- `crp`: controlled rounding: iterative rounding, audit
+- `rounder`: dispatch layer over `crp`
 
 ## Building from source
 
