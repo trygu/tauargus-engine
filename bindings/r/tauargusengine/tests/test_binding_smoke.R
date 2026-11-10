@@ -23,6 +23,19 @@ stopifnot(nchar(version) > 0L)
 stopifnot(tauargus_set_cell_key_values_cont(
     engine, 0L, "unused", "unused", "T", 1L) == -1)
 
+# audit_jj failure must surface as an R error carrying the native rc and
+# the file name. The binding throws (not Rf_error) so C++ temporaries
+# are destroyed before the long jump; rta_call raises the R error.
+err <- tryCatch({
+    audit_jj("/nonexistent-tauargus-audit-xyz.jj")
+    NULL
+}, error = function(e) conditionMessage(e))
+stopifnot(is.character(err))
+# -2 is the read_jj failure code (file missing or unparseable); -1 is
+# the model/LP error funnel.
+stopifnot(grepl("audit_jj failed (rc=-2)", err, fixed = TRUE))
+stopifnot(grepl("/nonexistent-tauargus-audit-xyz.jj", err, fixed = TRUE))
+
 hitas <- new_hitas()
 rounder <- new_rounder()
 stopifnot(inherits(hitas, "hitas_ctrl") || !is.null(hitas))
