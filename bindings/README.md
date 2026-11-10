@@ -27,8 +27,13 @@ not by end users.
 
 Build instructions for the Python extension are in
 [Building from source](../README.md#building-from-source) at the
-repository root. The user-facing APIs are documented in the front-end
-repos:
+repository root.
+
+[binding-api.md](binding-api.md) is the canonical reference for the
+raw binding surface in both languages: every method, its name in each
+language, its arguments, its return fields and the error-code
+catalogs. The user-facing APIs on top of it are documented in the
+front-end repos:
 [pytauargus](https://github.com/trygu/pytauargus/blob/master/docs/python-api.md)
 (Python) and
 [rtauargus.native](https://github.com/trygu/rtauargus.native) (R).

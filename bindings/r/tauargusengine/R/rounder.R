@@ -14,6 +14,15 @@ new_rounder <- function() .Call(rta_rounder_new)
 rounder_set_double_constant <- function(self, variable, value)
   .Call(rta_rounder_set_double_constant, self, variable, value)
 
+#' Translate a native rounding error code to its message
+#' @param self RounderCtrl object (see [new_rounder()])
+#' @param code Error code (CRP ErrorTypes, 7100-7110)
+#' @return A character string; unknown codes give
+#'   \code{"UnKnown Error (N)"}.
+#' @export
+rounder_error_string <- function(self, code)
+  .Call(rta_rounder_error_string, self, code)
+
 #' Run controlled rounding
 #' @param self RounderCtrl object
 #' @param solver Solver name ("SCIP", "HiGHS")

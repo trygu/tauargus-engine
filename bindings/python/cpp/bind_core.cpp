@@ -70,9 +70,9 @@ void init_core(py::module_ &m) {
         }, py::arg("var"), py::arg("digits"))
         .def("get_var_number_of_codes", [](TauArgus &t, long var) {
             long n = 0, na = 0;
-            t.GetVarNumberOfCodes(var, &n, &na);
-            return py::make_tuple(n, na);
-        }, py::arg("var"), "-> (n_codes, n_active_codes)")
+            bool ok = t.GetVarNumberOfCodes(var, &n, &na);
+            return py::make_tuple(ok, n, na);
+        }, py::arg("var"), "-> (ok, n_codes, n_active_codes)")
         .def("get_var_code", [](TauArgus &t, long var, long code) {
             long ctype = 0, missing = 0, level = 0;
             std::string cs;
@@ -137,12 +137,13 @@ void init_core(py::module_ &m) {
              double zero_range, bool empty_as_ns, long ns_range) {
             std::vector<long> a(dom_n), b(dom_p), c(pq_p), d(pq_q), e(pq_n);
             long errc = 0;
-            return t.SetTableSafetyInfo(idx, has_maxscore, dom,
+            bool ok = t.SetTableSafetyInfo(idx, has_maxscore, dom,
                     a.empty() ? nullptr : a.data(), b.empty() ? nullptr : b.data(),
                     pq, c.empty() ? nullptr : c.data(), d.empty() ? nullptr : d.data(),
                     e.empty() ? nullptr : e.data(), has_freq, freq_perc, safe_min_rec,
                     has_status, manual_perc, zero_rule, zero_range, empty_as_ns,
                     ns_range, &errc);
+            return py::make_tuple(ok, errc);
          }, py::arg("index"), py::arg("has_max_score"), py::arg("dominance_rule"),
             py::arg("dominance_number"), py::arg("dominance_perc"), py::arg("pq_rule"),
             py::arg("pq_p"), py::arg("pq_q"), py::arg("pq_n"), py::arg("has_freq"),
@@ -198,30 +199,30 @@ void init_core(py::module_ &m) {
             return py::make_tuple(ok, err, tab);
         }, "-> (ok, err, table_index)")
         .def("get_minimum_cell_value", [](TauArgus &t, long tab) {
-            double mx = 0;
-            double mn = t.GetMinimumCellValue(tab, &mx);
-            return py::make_tuple(mn, mx);
-        }, py::arg("tab"), "-> (min, max)")
+            double mn = 0, mx = 0;
+            bool ok = t.GetMinimumCellValue(tab, &mn, &mx);
+            return py::make_tuple(ok, mn, mx);
+        }, py::arg("tab"), "-> (ok, min, max)")
         .def("maximum_protection_level", &TauArgus::MaximumProtectionLevel,
              py::arg("tab"))
 
         // -- cell read -------------------------------------------------------
         .def("get_table_cell_value", [](TauArgus &t, long tab, long cell) {
             double r = 0;
-            t.GetTableCellValue(tab, cell, &r);
-            return r;
-        }, py::arg("tab"), py::arg("cell"))
+            bool ok = t.GetTableCellValue(tab, cell, &r);
+            return py::make_tuple(ok, r);
+        }, py::arg("tab"), py::arg("cell"), "-> (ok, value)")
         .def("get_table_cell_status", [](TauArgus &t, long tab, long cell) {
             long s = 0;
-            t.GetTableCellStatus(tab, cell, &s);
-            return s;
-        }, py::arg("tab"), py::arg("cell"))
+            bool ok = t.GetTableCellStatus(tab, cell, &s);
+            return py::make_tuple(ok, s);
+        }, py::arg("tab"), py::arg("cell"), "-> (ok, status)")
         .def("get_table_cell_protection_levels", [](TauArgus &t, long tab,
                                                      long cell) {
             double l = 0, u = 0;
-            t.GetTableCellProtectionLevels(tab, cell, &l, &u);
-            return py::make_tuple(l, u);
-        }, py::arg("tab"), py::arg("cell"))
+            bool ok = t.GetTableCellProtectionLevels(tab, cell, &l, &u);
+            return py::make_tuple(ok, l, u);
+        }, py::arg("tab"), py::arg("cell"), "-> (ok, lower, upper)")
         .def("get_table_cell", [](TauArgus &t, long tab,
                                   const std::vector<long> &dim_index,
                                   long topn) -> py::tuple {
@@ -260,9 +261,9 @@ void init_core(py::module_ &m) {
         }, py::arg("tab"), py::arg("dim_index"), py::arg("topn") = 0)
         .def("get_total_table_size", [](TauArgus &t, long tab) {
             long ncell = 0, size = 0;
-            t.GetTotalTabelSize(tab, &ncell, &size);
-            return py::make_tuple(ncell, size);
-        }, py::arg("tab"), "-> (n_cells, size_data_cell)")
+            bool ok = t.GetTotalTabelSize(tab, &ncell, &size);
+            return py::make_tuple(ok, ncell, size);
+        }, py::arg("tab"), "-> (ok, n_cells, size_data_cell)")
 
         // -- cell write / status --------------------------------------------
         .def("set_table_cell_cost", [](TauArgus &t, long tab,
@@ -384,13 +385,14 @@ void init_core(py::module_ &m) {
             std::vector<char *> cp(c.size());
             for (size_t i = 0; i < c.size(); i++) cp[i] = const_cast<char *>(c[i].c_str());
             std::vector<double> ms(maxscore), mh(maxscore_hold);
-            return t.SetInTable(idx, cp.data(), shadow, cost, resp, freq,
+            bool ok = t.SetInTable(idx, cp.data(), shadow, cost, resp, freq,
                     ms.empty() ? nullptr : ms.data(),
                     mh.empty() ? nullptr : mh.data(), status, lpl, upl, &err, &ev);
+            return py::make_tuple(ok, err, ev);
         }, py::arg("index"), py::arg("codes"), py::arg("shadow"), py::arg("cost"),
            py::arg("response"), py::arg("freq"), py::arg("max_score_cell"),
            py::arg("max_score_holding"), py::arg("status"), py::arg("lpl"),
-           py::arg("upl"))
+           py::arg("upl"), "-> (ok, err, err_var)")
         .def("set_in_code_list", [](TauArgus &t, const std::vector<long> &var_index,
                                     const std::vector<std::string> &codes) {
             long err = 0, ev = 0;

@@ -97,6 +97,7 @@ static const R_CallMethodDef CallEntries[] = {
     /* RounderCtrl */
     {"rta_rounder_set_double_constant", (DL_FUNC) &rta_rounder_set_double_constant, 3},
     {"rta_rounder_do_round",            (DL_FUNC) &rta_rounder_do_round,            11},
+    {"rta_rounder_error_string",  (DL_FUNC) &rta_rounder_error_string,  2},
 
     /* CSP audit */
     {"rta_audit_jj", (DL_FUNC) &rta_audit_jj, 1},

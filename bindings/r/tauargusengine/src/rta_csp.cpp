@@ -29,7 +29,12 @@ extern "C" SEXP rta_audit_jj(SEXP jjfile) {
 
     int rc = TauAuditJj(f.c_str(), &n, &ci, &mn, &mx, &val, &st, &fl);
     if (rc != 0) {
-        Rf_error("audit_jj failed (rc=%d): %s", rc, f.c_str());
+        // Throw, do not Rf_error here: Rf_error is a long jump that skips
+        // C++ destructors (f would leak and its destructor would be skipped
+        // mid-stack, which is undefined behavior). rta_call converts the
+        // exception to an R error after the stack has unwound.
+        throw std::runtime_error("audit_jj failed (rc=" + std::to_string(rc) +
+                                 "): " + f);
     }
 
     const int N = n > 0 ? n : 0;

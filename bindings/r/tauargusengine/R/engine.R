@@ -195,8 +195,8 @@ tauargus_set_table_safety <- function(self, index, dom, dom_n, dom_k, pq,
 #' @param zero_range Numeric
 #' @param empty_as_ns logical
 #' @param ns_range Numeric
-#' @return logical \code{TRUE} on success (failures can be translated with
-#'   \code{tauargus_error_string}).
+#' @return List: ok (logical), errc. When ok is FALSE, errc is a core
+#'   error code (translate with \code{tauargus_error_string}).
 #' @export
 tauargus_set_table_safety_info <- function(self, index, has_maxscore, dom,
                                            dom_n, dom_p, pq, pq_p, pq_q,
@@ -227,7 +227,7 @@ tauargus_compute_tables <- function(self)
 #' Total size of a computed table
 #' @param self TauArgus object
 #' @param tab Table index
-#' @return Numeric(2): number of cells, table size
+#' @return List: ok (logical), n_cells, size_data_cell
 #' @export
 tauargus_get_total_table_size <- function(self, tab)
   .Call(rta_tau_get_total_table_size, self, tab)
@@ -236,6 +236,7 @@ tauargus_get_total_table_size <- function(self, tab)
 #' @param self TauArgus object
 #' @param tab Table index
 #' @param cell Cell index
+#' @return List: ok (logical), value
 #' @export
 tauargus_get_table_cell_value <- function(self, tab, cell)
   .Call(rta_tau_get_table_cell_value, self, tab, cell)
@@ -244,6 +245,7 @@ tauargus_get_table_cell_value <- function(self, tab, cell)
 #' @param self TauArgus object
 #' @param tab Table index
 #' @param cell Cell index
+#' @return List: ok (logical), status
 #' @export
 tauargus_get_table_cell_status <- function(self, tab, cell)
   .Call(rta_tau_get_table_cell_status, self, tab, cell)
@@ -252,7 +254,7 @@ tauargus_get_table_cell_status <- function(self, tab, cell)
 #' @param self TauArgus object
 #' @param tab Table index
 #' @param cell Cell index
-#' @return Numeric(2): lower, upper
+#' @return List: ok (logical), lower, upper
 #' @export
 tauargus_get_table_cell_protection_levels <- function(self, tab, cell)
   .Call(rta_tau_get_table_cell_protection_levels, self, tab, cell)
@@ -326,7 +328,7 @@ tauargus_set_protection_levels_dim <- function(self, tab, dim_index, lpl, upl)
 #' Minimum and maximum cell value of a table
 #' @param self TauArgus object
 #' @param tab Table index
-#' @return Numeric(2): min, max
+#' @return List: ok (logical), min, max
 #' @export
 tauargus_get_minimum_cell_value <- function(self, tab)
   .Call(rta_tau_get_minimum_cell_value, self, tab)
@@ -334,7 +336,7 @@ tauargus_get_minimum_cell_value <- function(self, tab)
 #' Number of codes (and NA codes) of a variable
 #' @param self TauArgus object
 #' @param var Variable index
-#' @return Integer(2): n_codes, n_na
+#' @return List: ok (logical), n_codes, n_active
 #' @export
 tauargus_get_var_number_of_codes <- function(self, var)
   .Call(rta_tau_get_var_number_of_codes, self, var)
@@ -558,6 +560,7 @@ tauargus_set_cell_key_values_cont <- function(self, tab, ptable_file_cont,
 #' @param status Numeric
 #' @param lpl Numeric
 #' @param upl Numeric
+#' @return List: ok (logical), err, err_var
 #' @export
 tauargus_set_in_table <- function(self, idx, codes, shadow, cost, resp, freq,
                                   maxscore, maxscore_hold, status, lpl, upl) {

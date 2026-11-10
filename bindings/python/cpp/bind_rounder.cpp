@@ -18,6 +18,9 @@ void init_rounder(py::module_ &m) {
     py::class_<RounderCtrl>(m, "RounderCtrl")
         .def(py::init<>())
         .def("version", &RounderCtrl::GetVersion)
+        .def("error_string", [](RounderCtrl &r, long code) {
+            return r.GetErrorString((int) code);
+        }, py::arg("code"))
         .def("set_double_constant", &RounderCtrl::SetDoubleConstant,
              py::arg("variable"), py::arg("value"))
         .def("do_round", [](RounderCtrl &r, const std::string &solver,
