@@ -14,8 +14,9 @@ new_hitas <- function() .Call(rta_hitas_new)
 #' @param ilm_file Initial LP file
 #' @param out_dir Output directory
 #' @param solver Solver name ("SCIP", "HiGHS")
-#' @return Numeric status code: 0 on success, otherwise a HiTaS
-#'   error code (translate with [hitas_error_string()]).
+#' @return Numeric status code: 0 (optimal) or 1 (sub-optimal) on
+#'   success; a code above 1 signals an R error (translate with
+#'   [hitas_error_string()]).
 #' @export
 hitas_full_jj <- function(self, in_file_jj, out_file, max_time = 0,
                           ilm_file = "", out_dir = "", solver = "SCIP") {
@@ -34,8 +35,8 @@ hitas_full_jj <- function(self, in_file_jj, out_file, max_time = 0,
 #' @param single_with_single Solve singles jointly (logical)
 #' @param single_with_more Solve singles with higher tables jointly (logical)
 #' @param do_count_bounds Enable count bounds (logical)
-#' @return Numeric status code: 0 on success, otherwise a HiTaS
-#'   error code (translate with [hitas_error_string()]).
+#' @return 0 on success; any non-zero HiTaS error code signals an R
+#'   error (translate with [hitas_error_string()]).
 #' @export
 hitas_a_hitas <- function(self, pars_file, files_file, max_time = 0,
                           ilm_file = "", tau_out_dir = "", solver = "SCIP",
