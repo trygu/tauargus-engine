@@ -298,6 +298,9 @@ jobs:
           # The check compiles from a temp copy of the package, where the
           # Makevars' relative engine path no longer reaches the tree.
           TA_ENGINE: ${{ github.workspace }}
+          # The check runs without tests, so the suggested testthat
+          # package is not needed; the runner's apt R does not have it.
+          _R_CHECK_FORCE_SUGGESTS_: "false"
         run: |
           set -euo pipefail
           R CMD build bindings/r/tauargusengine \
