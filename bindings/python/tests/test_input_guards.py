@@ -270,9 +270,12 @@ def test_write_jj_format_rejects_nan_bounds(tmp_path):
 
 def test_write_hierarchical_ampl_negative_max_scale(tmp_path):
     t = _one_var_one_table()
+    with pytest.raises(ValueError, match="tab"):
+        t.write_hierarchical_table_in_ampl_format(
+            str(tmp_path / "a.ampl"), str(tmp_path), -1, 1.0)
     with pytest.raises(ValueError, match="max_scale"):
         t.write_hierarchical_table_in_ampl_format(
-            str(tmp_path / "a.ampl"), str(tmp_path), -1, -2.0)
+            str(tmp_path / "a.ampl"), str(tmp_path), 0, -2.0)
     with pytest.raises(ValueError, match="max_scale"):
         t.write_hierarchical_table_in_ampl_format(
             str(tmp_path / "a.ampl"), str(tmp_path), 0, float("inf"))
