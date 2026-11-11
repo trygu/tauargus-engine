@@ -1,12 +1,12 @@
-# Build the engine and run the binding tests on master pushes and PRs.
+# Build the engine and run the binding tests on PRs.
 # (Wheel building and releasing live in the pytauargus repo; the R
 # package build and release live in the rtauargus.native repo.)
+# Merges are gated on the green PR run; the merge commit carries the
+# same tree, so there is no post-merge master re-run.
 
 name: Engine — Native and binding tests
 
 on:
-  push:
-    branches: [master]
   pull_request:
   workflow_dispatch:
 
