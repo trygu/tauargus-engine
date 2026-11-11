@@ -6,7 +6,10 @@
 # HiGHS. (R 4.6+ compiles package C++ with its default standard, C++20, which
 # is compatible with the engine's C++11 headers.)
 
-TA_ENGINE := $(abspath ../../../..)
+# ?= so the engine root can be set from the environment: R CMD check
+# builds the package from a temp copy where the relative path no longer
+# reaches the engine tree.
+TA_ENGINE ?= $(abspath ../../../..)
 # The engine build tree. On Windows CI the R binding links a MinGW build
 # (see the workflow), not the MSVC one the Python binding uses, so the
 # directory is overridable via the TA_ENGINE_BUILD environment variable.
