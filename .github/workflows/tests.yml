@@ -305,6 +305,7 @@ jobs:
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_binding_smoke.R"
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_errors.R"
           R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_native_output.R"
+          R_LIBS="$LIB" Rscript "$STAGE/tauargusengine/tests/test_input_guards.R"
 
       - name: Test R host I/O and native exception unwinding
         run: |

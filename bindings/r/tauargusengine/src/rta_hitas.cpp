@@ -36,6 +36,13 @@ extern "C" SEXP rta_hitas_full_jj(SEXP self, SEXP in, SEXP out, SEXP max_time,
     long rc = h.FullJJ(rta_str(in).c_str(), rta_str(out).c_str(),
                        rta_long(max_time), rta_str(ilm).c_str(),
                        rta_str(out_dir).c_str(), rta_str(solver).c_str());
+    // 0 = optimal and 1 = sub-optimal are valid results; anything else is
+    // a HiTaS error code (the engine contains it since 0.7.0; no raw int
+    // crosses the DSO boundary). Signal it as an R error.
+    if (rc > 1)
+        throw std::runtime_error(
+            "FullJJ failed (code " + std::to_string(rc) + ": " +
+            h.GetErrorString((int) rc) + ")");
     return rta_long_sexp(rc);
     });
 }
@@ -49,6 +56,12 @@ extern "C" SEXP rta_hitas_a_hitas(SEXP self, SEXP pars, SEXP files,
                        rta_long(max_time), rta_str(ilm).c_str(),
                        rta_str(tau_out).c_str(), rta_str(solver).c_str(),
                        rta_lgl(sws), rta_lgl(swm), rta_lgl(cdb));
+    // Non-zero is a HiTaS error code (0 = success). Signal it as an R
+    // error; the legacy interactive contract throws instead of returning.
+    if (rc != 0)
+        throw std::runtime_error(
+            "AHiTaS failed (code " + std::to_string(rc) + ": " +
+            h.GetErrorString((int) rc) + ")");
     return rta_long_sexp(rc);
     });
 }

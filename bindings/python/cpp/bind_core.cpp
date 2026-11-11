@@ -10,6 +10,9 @@
 
 #include "TauArgus.h"
 #include "init_decls.h"
+#include "input_guards.h"
+
+namespace g = tauargus::guards;
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -40,8 +43,14 @@ void init_core(py::module_ &m) {
         }, py::arg("file"), "Explore an input file. -> (ok, err, line, var).")
 
         // -- dimensions ----------------------------------------------------
-        .def("set_number_tab", &TauArgus::SetNumberTab, py::arg("n_tab"))
-        .def("set_number_var", &TauArgus::SetNumberVar, py::arg("n_var"))
+        .def("set_number_tab", [](TauArgus &t, long n_tab) {
+            g::non_negative("n_tab", n_tab);
+            return t.SetNumberTab(n_tab);
+        }, py::arg("n_tab"))
+        .def("set_number_var", [](TauArgus &t, long n_var) {
+            g::non_negative("n_var", n_var);
+            return t.SetNumberVar(n_var);
+        }, py::arg("n_var"))
 
         // -- variables -----------------------------------------------------
         .def("set_variable", [](TauArgus &t, long idx, long b_pos, long n_pos,
@@ -51,6 +60,11 @@ void init_core(py::module_ &m) {
                                  const std::string &p1, const std::string &p2,
                                  bool is_cat, bool is_num, bool is_weight,
                                  bool is_hier, bool is_holding, bool is_rec) {
+            g::non_negative("index", idx);
+            g::non_negative("b_pos", b_pos);
+            g::non_negative("n_pos", n_pos);
+            g::non_negative("n_dec", n_dec);
+            g::non_negative("n_missing", n_missing);
             return t.SetVariable(idx, b_pos, n_pos, n_dec, n_missing,
                                   m1.c_str(), m2.c_str(), total.c_str(), is_peeper,
                                   p1.c_str(), p2.c_str(), is_cat, is_num, is_weight,
@@ -61,19 +75,29 @@ void init_core(py::module_ &m) {
            py::arg("peeper_code2"), py::arg("is_categorical"), py::arg("is_numeric"),
            py::arg("is_weight"), py::arg("is_hierarchical"), py::arg("is_holding"),
            py::arg("is_record_key"))
-        .def("set_hierarchical_codelist", &TauArgus::SetHierarchicalCodelist,
-             py::arg("var"), py::arg("file"), py::arg("level_string"))
+        .def("set_hierarchical_codelist", [](TauArgus &t, long var,
+                                             const std::string &file,
+                                             const std::string &level_string) {
+            g::non_negative("var", var);
+            return t.SetHierarchicalCodelist(var, file.c_str(),
+                                             level_string.c_str());
+        }, py::arg("var"), py::arg("file"), py::arg("level_string"))
         .def("set_hierarchical_digits", [](TauArgus &t, long var,
                                            const std::vector<long> &digits) {
+            g::non_negative("var", var);
+            g::non_negative_vec("digits", digits);
             std::vector<long> d = digits;
             return t.SetHierarchicalDigits(var, (long)d.size(), d.data());
         }, py::arg("var"), py::arg("digits"))
         .def("get_var_number_of_codes", [](TauArgus &t, long var) {
+            g::non_negative("var", var);
             long n = 0, na = 0;
             bool ok = t.GetVarNumberOfCodes(var, &n, &na);
             return py::make_tuple(ok, n, na);
         }, py::arg("var"), "-> (ok, n_codes, n_active_codes)")
         .def("get_var_code", [](TauArgus &t, long var, long code) {
+            g::non_negative("var", var);
+            g::non_negative("code", code);
             long ctype = 0, missing = 0, level = 0;
             std::string cs;
             bool ok = t.GetVarCode(var, code, &ctype, &cs, &missing, &level);
@@ -81,6 +105,8 @@ void init_core(py::module_ &m) {
         }, py::arg("var"), py::arg("code"),
            "-> (ok, code_type, code_string, is_missing, level)")
         .def("get_var_code_properties", [](TauArgus &t, long var, long code) {
+            g::non_negative("var", var);
+            g::non_negative("code", code);
             long parent = 0, active = 0, missing = 0, level = 0, nchild = 0;
             const char *c = nullptr;
             bool ok = t.GetVarCodeProperties(var, code, &parent, &active, &missing,
@@ -89,17 +115,29 @@ void init_core(py::module_ &m) {
             return py::make_tuple(ok, parent, active, missing, level, nchild, cs);
         }, py::arg("var"), py::arg("code"),
            "-> (ok, is_parent, is_active, is_missing, level, n_children, code)")
-        .def("set_var_code_active", &TauArgus::SetVarCodeActive,
-             py::arg("var"), py::arg("code"), py::arg("active"))
-        .def("do_active_recode", &TauArgus::DoActiveRecode, py::arg("var"),
-             py::call_guard<py::gil_scoped_release>())
+        .def("set_var_code_active", [](TauArgus &t, long var, long code,
+                                       bool active) {
+            g::non_negative("var", var);
+            g::non_negative("code", code);
+            return t.SetVarCodeActive(var, code, active);
+        }, py::arg("var"), py::arg("code"), py::arg("active"))
+        .def("do_active_recode", [](TauArgus &t, long var) {
+            g::non_negative("var", var);
+            py::gil_scoped_release release;
+            return t.DoActiveRecode(var);
+        }, py::arg("var"))
         .def("apply_recode", &TauArgus::ApplyRecode,
              py::call_guard<py::gil_scoped_release>())
-        .def("undo_recode", &TauArgus::UndoRecode, py::arg("var"),
-             py::call_guard<py::gil_scoped_release>())
+        .def("undo_recode", [](TauArgus &t, long var) {
+            g::non_negative("var", var);
+            py::gil_scoped_release release;
+            return t.UndoRecode(var);
+        }, py::arg("var"))
         .def("do_recode", [](TauArgus &t, long var, const std::string &data,
                               long n_missing, const std::string &missing1,
                               const std::string &missing2) {
+            g::non_negative("var", var);
+            g::non_negative("n_missing", n_missing);
             long et = 0, el = 0, ep = 0;
             const char *warn = nullptr;
             bool ok;
@@ -120,6 +158,14 @@ void init_core(py::module_ &m) {
                              const std::string &ckm_type, long ckm_topk,
                              double lambda, double max_scaled_cost, long peep_var,
                              bool missing_as_safe) {
+            g::non_negative("index", idx);
+            g::non_negative_vec("explanatory_vars", explanatory);
+            g::non_negative("response_var", resp);
+            g::non_negative("ckm_topk", ckm_topk);
+            g::finite_non_negative("lam", lambda);
+            g::finite_non_negative("max_scaled_cost", max_scaled_cost);
+            // shadow/cost/cellkey/peep_var carry the legacy "none"
+            // sentinel (-1) and are intentionally not guarded.
             std::vector<long> e = explanatory;
             return t.SetTable(idx, (long)e.size(), e.data(), is_freq, resp, shadow,
                               cost, cellkey, ckm_type, ckm_topk, lambda,
@@ -135,6 +181,8 @@ void init_core(py::module_ &m) {
              const std::vector<long> &pq_n, bool has_freq, long freq_perc,
              long safe_min_rec, bool has_status, long manual_perc, bool zero_rule,
              double zero_range, bool empty_as_ns, long ns_range) {
+            g::non_negative("index", idx);
+            g::finite_non_negative("zero_safety_range", zero_range);
             std::vector<long> a(dom_n), b(dom_p), c(pq_p), d(pq_q), e(pq_n);
             long errc = 0;
             bool ok = t.SetTableSafetyInfo(idx, has_maxscore, dom,
@@ -160,6 +208,8 @@ void init_core(py::module_ &m) {
               bool weight_on_safety, bool apply_holding, bool zero_rule,
               bool empty_as_ns, long ns_range, double zero_range, long manual_perc,
               const std::vector<long> &freq_perc) {
+             g::non_negative("index", idx);
+             g::finite_non_negative("zero_safety_range", zero_range);
              std::vector<long> a(dom_n), b(dom_k), c(pq_p), d(pq_q), e(pq_n);
              std::vector<long> f(min_freq), g(peep_perc), h(peep_range), i(peep_minfreq), j(freq_perc);
              auto or2 = [](std::vector<long> &v, long dft) {
@@ -199,26 +249,35 @@ void init_core(py::module_ &m) {
             return py::make_tuple(ok, err, tab);
         }, "-> (ok, err, table_index)")
         .def("get_minimum_cell_value", [](TauArgus &t, long tab) {
+            g::non_negative("tab", tab);
             double mn = 0, mx = 0;
             bool ok = t.GetMinimumCellValue(tab, &mn, &mx);
             return py::make_tuple(ok, mn, mx);
         }, py::arg("tab"), "-> (ok, min, max)")
-        .def("maximum_protection_level", &TauArgus::MaximumProtectionLevel,
-             py::arg("tab"))
+        .def("maximum_protection_level", [](TauArgus &t, long tab) {
+            g::non_negative("tab", tab);
+            return t.MaximumProtectionLevel(tab);
+        }, py::arg("tab"))
 
         // -- cell read -------------------------------------------------------
         .def("get_table_cell_value", [](TauArgus &t, long tab, long cell) {
+            g::non_negative("tab", tab);
+            g::non_negative("cell", cell);
             double r = 0;
             bool ok = t.GetTableCellValue(tab, cell, &r);
             return py::make_tuple(ok, r);
         }, py::arg("tab"), py::arg("cell"), "-> (ok, value)")
         .def("get_table_cell_status", [](TauArgus &t, long tab, long cell) {
+            g::non_negative("tab", tab);
+            g::non_negative("cell", cell);
             long s = 0;
             bool ok = t.GetTableCellStatus(tab, cell, &s);
             return py::make_tuple(ok, s);
         }, py::arg("tab"), py::arg("cell"), "-> (ok, status)")
         .def("get_table_cell_protection_levels", [](TauArgus &t, long tab,
                                                      long cell) {
+            g::non_negative("tab", tab);
+            g::non_negative("cell", cell);
             double l = 0, u = 0;
             bool ok = t.GetTableCellProtectionLevels(tab, cell, &l, &u);
             return py::make_tuple(ok, l, u);
@@ -226,6 +285,8 @@ void init_core(py::module_ &m) {
         .def("get_table_cell", [](TauArgus &t, long tab,
                                   const std::vector<long> &dim_index,
                                   long topn) -> py::tuple {
+            g::non_negative("tab", tab);
+            g::non_negative_vec("dim_index", dim_index);
             std::vector<long> d = dim_index;
             long dimensions = 0, cell_scores = 0, holding_scores = 0;
             if (!t.GetTableCellBufferSizes(tab, &dimensions, &cell_scores,
@@ -260,6 +321,7 @@ void init_core(py::module_ &m) {
                                    peep_holding, lower, upper, rlower, rupper);
         }, py::arg("tab"), py::arg("dim_index"), py::arg("topn") = 0)
         .def("get_total_table_size", [](TauArgus &t, long tab) {
+            g::non_negative("tab", tab);
             long ncell = 0, size = 0;
             bool ok = t.GetTotalTabelSize(tab, &ncell, &size);
             return py::make_tuple(ok, ncell, size);
@@ -268,56 +330,100 @@ void init_core(py::module_ &m) {
         // -- cell write / status --------------------------------------------
         .def("set_table_cell_cost", [](TauArgus &t, long tab,
                                        const std::vector<long> &dim, double cost) {
+            g::non_negative("tab", tab);
+            g::non_negative_vec("dim_index", dim);
+            g::finite_non_negative("cost", cost);
             std::vector<long> d = dim;
             return t.SetTableCellCost(tab, d.data(), cost);
         }, py::arg("tab"), py::arg("dim_index"), py::arg("cost"))
         .def("set_table_cell_status_dim", [](TauArgus &t, long tab,
                                              const std::vector<long> &dim, long status) {
+            g::non_negative("tab", tab);
+            g::non_negative_vec("dim_index", dim);
             std::vector<long> d = dim;
             return t.SetTableCellStatus(tab, d.data(), status);
         }, py::arg("tab"), py::arg("dim_index"), py::arg("status"))
         .def("set_table_cell_status_cell", [](TauArgus &t, long tab, long cell,
                                               long status) {
+            g::non_negative("tab", tab);
+            g::non_negative("cell", cell);
             return t.SetTableCellStatus(tab, cell, status);
         }, py::arg("tab"), py::arg("cell"), py::arg("status"))
-        .def("set_table_cell_protection_levels",
-             &TauArgus::SetTableCellProtectionLevels, py::arg("tab"), py::arg("cell"),
-             py::arg("lpl"), py::arg("upl"))
+        .def("set_table_cell_protection_levels", [](TauArgus &t, long tab,
+                                                    long cell, double lpl,
+                                                    double upl) {
+            g::non_negative("tab", tab);
+            g::non_negative("cell", cell);
+            g::finite_non_negative("lpl", lpl);
+            g::finite_non_negative("upl", upl);
+            return t.SetTableCellProtectionLevels(tab, cell, lpl, upl);
+        }, py::arg("tab"), py::arg("cell"), py::arg("lpl"), py::arg("upl"))
         .def("set_protection_levels_dim", [](TauArgus &t, long tab,
                                              const std::vector<long> &dim,
                                              double lpl, double upl) {
+            g::non_negative("tab", tab);
+            g::non_negative_vec("dim_index", dim);
+            g::finite_non_negative("lpl", lpl);
+            g::finite_non_negative("upl", upl);
             std::vector<long> d = dim;
             return t.SetProtectionLevelsForResponseTable(tab, d.data(), lpl, upl);
         }, py::arg("tab"), py::arg("dim_index"), py::arg("lpl"), py::arg("upl"))
-        .def("set_all_empty_non_structural", &TauArgus::SetAllEmptyNonStructural,
-             py::arg("tab"))
+        .def("set_all_empty_non_structural", [](TauArgus &t, long tab) {
+            g::non_negative("tab", tab);
+            return t.SetAllEmptyNonStructural(tab);
+        }, py::arg("tab"))
 
         // -- secondary suppression entry points -----------------------------
         .def("set_secondary_jjformat", [](TauArgus &t, long tab,
                                           const std::string &file, bool with_bogus) {
+            g::non_negative("tab", tab);
             long n = 0;
             long code = t.SetSecondaryJJFORMAT(tab, file.c_str(), with_bogus, &n);
             return py::make_tuple(code, n);
         }, py::arg("tab"), py::arg("file"), py::arg("with_bogus") = false,
            "-> (code, n_set_secondary)")
-        .def("write_jj_format", &TauArgus::WriteJJFormat, py::arg("tab"),
-             py::arg("file"), py::arg("lower"), py::arg("upper"),
-             py::arg("with_bogus") = false, py::arg("as_perc") = false,
-             py::arg("for_rounding") = false,
-             py::call_guard<py::gil_scoped_release>())
-        .def("prepare_hitas", &TauArgus::PrepareHITAS, py::arg("tab"),
-             py::arg("name_param_file"), py::arg("name_files_file"), py::arg("tau_temp"))
+        .def("write_jj_format", [](TauArgus &t, long tab, const std::string &file,
+                                   double lower, double upper, bool with_bogus,
+                                   bool as_perc, bool for_rounding) {
+            g::non_negative("tab", tab);
+            g::finite_or_inf("lower", lower);
+            g::finite_or_inf("upper", upper);
+            py::gil_scoped_release release;
+            return t.WriteJJFormat(tab, file.c_str(), lower, upper, with_bogus,
+                                    as_perc, for_rounding);
+        }, py::arg("tab"), py::arg("file"), py::arg("lower"), py::arg("upper"),
+           py::arg("with_bogus") = false, py::arg("as_perc") = false,
+           py::arg("for_rounding") = false)
+        .def("prepare_hitas", [](TauArgus &t, long tab,
+                                 const std::string &name_param_file,
+                                 const std::string &name_files_file,
+                                 const std::string &tau_temp) {
+            g::non_negative("tab", tab);
+            return t.PrepareHITAS(tab, name_param_file.c_str(),
+                                  name_files_file.c_str(), tau_temp.c_str());
+        }, py::arg("tab"), py::arg("name_param_file"),
+           py::arg("name_files_file"), py::arg("tau_temp"))
         .def("set_secondary_hitas", [](TauArgus &t, long tab) {
+            g::non_negative("tab", tab);
             long n = 0;
             bool ok = t.SetSecondaryHITAS(tab, &n);
             return py::make_tuple(ok, n);
         }, py::arg("tab"), "-> (ok, n_set_secondary)")
-        .def("write_ghmiter_data_cell", &TauArgus::WriteGHMITERDataCell,
-             py::arg("file"), py::arg("tab"), py::arg("is_singleton"))
-        .def("write_ghmiter_stuer", &TauArgus::WriteGHMITERSteuer, py::arg("file"),
-             py::arg("end1"), py::arg("end2"), py::arg("tab"))
+        .def("write_ghmiter_data_cell", [](TauArgus &t, const std::string &file,
+                                           long tab, bool is_singleton) {
+            g::non_negative("tab", tab);
+            return t.WriteGHMITERDataCell(file.c_str(), tab, is_singleton);
+        }, py::arg("file"), py::arg("tab"), py::arg("is_singleton"))
+        .def("write_ghmiter_stuer", [](TauArgus &t, const std::string &file,
+                                       const std::string &end1,
+                                       const std::string &end2, long tab) {
+            g::non_negative("tab", tab);
+            return t.WriteGHMITERSteuer(file.c_str(), end1.c_str(), end2.c_str(),
+                                        tab);
+        }, py::arg("file"), py::arg("end1"), py::arg("end2"), py::arg("tab"))
         .def("set_secondary_ghmiter", [](TauArgus &t, const std::string &file,
                                          long tab, bool is_singleton) {
+            g::non_negative("tab", tab);
             long n = 0;
             long code = t.SetSecondaryGHMITER(file.c_str(), tab, &n, is_singleton);
             return py::make_tuple(code, n);
@@ -326,6 +432,7 @@ void init_core(py::module_ &m) {
         .def("set_secondary_from_hierarchical_ampl", [](TauArgus &t,
                                                         const std::string &file,
                                                         long tab) {
+            g::non_negative("tab", tab);
             long err = 0;
             bool ok = t.SetSecondaryFromHierarchicalAMPL(file.c_str(), tab, &err);
             return py::make_tuple(ok, err);
@@ -333,6 +440,8 @@ void init_core(py::module_ &m) {
         .def("write_hierarchical_table_in_ampl_format",
              [](TauArgus &t, const std::string &file, const std::string &temp,
                 long tab, double max_scale) {
+            g::non_negative("tab", tab);
+            g::finite_non_negative("max_scale", max_scale);
             long err = 0;
             bool ok = t.WriteHierarchicalTableInAMPLFormat(file.c_str(), temp.c_str(),
                                                            tab, max_scale, &err);
@@ -340,15 +449,27 @@ void init_core(py::module_ &m) {
         }, py::arg("ampl_file"), py::arg("temp_dir"), py::arg("tab"), py::arg("max_scale"))
         .def("set_cta_values", [](TauArgus &t, long tab, long cell, double org,
                                   double cta) {
+            g::non_negative("tab", tab);
+            g::non_negative("cell", cell);
             long sec = 0;
             return py::make_tuple(t.SetCTAValues(tab, cell, org, cta, &sec), sec);
         }, py::arg("tab"), py::arg("cell"), py::arg("org_val"), py::arg("cta_val"))
-        .def("set_realized_lower_and_upper", &TauArgus::SetRealizedLowerAndUpper,
-             py::arg("tab"), py::arg("cell"), py::arg("upper"), py::arg("lower"))
-        .def("set_rounded_response", &TauArgus::SetRoundedResponse, py::arg("file"),
-             py::arg("tab"))
+        .def("set_realized_lower_and_upper", [](TauArgus &t, long tab, long cell,
+                                                double upper, double lower) {
+            g::non_negative("tab", tab);
+            g::non_negative("cell", cell);
+            g::finite_or_inf("upper", upper);
+            g::finite_or_inf("lower", lower);
+            return t.SetRealizedLowerAndUpper(tab, cell, upper, lower);
+        }, py::arg("tab"), py::arg("cell"), py::arg("upper"), py::arg("lower"))
+        .def("set_rounded_response", [](TauArgus &t, const std::string &file,
+                                        long tab) {
+            g::non_negative("tab", tab);
+            return t.SetRoundedResponse(file.c_str(), tab);
+        }, py::arg("file"), py::arg("tab"))
         .def("set_cell_key_values_freq", [](TauArgus &t, long tab,
                                             const std::string &ptable) {
+            g::non_negative("tab", tab);
             int mn = 0, mx = 0;
             return py::make_tuple(t.SetCellKeyValuesFreq(tab, ptable, &mn, &mx), mn, mx);
         }, py::arg("tab"), py::arg("ptable_file"))
@@ -361,6 +482,8 @@ void init_core(py::module_ &m) {
                                             double s0, double s1, double z_f, double q,
                                             const std::vector<double> &epsilon,
                                             double mu_c) {
+            g::non_negative("tab", tab);
+            g::non_negative("top_k", top_k);
             std::vector<double> eps = epsilon;
             return t.SetCellKeyValuesCont(tab, ptable_cont, ptable_sep, ckm_type,
                     top_k, zeros, parity, separation, m1sqr, scaling, s0, s1, z_f, q,
@@ -370,8 +493,11 @@ void init_core(py::module_ &m) {
            py::arg("parity"), py::arg("separation"), py::arg("m1sqr"),
            py::arg("scaling"), py::arg("sigma0"), py::arg("sigma1"), py::arg("xstar"),
            py::arg("q"), py::arg("epsilon"), py::arg("mu_c"))
-        .def("undo_secondary_suppress", &TauArgus::UndoSecondarySuppress,
-             py::arg("tab"), py::arg("sort") = 1)
+        .def("undo_secondary_suppress", [](TauArgus &t, long tab, long sort) {
+            g::non_negative("tab", tab);
+            g::non_negative("sort", sort);
+            return t.UndoSecondarySuppress(tab, sort);
+        }, py::arg("tab"), py::arg("sort") = 1)
 
         // -- table input (tabular data flow) --------------------------------
         .def("set_in_table", [](TauArgus &t, long idx,
@@ -380,6 +506,11 @@ void init_core(py::module_ &m) {
                                 const std::vector<double> &maxscore,
                                 const std::vector<double> &maxscore_hold, long status,
                                 double lpl, double upl) {
+            g::non_negative("index", idx);
+            g::non_negative("freq", freq);
+            g::finite_non_negative("lpl", lpl);
+            g::finite_non_negative("upl", upl);
+            // shadow/cost/resp are cell data values, not parameters.
             long err = 0, ev = 0;
             std::vector<std::string> c = codes;
             std::vector<char *> cp(c.size());
@@ -395,6 +526,7 @@ void init_core(py::module_ &m) {
            py::arg("upl"), "-> (ok, err, err_var)")
         .def("set_in_code_list", [](TauArgus &t, const std::vector<long> &var_index,
                                     const std::vector<std::string> &codes) {
+            g::non_negative_vec("var_index", var_index);
             long err = 0, ev = 0;
             std::vector<std::string> c = codes;
             std::vector<char *> cp(c.size());
@@ -405,6 +537,7 @@ void init_core(py::module_ &m) {
         }, py::arg("var_index"), py::arg("codes"))
         .def("set_totals_in_code_list", [](TauArgus &t,
                                            const std::vector<long> &var_index) {
+            g::non_negative_vec("var_index", var_index);
             long err = 0, ev = 0;
             std::vector<long> v = var_index;
             bool ok = t.SetTotalsInCodeList((long)v.size(), v.data(), &err, &ev);
@@ -413,6 +546,7 @@ void init_core(py::module_ &m) {
         .def("completed_table", [](TauArgus &t, long idx, const std::string &file,
                                     bool calc_totals, bool calc_totals_safe,
                                     bool for_cover) {
+            g::non_negative("index", idx);
             long err = 0;
             bool ok = t.CompletedTable(idx, &err, file.c_str(), calc_totals,
                                        calc_totals_safe, for_cover);
@@ -420,14 +554,25 @@ void init_core(py::module_ &m) {
         }, py::arg("index"), py::arg("file"), py::arg("compute_totals"),
            py::arg("calculated_totals_as_safe") = false,
            py::arg("for_cover_table") = false)
-        .def("write_cell_records", &TauArgus::WriteCellRecords, py::arg("tab"),
-             py::arg("file"), py::arg("sbs"), py::arg("sbs_level") = false,
-             py::arg("suppress_empty") = false, py::arg("first_line") = "",
-             py::arg("show_unsafe") = false, py::arg("embed_quotes") = true,
-             py::arg("resp_type") = 1)
+        .def("write_cell_records", [](TauArgus &t, long tab,
+                                      const std::string &file, long sbs,
+                                      bool sbs_level, bool suppress_empty,
+                                      const std::string &first_line,
+                                      bool show_unsafe, bool embed_quotes,
+                                      long resp_type) {
+            g::non_negative("tab", tab);
+            return t.WriteCellRecords(tab, file.c_str(), sbs, sbs_level,
+                                      suppress_empty, first_line.c_str(),
+                                      show_unsafe, embed_quotes, resp_type);
+        }, py::arg("tab"), py::arg("file"), py::arg("sbs"),
+           py::arg("sbs_level") = false, py::arg("suppress_empty") = false,
+           py::arg("first_line") = "", py::arg("show_unsafe") = false,
+           py::arg("embed_quotes") = true, py::arg("resp_type") = 1)
         .def("write_csv", [](TauArgus &t, long tab, const std::string &file,
                              bool embed_quotes, const std::vector<long> &dim_seq,
                              long resp_type) {
+            g::non_negative("tab", tab);
+            g::non_negative_vec("dim_sequence", dim_seq);
             std::vector<long> d = dim_seq;
             return t.WriteCSV(tab, file.c_str(), embed_quotes,
                               d.empty() ? nullptr : d.data(), resp_type);
