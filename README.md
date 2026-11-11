@@ -28,7 +28,9 @@ The user-facing front-ends live in separate repos:
   built from a pinned revision of this repo.
 - **[rtauargus.native](https://github.com/trygu/rtauargus.native)**: the
   R package front-end over the thin R binding (a fork of INSEE's
-  `rtauargus`). It owns the R release pipeline for both R packages.
+  `rtauargus`). It owns the R release pipeline: on `r-v*` tags it merges
+this repo's native binding layer into the fork and ships one
+self-contained R package.
 
 ## Relationship to the original Tau-Argus
 
@@ -148,28 +150,48 @@ needs nothing external. Use it three ways:
 
 ## Architecture
 
-```text
-.arb batch  ->  tauargus CLI / tauargus-tui  ->  pytauargus  ->  tauargus-engine (C/C++)  ->  HiGHS
-```
-
-The engine is C++11, built from five git submodules under `engine/native/`:
-
-- `core`: Data model, Argus/JJ file I/O, SDC engine entry points
-- `csp`: Cell-suppression LP (branch-and-price) and feasibility audit
-- `hitas`: Hierarchical table suppression (HiTaS); links `csp`
-- `crp`: Controlled rounding (iterative rounding, audit)
-- `rounder`: Dispatch layer over `crp`
+Three layers: the front-ends in separate repos, and the bindings and
+engine in this repo. Each front-end pins this repo as a git submodule
+(the gitlink is the pin) and ships a self-contained build of the engine
+with its releases. The complete project map, including every submodule
+pin:
 
 ```text
-.
-├── engine/      C/C++ engine; CMakeLists.txt is a superbuild of the 5
-│                submodules (see engine/README.md for the module map)
-├── bindings/    thin Python and R bindings (see bindings/README.md)
-│   ├── python/  pybind11 extension (cpp/) + CMake, binding smoke tests
-│   └── r/       tauargusengine, the thin R package + binding smoke test
-└── data/        sample .arb batches and tabular fixtures; also the test
-                 fixtures consumed by the pytauargus repo's package tests
+tauargus-engine                   this repository: engine + bindings
+├── engine/native/                five solver modules, each a git
+│   ├── core                      submodule; C++11; all built
+│   ├── csp                       against HiGHS (version pinned in
+│   ├── hitas                     engine/HiGHS-VERSION; HiGHS is an
+│   ├── crp                       external dependency, not a submodule)
+│   └── rounder
+├── bindings/python               pybind11 _tauargus extension
+├── bindings/r/tauargusengine     thin R package (R .Call over C++)
+└── data/                         sample .arb batches and tabular
+                                  fixtures; also the fixtures consumed
+                                  by the pytauargus package tests
+
+pytauargus                        Python front-end (separate repo):
+└── tauargus-engine               DataFrame API, batch API, tauargus
+                                  CLI and the pytauargus-tui terminal
+                                  UI; pins this repo as a git
+                                  submodule; the wheel bundles the
+                                  extension, the five engine libraries
+                                  and HiGHS
+
+rtauargus.native                  R front-end (separate repo), a fork
+└── tauargus-engine               of INSEE rtauargus; pins this repo
+                                  as a git submodule; the release
+                                  stages bindings/r into the package
 ```
+
+The five modules (see `engine/README.md` for the module map):
+
+- `core`: data model, Argus/JJ file I/O, SDC entry points
+- `csp`: cell-suppression LP (branch-and-price) and the feasibility
+  audit (the legacy intervalle port)
+- `hitas`: hierarchical table suppression (links `csp`)
+- `crp`: controlled rounding: iterative rounding, audit
+- `rounder`: dispatch layer over `crp`
 
 ## Building from source
 
@@ -209,13 +231,15 @@ revision of this repo.
 
 ### R package
 
-The distributable R package `tauargusengine` is self-contained:
-`scripts/stage-r-package.sh` assembles it with the engine and HiGHS
-sources, and its configure script builds everything from the package's
-own sources at install time. The script is reusable: the
-[rtauargus.native](https://github.com/trygu/rtauargus.native) repo pins
-this repo as a submodule and runs its release pipeline from this recipe
-on `r-v*` tags (one GitHub Release set with both R packages).
+The native R binding sources live in `bindings/r/tauargusengine` (a local
+dev and test target). For release,
+`scripts/stage-r-package.sh --merge-into` composes that native layer
+(binding R code, `src/`, `configure`, the engine and pinned HiGHS sources)
+into the [rtauargus.native](https://github.com/trygu/rtauargus.native) INSEE
+fork, so the release ships one self-contained `rtauargus.native` package
+that builds everything from its own sources at install time. The
+rtauargus.native repo pins this repo as a submodule and runs its release
+pipeline from this recipe on `r-v*` tags.
 
 ## Testing
 
