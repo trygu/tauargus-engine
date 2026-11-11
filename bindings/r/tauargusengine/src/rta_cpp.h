@@ -31,7 +31,9 @@ static inline void rta_require_whole(double d, const char *name) {
     if (std::isinf(d) || d != std::trunc(d))
         throw std::invalid_argument(std::string("argument '") + name +
                                     "' must be a finite whole number");
-    if (d > (double) LONG_MAX || d < (double) LONG_MIN)
+    // LONG_MAX rounds up to 2^63 as a double on 64-bit platforms.
+    // The upper bound is exclusive; LONG_MIN is exactly representable.
+    if (d >= -(double) LONG_MIN || d < (double) LONG_MIN)
         throw std::invalid_argument(std::string("argument '") + name + "' is out of range");
 }
 
@@ -138,7 +140,7 @@ static inline std::vector<long> rta_long_vec(SEXP x, const char *name = "value")
             if (std::isinf(d) || d != std::trunc(d))
                 throw std::invalid_argument(std::string("element ") + std::to_string(i + 1) +
                                             " of '" + name + "' must be a finite whole number");
-            if (d > (double) LONG_MAX || d < (double) LONG_MIN)
+            if (d >= -(double) LONG_MIN || d < (double) LONG_MIN)
                 throw std::invalid_argument(std::string("element ") + std::to_string(i + 1) +
                                             " of '" + name + "' is out of range");
             v[i] = (long) d;
