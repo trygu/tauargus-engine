@@ -15,10 +15,30 @@
 #include <string>
 #include <vector>
 #include <cstdarg>
+#include <climits>
+#include <cmath>
 #include <cstdio>
 #include <exception>
 #include <stdexcept>
 #include "rta_host_io.h"
+
+// Phase 4 input guards: rejected input raises std::invalid_argument
+// (rta_call turns it into a typed R error). The message names the
+// argument so the R front-end can show it to the user.
+static inline void rta_require_whole(double d, const char *name) {
+    if (R_IsNA(d) || R_IsNaN(d))
+        throw std::invalid_argument(std::string("argument '") + name + "' must not be NA");
+    if (std::isinf(d) || d != std::trunc(d))
+        throw std::invalid_argument(std::string("argument '") + name +
+                                    "' must be a finite whole number");
+    if (d > (double) LONG_MAX || d < (double) LONG_MIN)
+        throw std::invalid_argument(std::string("argument '") + name + "' is out of range");
+}
+
+static inline void rta_require_finite(double d, const char *name) {
+    if (R_IsNA(d) || R_IsNaN(d))
+        throw std::invalid_argument(std::string("argument '") + name + "' must not be NA");
+}
 
 // Catch native exceptions after C++ temporaries have been unwound, then
 // signal an R error outside the catch block (Rf_error uses a long jump).
@@ -59,12 +79,21 @@ static inline std::string rta_str(SEXP x) {
     return CHAR(STRING_ELT(x, 0));
 }
 
-static inline long rta_long(SEXP x) {
+static inline long rta_long(SEXP x, const char *name = "value") {
     if (x == R_NilValue) return 0;
-    if (TYPEOF(x) == INTSXP) return (long) INTEGER(x)[0];
-    if (TYPEOF(x) == REALSXP) return (long) REAL(x)[0];
-    if (TYPEOF(x) == LGLSXP) return (long) LOGICAL(x)[0];
-    return (long) Rf_asReal(x);
+    if (TYPEOF(x) == INTSXP) {
+        if (INTEGER(x)[0] == NA_INTEGER)
+            throw std::invalid_argument(std::string("argument '") + name + "' must not be NA");
+        return (long) INTEGER(x)[0];
+    }
+    if (TYPEOF(x) == LGLSXP) {
+        if (LOGICAL(x)[0] == NA_LOGICAL)
+            throw std::invalid_argument(std::string("argument '") + name + "' must not be NA");
+        return (long) LOGICAL(x)[0];
+    }
+    double d = (TYPEOF(x) == REALSXP) ? REAL(x)[0] : Rf_asReal(x);
+    rta_require_whole(d, name);
+    return (long) d;
 }
 
 static inline double rta_dbl(SEXP x) {
@@ -72,32 +101,66 @@ static inline double rta_dbl(SEXP x) {
     return (double) Rf_asReal(x);
 }
 
-static inline bool rta_lgl(SEXP x) {
+static inline bool rta_lgl(SEXP x, const char *name = "value") {
     if (x == R_NilValue) return false;
-    if (TYPEOF(x) == LGLSXP) return LOGICAL(x)[0] != 0;
-    if (TYPEOF(x) == INTSXP) return INTEGER(x)[0] != 0;
-    if (TYPEOF(x) == REALSXP) return REAL(x)[0] != 0;
-    return Rf_asLogical(x) != 0;
+    if (TYPEOF(x) == LGLSXP) {
+        if (LOGICAL(x)[0] == NA_LOGICAL)
+            throw std::invalid_argument(std::string("argument '") + name + "' must not be NA");
+        return LOGICAL(x)[0] != 0;
+    }
+    if (TYPEOF(x) == INTSXP) {
+        if (INTEGER(x)[0] == NA_INTEGER)
+            throw std::invalid_argument(std::string("argument '") + name + "' must not be NA");
+        return INTEGER(x)[0] != 0;
+    }
+    if (TYPEOF(x) == REALSXP) {
+        double d = REAL(x)[0];
+        rta_require_finite(d, name);
+        return d != 0;
+    }
+    int v = Rf_asLogical(x);
+    if (v == NA_LOGICAL)
+        throw std::invalid_argument(std::string("argument '") + name + "' must not be NA");
+    return v != 0;
 }
 
 /* A vector of integers (coerced through real to keep large values exact). */
-static inline std::vector<long> rta_long_vec(SEXP x) {
+static inline std::vector<long> rta_long_vec(SEXP x, const char *name = "value") {
     int n = x == R_NilValue ? 0 : LENGTH(x);
     std::vector<long> v(n);
     if (n) {
         SEXP xr = PROTECT(Rf_coerceVector(x, REALSXP));
-        for (int i = 0; i < n; i++) v[i] = (long) REAL(xr)[i];
+        for (int i = 0; i < n; i++) {
+            double d = REAL(xr)[i];
+            if (R_IsNA(d) || R_IsNaN(d))
+                throw std::invalid_argument(std::string("element ") + std::to_string(i + 1) +
+                                            " of '" + name + "' must not be NA");
+            if (std::isinf(d) || d != std::trunc(d))
+                throw std::invalid_argument(std::string("element ") + std::to_string(i + 1) +
+                                            " of '" + name + "' must be a finite whole number");
+            if (d > (double) LONG_MAX || d < (double) LONG_MIN)
+                throw std::invalid_argument(std::string("element ") + std::to_string(i + 1) +
+                                            " of '" + name + "' is out of range");
+            v[i] = (long) d;
+        }
         UNPROTECT(1);
     }
     return v;
 }
 
-static inline std::vector<double> rta_dbl_vec(SEXP x) {
+/* Inf is allowed here: bound vectors (rounder upper/lower) use it. */
+static inline std::vector<double> rta_dbl_vec(SEXP x, const char *name = "value") {
     int n = x == R_NilValue ? 0 : LENGTH(x);
     std::vector<double> v(n);
     if (n) {
         SEXP xr = PROTECT(Rf_coerceVector(x, REALSXP));
-        for (int i = 0; i < n; i++) v[i] = REAL(xr)[i];
+        for (int i = 0; i < n; i++) {
+            double d = REAL(xr)[i];
+            if (R_IsNA(d) || R_IsNaN(d))
+                throw std::invalid_argument(std::string("element ") + std::to_string(i + 1) +
+                                            " of '" + name + "' must not be NA");
+            v[i] = d;
+        }
         UNPROTECT(1);
     }
     return v;
@@ -138,7 +201,11 @@ static inline SEXP rta_str_sexp(const std::string &s) {
 
 static inline SEXP rta_lgl_sexp(bool b) { return Rf_ScalarLogical(b ? 1 : 0); }
 static inline SEXP rta_dbl_sexp(double d) { return Rf_ScalarReal(d); }
-static inline SEXP rta_long_sexp(long l) { return Rf_ScalarInteger((int) l); }
+static inline SEXP rta_long_sexp(long l) {
+    // Values beyond INTSXP range would truncate; report them as double.
+    if (l > INT_MAX || l < INT_MIN) return Rf_ScalarReal((double) l);
+    return Rf_ScalarInteger((int) l);
+}
 
 static inline SEXP rta_dbl2(double a, double b) {
     SEXP v = PROTECT(Rf_allocVector(REALSXP, 2));
