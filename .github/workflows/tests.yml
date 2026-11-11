@@ -284,6 +284,49 @@ jobs:
           Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R \
             2>&1 | tee "${RUNNER_TEMP}/engine-tests/r-binding-smoke.txt"
 
+      # R CMD check on the binding source package: it catches what the
+      # smoke tests cannot, above all a NAMESPACE export without a man
+      # page (the rounder_error_string export reached the 0.7.0 train
+      # undocumented). Docs checks are platform-independent, so the
+      # cheapest leg runs it once. Tests are skipped: the behavioral
+      # suites are the smoke, native-error, host-I/O and input-guard
+      # steps, and test_native_output.R needs the staged host-I/O build.
+      - name: Check R binding package (R CMD check)
+        if: matrix.osname == 'linux' && matrix.arch == 'x86_64'
+        env:
+          HIGHSPREFIX: ${{ runner.temp }}/highs-prefix
+          # The check compiles from a temp copy of the package, where the
+          # Makevars' relative engine path no longer reaches the tree.
+          TA_ENGINE: ${{ github.workspace }}
+          # The check runs without tests, so the suggested testthat
+          # package is not needed; the runner's apt R does not have it.
+          _R_CHECK_FORCE_SUGGESTS_: "false"
+        run: |
+          set -euo pipefail
+          R CMD build bindings/r/tauargusengine \
+            > "$RUNNER_TEMP/engine-tests/r-cmd-build.txt" 2>&1 || {
+              tail -n 60 "$RUNNER_TEMP/engine-tests/r-cmd-build.txt"
+              exit 1
+            }
+          # The ERROR class is the gate: it is where the gap this step
+          # exists to catch lives (a NAMESPACE export without a man
+          # page). WARNING and NOTE are allowed, because the dev
+          # Makevars' GNU extensions warn on every platform (it links
+          # the prebuilt engine and cannot use the portable
+          # configure/Makevars.in pattern) and NOTEs are advisory.
+          # R CMD check exits 1 for ERROR and WARNING alike, so the
+          # exit status is deliberately not the gate; the status line
+          # is. A missing status line (the check crashed) also fails.
+          R CMD check --no-manual --no-tests tauargusengine_*.tar.gz \
+            > "$RUNNER_TEMP/engine-tests/r-cmd-check.txt" 2>&1
+          status=$(grep '^Status:' "$RUNNER_TEMP/engine-tests/r-cmd-check.txt" | tail -n 1)
+          case "$status" in
+            "")  echo "no Status line in the R CMD check log" >&2; exit 1 ;;
+            *ERROR*) echo "$status" >&2; exit 1 ;;
+          esac
+          rm -f tauargusengine_*.tar.gz
+          rm -rf tauargusengine.Rcheck
+
       - name: Test self-contained R source installation
         run: |
           set -euo pipefail
