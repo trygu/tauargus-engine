@@ -38,6 +38,13 @@ extern "C" SEXP rta_rounder_set_double_constant(SEXP self, SEXP variable,
     });
 }
 
+extern "C" SEXP rta_rounder_error_string(SEXP self, SEXP code) {
+    return rta_call([&]() -> SEXP {
+    RounderCtrl &r = rta_object<RounderCtrl>(self, "tauargusengine::RounderCtrl");
+    return rta_str_sexp(r.GetErrorString((int) rta_long(code)));
+    });
+}
+
 extern "C" SEXP rta_rounder_do_round(SEXP self, SEXP solver, SEXP in_file,
                                      SEXP base, SEXP upper, SEXP lower,
                                      SEXP auditing, SEXP solution,
@@ -45,8 +52,8 @@ extern "C" SEXP rta_rounder_do_round(SEXP self, SEXP solver, SEXP in_file,
                                      SEXP zero_restricted) {
     return rta_call([&]() -> SEXP {
     RounderCtrl &r = rta_object<RounderCtrl>(self, "tauargusengine::RounderCtrl");
-    std::vector<double> u = rta_dbl_vec(upper);
-    std::vector<double> l = rta_dbl_vec(lower);
+    std::vector<double> u = rta_dbl_vec(upper, "upper_bound");
+    std::vector<double> l = rta_dbl_vec(lower, "lower_bound");
 
     std::string s_solver = rta_str(solver);
     std::string s_in = rta_str(in_file);

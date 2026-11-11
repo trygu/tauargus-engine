@@ -65,6 +65,7 @@ export(hitas_error_string)
 # RounderCtrl
 export(rounder_set_double_constant)
 export(rounder_do_round)
+export(rounder_error_string)
 
 # CSP audit
 export(audit_jj)

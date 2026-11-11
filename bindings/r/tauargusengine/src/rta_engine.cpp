@@ -73,14 +73,14 @@ extern "C" SEXP rta_tau_set_in_file_info(SEXP self, SEXP is_fixed, SEXP sep) {
 extern "C" SEXP rta_tau_set_number_var(SEXP self, SEXP n) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
-    return rta_lgl_sexp(t.SetNumberVar(rta_long(n)));
+    return rta_lgl_sexp(t.SetNumberVar(rta_long(n, "n_var")));
     });
 }
 
 extern "C" SEXP rta_tau_set_number_tab(SEXP self, SEXP n) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
-    return rta_lgl_sexp(t.SetNumberTab(rta_long(n)));
+    return rta_lgl_sexp(t.SetNumberTab(rta_long(n, "n_tab")));
     });
 }
 
@@ -137,8 +137,8 @@ extern "C" SEXP rta_tau_set_hierarchical_digits(SEXP self, SEXP var,
                                                 SEXP digits) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
-    std::vector<long> d = rta_long_vec(digits);
-    return rta_lgl_sexp(t.SetHierarchicalDigits(rta_long(var),
+    std::vector<long> d = rta_long_vec(digits, "digits");
+    return rta_lgl_sexp(t.SetHierarchicalDigits(rta_long(var, "var"),
                                                 (long) d.size(), d.data()));
     });
 }
@@ -147,8 +147,15 @@ extern "C" SEXP rta_tau_get_var_number_of_codes(SEXP self, SEXP var) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
     long n = 0, na = 0;
-    t.GetVarNumberOfCodes(rta_long(var), &n, &na);
-    return rta_long2(n, na);
+    bool ok = t.GetVarNumberOfCodes(rta_long(var), &n, &na);
+    // -> list(ok, n_codes, n_active)
+    SEXP r = PROTECT(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(r, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(r, 1, rta_long_sexp(n));
+    SET_VECTOR_ELT(r, 2, rta_long_sexp(na));
+    rta_set_names(r, "ok", "n_codes", "n_active");
+    UNPROTECT(1);
+    return r;
     });
 }
 
@@ -202,7 +209,8 @@ extern "C" SEXP rta_tau_set_var_code_active(SEXP self, SEXP var, SEXP code,
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
     return rta_lgl_sexp(
-        t.SetVarCodeActive(rta_long(var), rta_long(code), rta_lgl(active)));
+        t.SetVarCodeActive(rta_long(var, "var"), rta_long(code, "code"),
+                           rta_lgl(active, "active")));
     });
 }
 
@@ -340,10 +348,13 @@ extern "C" SEXP rta_tau_set_table_safety_info(SEXP self, SEXP index,
         rta_lgl(has_freq), rta_long(freq_perc), rta_long(safe_min_rec),
         rta_lgl(has_status), rta_long(manual_perc), rta_lgl(zero_rule),
         rta_dbl(zero_range), rta_lgl(empty_as_ns), rta_long(ns_range), &errc);
-    (void) errc;
-    // Logical, like the SetTable/SetTableSafety siblings (the caller can
-    // translate failures via TauArgus::ErrorString).
-    return rta_lgl_sexp(ok);
+    // -> list(ok, errc)
+    SEXP res = PROTECT(Rf_allocVector(VECSXP, 2));
+    SET_VECTOR_ELT(res, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(res, 1, rta_long_sexp(errc));
+    rta_set_names(res, "ok", "errc");
+    UNPROTECT(1);
+    return res;
     });
 }
 
@@ -377,9 +388,16 @@ extern "C" SEXP rta_tau_compute_tables(SEXP self) {
 extern "C" SEXP rta_tau_get_minimum_cell_value(SEXP self, SEXP tab) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
-    double mx = 0;
-    double mn = t.GetMinimumCellValue(rta_long(tab), &mx);
-    return rta_dbl2(mn, mx);
+    double mn = 0, mx = 0;
+    bool ok = t.GetMinimumCellValue(rta_long(tab), &mn, &mx);
+    // -> list(ok, min, max)
+    SEXP r = PROTECT(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(r, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(r, 1, rta_dbl_sexp(mn));
+    SET_VECTOR_ELT(r, 2, rta_dbl_sexp(mx));
+    rta_set_names(r, "ok", "min", "max");
+    UNPROTECT(1);
+    return r;
     });
 }
 
@@ -390,8 +408,15 @@ extern "C" SEXP rta_tau_get_total_table_size(SEXP self, SEXP tab) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
     long ncell = 0, size = 0;
-    t.GetTotalTabelSize(rta_long(tab), &ncell, &size);
-    return rta_long2(ncell, size);
+    bool ok = t.GetTotalTabelSize(rta_long(tab), &ncell, &size);
+    // -> list(ok, n_cells, size_data_cell)
+    SEXP r = PROTECT(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(r, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(r, 1, rta_long_sexp(ncell));
+    SET_VECTOR_ELT(r, 2, rta_long_sexp(size));
+    rta_set_names(r, "ok", "n_cells", "size_data_cell");
+    UNPROTECT(1);
+    return r;
     });
 }
 
@@ -399,8 +424,14 @@ extern "C" SEXP rta_tau_get_table_cell_value(SEXP self, SEXP tab, SEXP cell) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
     double r = 0;
-    t.GetTableCellValue(rta_long(tab), rta_long(cell), &r);
-    return rta_dbl_sexp(r);
+    bool ok = t.GetTableCellValue(rta_long(tab), rta_long(cell), &r);
+    // -> list(ok, value)
+    SEXP res = PROTECT(Rf_allocVector(VECSXP, 2));
+    SET_VECTOR_ELT(res, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(res, 1, rta_dbl_sexp(r));
+    rta_set_names(res, "ok", "value");
+    UNPROTECT(1);
+    return res;
     });
 }
 
@@ -409,8 +440,14 @@ extern "C" SEXP rta_tau_get_table_cell_status(SEXP self, SEXP tab,
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
     long s = 0;
-    t.GetTableCellStatus(rta_long(tab), rta_long(cell), &s);
-    return rta_long_sexp(s);
+    bool ok = t.GetTableCellStatus(rta_long(tab), rta_long(cell), &s);
+    // -> list(ok, status)
+    SEXP res = PROTECT(Rf_allocVector(VECSXP, 2));
+    SET_VECTOR_ELT(res, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(res, 1, rta_long_sexp(s));
+    rta_set_names(res, "ok", "status");
+    UNPROTECT(1);
+    return res;
     });
 }
 
@@ -419,8 +456,15 @@ extern "C" SEXP rta_tau_get_table_cell_protection_levels(SEXP self, SEXP tab,
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
     double l = 0, u = 0;
-    t.GetTableCellProtectionLevels(rta_long(tab), rta_long(cell), &l, &u);
-    return rta_dbl2(l, u);
+    bool ok = t.GetTableCellProtectionLevels(rta_long(tab), rta_long(cell), &l, &u);
+    // -> list(ok, lower, upper)
+    SEXP res = PROTECT(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(res, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(res, 1, rta_dbl_sexp(l));
+    SET_VECTOR_ELT(res, 2, rta_dbl_sexp(u));
+    rta_set_names(res, "ok", "lower", "upper");
+    UNPROTECT(1);
+    return res;
     });
 }
 
@@ -696,10 +740,14 @@ extern "C" SEXP rta_tau_set_in_table(SEXP self, SEXP idx, SEXP codes,
                            mh.empty() ? nullptr : mh.data(),
                            rta_long(status), rta_dbl(lpl), rta_dbl(upl), &err,
                            &ev);
-    (void) err; (void) ev;
-    // Logical, like the other Set* wrappers (the Python binding also
-    // discards err/ev here).
-    return rta_lgl_sexp(ok);
+    // -> list(ok, err, err_var)
+    SEXP res = PROTECT(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(res, 0, rta_lgl_sexp(ok));
+    SET_VECTOR_ELT(res, 1, rta_long_sexp(err));
+    SET_VECTOR_ELT(res, 2, rta_long_sexp(ev));
+    rta_set_names(res, "ok", "err", "err_var");
+    UNPROTECT(1);
+    return res;
     });
 }
 
