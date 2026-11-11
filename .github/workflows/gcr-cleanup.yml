@@ -1,0 +1,59 @@
+# One-shot: permanently delete the stale GHCR container package
+# (ghcr.io/trygu/tauargus-engine, tags 0.2.1-0.5.2 + latest). Container
+# images are no longer an engine artifact; a containerized deployment
+# will ship with the web front-end from the product side, if ever.
+# Deleting a package removes every version of it. Delete this workflow
+# after the run.
+name: gcr-cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: "GHCR package name to delete (no registry prefix)"
+        required: true
+        default: "tauargus-engine"
+
+permissions:
+  packages: write
+
+jobs:
+  delete:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Guard
+        env:
+          PKG: ${{ github.event.inputs.package_name }}
+        run: |
+          # Only allow deleting the one stale package this workflow exists for.
+          case "$PKG" in
+            tauargus-engine) ;;
+            *) echo "refusing to delete unexpected package '$PKG'"; exit 1 ;;
+          esac
+
+      - name: Delete package (all versions)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PKG: ${{ github.event.inputs.package_name }}
+        run: |
+          set -euo pipefail
+          # package_type: GHCR lists as 'container'; older API responses
+          # used 'docker'. Try both.
+          id=""
+          for t in container docker; do
+            id=$(gh api "/user/packages?package_type=$t&per_page=100" \
+              --jq ".[] | select(.name == \"$PKG\") | .id")
+            [ -n "$id" ] && break
+          done
+          if [ -z "$id" ]; then
+            echo "package $PKG not found (already deleted?)"
+            exit 0
+          fi
+          echo "found package id=$id ($PKG)"
+          for v in $(gh api "/user/packages/$id/versions?per_page=100" --jq '.[].id'); do
+            echo "deleting version id=$v"
+            gh api -X DELETE "/user/packages/$id/versions/$v"
+          done
+          echo "deleting package id=$id"
+          gh api -X DELETE "/user/packages/$id"
+          echo "done"
