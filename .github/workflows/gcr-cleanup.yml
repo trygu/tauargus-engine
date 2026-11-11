@@ -37,17 +37,25 @@ jobs:
           PKG: ${{ github.event.inputs.package_name }}
         run: |
           set -uo pipefail
-          # The /user/packages API requires package_type=docker for GHCR
-          # packages ('container' is rejected with 400).
-          # Print the full inventory for diagnosis (name, visibility, versions).
-          gh api "/user/packages?package_type=docker&per_page=100" \
-            --jq '.[] | .name + " | visibility=" + .visibility + " | versions=" + (.versions | length)'
-          # Match by suffix so a namespace-qualified name cannot slip past.
-          id=$(gh api "/user/packages?package_type=docker&per_page=100" \
-            --jq ".[] | select(.name | test(\"$PKG\$\")) | .id" || true)
+          # The registry serves the package, but the earlier probes came up
+          # empty. Probe every plausible listing endpoint and print what
+          # each returns before deciding.
+          list() { gh api "$1" --jq '.[].name' 2>&1 || echo "(call failed)"; }
+          echo "== /user/packages (no filter):"; list "/user/packages?per_page=100"
+          echo "== /user/packages?package_type=docker:"; list "/user/packages?package_type=docker&per_page=100"
+          echo "== /user/packages?package_type=container:"; list "/user/packages?package_type=container&per_page=100"
+          echo "== /users/trygu/packages:"; list "/users/trygu/packages?per_page=100"
+          # Collect the id from whichever endpoint lists the package.
+          id=""
+          for ep in "/user/packages?per_page=100" \
+                    "/user/packages?package_type=docker&per_page=100" \
+                    "/users/trygu/packages?per_page=100"; do
+            id=$(gh api "$ep" --jq ".[] | select(.name | test(\"$PKG\$\")) | .id" 2>/dev/null || true)
+            [ -n "$id" ] && break
+          done
           if [ -z "$id" ]; then
-            echo "package $PKG not found (already deleted?)"
-            exit 0
+            echo "package $PKG not found in any listing; see diagnostics above"
+            exit 1
           fi
           echo "found package id=$id ($PKG)"
           for v in $(gh api "/user/packages/$id/versions?per_page=100" --jq '.[].id'); do
