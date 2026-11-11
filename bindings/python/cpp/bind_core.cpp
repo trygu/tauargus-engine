@@ -11,6 +11,7 @@
 #include "TauArgus.h"
 #include "init_decls.h"
 #include "input_guards.h"
+#include "ghm.h"
 
 namespace g = tauargus::guards;
 
@@ -429,6 +430,27 @@ void init_core(py::module_ &m) {
             return py::make_tuple(code, n);
         }, py::arg("file"), py::arg("tab"), py::arg("is_singleton") = false,
            "-> (code, n_set_secondary)")
+         .def("run_ghmiter", [](TauArgus &t, const std::string &steer,
+                                const std::string &cells, const std::string &result,
+                                double minw, double maxw, double nulw,
+                                double absbet, double qquote, double dquote,
+                                int gewran, int schaez, int mode, int print1,
+                                int exact) {
+             (void)t;
+             ghm_params p;
+             p.minw = minw; p.maxw = maxw; p.nulw = nulw; p.absbet = absbet;
+             p.qquote = qquote; p.dquote = dquote; p.gewran = gewran;
+             p.schaez = schaez; p.mode = mode; p.print1 = print1; p.exact = exact;
+             ghm_result res;
+             ghm_run(steer.c_str(), cells.c_str(), result.c_str(), &p, &res);
+             return py::make_tuple(res.code, (long)res.n_secondary,
+                                   std::string(res.message));
+         }, py::arg("steer_file"), py::arg("cells_file"), py::arg("result_file"),
+            py::arg("minw") = 1.0, py::arg("maxw") = 100.0, py::arg("nulw") = 0.0,
+            py::arg("absbet") = 0.0, py::arg("qquote") = 0.0,
+            py::arg("dquote") = 0.0, py::arg("gewran") = 1, py::arg("schaez") = 1,
+            py::arg("mode") = 0, py::arg("print1") = 1, py::arg("exact") = 1,
+            "-> (code, n_set_secondary, message)")
         .def("set_secondary_from_hierarchical_ampl", [](TauArgus &t,
                                                         const std::string &file,
                                                         long tab) {

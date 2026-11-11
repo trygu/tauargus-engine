@@ -37,6 +37,7 @@ set(NATIVE_CORE_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/core/src)
 set(NATIVE_CSP_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/csp/src)
 set(NATIVE_HITAS_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/hitas/src)
 set(NATIVE_ROUNDER_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/rounder/src)
+set(NATIVE_GHM_SRC ${TAUARGUS_ENGINE_DIR}/engine/native/ghm/src)
 
 # Resolve the engine lib file names for the host platform.
 #   - macOS / Linux: shared libs are lib<name>.{dylib,so} in build/lib.
@@ -47,6 +48,7 @@ if(APPLE)
         ${NATIVE_LIB_DIR}/libtauargus_csp.dylib
         ${NATIVE_LIB_DIR}/libtauargus_hitas.dylib
         ${NATIVE_LIB_DIR}/libtauargus_rounder.dylib
+        ${NATIVE_LIB_DIR}/libtauargus_ghm.dylib
         ${NATIVE_LIB_DIR}/libCRP.dylib)
     set(ENGINE_STATIC ${NATIVE_LIB_DIR}/libtauargus_core.a)
     set(BUNDLE_LIBS ${ENGINE_SHARED})
@@ -57,6 +59,7 @@ elseif(UNIX)
         ${NATIVE_LIB_DIR}/libtauargus_csp.so
         ${NATIVE_LIB_DIR}/libtauargus_hitas.so
         ${NATIVE_LIB_DIR}/libtauargus_rounder.so
+        ${NATIVE_LIB_DIR}/libtauargus_ghm.so
         ${NATIVE_LIB_DIR}/libCRP.so)
     set(ENGINE_STATIC ${NATIVE_LIB_DIR}/libtauargus_core.a)
     set(BUNDLE_LIBS ${ENGINE_SHARED})
@@ -70,12 +73,14 @@ elseif(WIN32)
         ${WIN_LIB_DIR}/tauargus_csp.lib
         ${WIN_LIB_DIR}/tauargus_hitas.lib
         ${WIN_LIB_DIR}/tauargus_rounder.lib
+        ${WIN_LIB_DIR}/tauargus_ghm.lib
         ${WIN_LIB_DIR}/CRP.lib)
     set(ENGINE_STATIC ${WIN_LIB_DIR}/tauargus_core.lib)
     set(ENGINE_RUNTIME_DLLS
         ${WIN_BIN_DIR}/tauargus_csp.dll
         ${WIN_BIN_DIR}/tauargus_hitas.dll
         ${WIN_BIN_DIR}/tauargus_rounder.dll
+        ${WIN_BIN_DIR}/tauargus_ghm.dll
         ${WIN_BIN_DIR}/CRP.dll)
     set(BUNDLE_LIBS ${ENGINE_RUNTIME_DLLS})
     set(EXT_BUILD_RPATH "${WIN_BIN_DIR}")
@@ -103,6 +108,7 @@ target_include_directories(_tauargus
         ${NATIVE_CSP_SRC}
         ${NATIVE_HITAS_SRC}
         ${NATIVE_ROUNDER_SRC}
+        ${NATIVE_GHM_SRC}
 )
 
 # Linux: hide every symbol except the module init. Without this, the
