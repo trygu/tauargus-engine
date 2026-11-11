@@ -1,11 +1,12 @@
 # Tau-Argus — top-level native superbuild.
 #
-# Builds the five SDC engine modules in dependency order:
+# Builds the six SDC engine modules in dependency order:
 #   core    (static; shared data structures / utilities)
 #   csp     (LP/MIP engine, HiGHS-backed)
 #   hitas   (hierarchical table suppression; links csp)
 #   crp     (controlled rounding, HiGHS-backed)
 #   rounder (thin C++ dispatch over crp)
+#   ghm     (hypercube secondary suppression; standalone, no solver)
 #
 # All solver backends converge on the open-source HiGHS. Configure with the
 # HiGHS CMake package path, e.g. on macOS Homebrew:
@@ -77,3 +78,4 @@ add_subdirectory(native/csp)
 add_subdirectory(native/hitas)
 add_subdirectory(native/crp)
 add_subdirectory(native/rounder)
+add_subdirectory(native/ghm)
