@@ -73,14 +73,14 @@ extern "C" SEXP rta_tau_set_in_file_info(SEXP self, SEXP is_fixed, SEXP sep) {
 extern "C" SEXP rta_tau_set_number_var(SEXP self, SEXP n) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
-    return rta_lgl_sexp(t.SetNumberVar(rta_long(n)));
+    return rta_lgl_sexp(t.SetNumberVar(rta_long(n, "n_var")));
     });
 }
 
 extern "C" SEXP rta_tau_set_number_tab(SEXP self, SEXP n) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
-    return rta_lgl_sexp(t.SetNumberTab(rta_long(n)));
+    return rta_lgl_sexp(t.SetNumberTab(rta_long(n, "n_tab")));
     });
 }
 
@@ -137,8 +137,8 @@ extern "C" SEXP rta_tau_set_hierarchical_digits(SEXP self, SEXP var,
                                                 SEXP digits) {
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
-    std::vector<long> d = rta_long_vec(digits);
-    return rta_lgl_sexp(t.SetHierarchicalDigits(rta_long(var),
+    std::vector<long> d = rta_long_vec(digits, "digits");
+    return rta_lgl_sexp(t.SetHierarchicalDigits(rta_long(var, "var"),
                                                 (long) d.size(), d.data()));
     });
 }
@@ -209,7 +209,8 @@ extern "C" SEXP rta_tau_set_var_code_active(SEXP self, SEXP var, SEXP code,
     return rta_call([&]() -> SEXP {
     TauArgus &t = rta_object<TauArgus>(self, "tauargusengine::TauArgus");
     return rta_lgl_sexp(
-        t.SetVarCodeActive(rta_long(var), rta_long(code), rta_lgl(active)));
+        t.SetVarCodeActive(rta_long(var, "var"), rta_long(code, "code"),
+                           rta_lgl(active, "active")));
     });
 }
 
