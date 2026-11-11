@@ -37,20 +37,14 @@ jobs:
           PKG: ${{ github.event.inputs.package_name }}
         run: |
           set -uo pipefail
-          # The registry serves the package, but the earlier probes came up
-          # empty. Probe every plausible listing endpoint and print what
-          # each returns before deciding.
-          list() { gh api "$1" --jq '.[].name' 2>&1 || echo "(call failed)"; }
-          echo "== /user/packages (no filter):"; list "/user/packages?per_page=100"
-          echo "== /user/packages?package_type=docker:"; list "/user/packages?package_type=docker&per_page=100"
-          echo "== /user/packages?package_type=container:"; list "/user/packages?package_type=container&per_page=100"
-          echo "== /users/trygu/packages:"; list "/users/trygu/packages?per_page=100"
-          # Collect the id from whichever endpoint lists the package.
+          # Try both accepted package_type values ('container' is the
+          # current type, 'docker' the legacy one); print each result.
           id=""
-          for ep in "/user/packages?per_page=100" \
-                    "/user/packages?package_type=docker&per_page=100" \
-                    "/users/trygu/packages?per_page=100"; do
-            id=$(gh api "$ep" --jq ".[] | select(.name | test(\"$PKG\$\")) | .id" 2>/dev/null || true)
+          for t in container docker; do
+            out=$(gh api "/user/packages?package_type=$t&per_page=100" 2>&1) \
+              || { echo "[$t] API error: $(echo "$out" | head -1)"; continue; }
+            echo "[$t] packages: $(echo "$out" | jq -r '.[].name' | tr '\n' ' ')"
+            id=$(echo "$out" | jq -r ".[] | select(.name | test(\"$PKG\$\")) | .id")
             [ -n "$id" ] && break
           done
           if [ -z "$id" ]; then
