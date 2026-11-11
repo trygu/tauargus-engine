@@ -36,15 +36,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PKG: ${{ github.event.inputs.package_name }}
         run: |
-          set -euo pipefail
-          # package_type: GHCR lists as 'container'; older API responses
-          # used 'docker'. Try both.
-          id=""
-          for t in container docker; do
-            id=$(gh api "/user/packages?package_type=$t&per_page=100" \
-              --jq ".[] | select(.name == \"$PKG\") | .id")
-            [ -n "$id" ] && break
-          done
+          set -uo pipefail
+          # The /user/packages API requires package_type=docker for GHCR
+          # packages ('container' is rejected with 400).
+          id=$(gh api "/user/packages?package_type=docker&per_page=100" \
+            --jq ".[] | select(.name == \"$PKG\") | .id" || true)
           if [ -z "$id" ]; then
             echo "package $PKG not found (already deleted?)"
             exit 0
