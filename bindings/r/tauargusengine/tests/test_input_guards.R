@@ -17,6 +17,9 @@ check_error(tauargus_set_number_tab(e, NA), "n_tab.*NA|NA.*n_tab")
 check_error(tauargus_set_number_tab(e, 1.5), "n_tab.*(whole|integer)")
 check_error(tauargus_set_number_tab(e, Inf), "n_tab.*finite")
 check_error(tauargus_set_number_tab(e, 1e19), "n_tab.*range")
+# On 64-bit systems (double)LONG_MAX rounds up to 2^63. This value must
+# be rejected before a double-to-long cast, not passed to the engine.
+check_error(tauargus_set_number_tab(e, 2^63), "n_tab.*range")
 check_error(tauargus_set_number_var(e, NA), "n_var")
 
 # rta_lgl: NA
@@ -25,6 +28,7 @@ check_error(tauargus_set_var_code_active(e, 1L, 1L, NA), "active")
 # rta_long_vec: NA / fractional element (fires before the native call)
 check_error(tauargus_set_hierarchical_digits(e, 1L, c(1L, NA)), "digits")
 check_error(tauargus_set_hierarchical_digits(e, 1L, c(1L, 2.5)), "digits")
+check_error(tauargus_set_hierarchical_digits(e, 1L, c(1, 2^63)), "digits.*range")
 
 # rta_dbl_vec: NA element; Inf stays legal for bound vectors. The file
 # exists but is malformed, so the Inf run passes the guards and only
