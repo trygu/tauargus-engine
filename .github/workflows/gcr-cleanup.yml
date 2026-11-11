@@ -39,8 +39,12 @@ jobs:
           set -uo pipefail
           # The /user/packages API requires package_type=docker for GHCR
           # packages ('container' is rejected with 400).
+          # Print the full inventory for diagnosis (name, visibility, versions).
+          gh api "/user/packages?package_type=docker&per_page=100" \
+            --jq '.[] | .name + " | visibility=" + .visibility + " | versions=" + (.versions | length)'
+          # Match by suffix so a namespace-qualified name cannot slip past.
           id=$(gh api "/user/packages?package_type=docker&per_page=100" \
-            --jq ".[] | select(.name == \"$PKG\") | .id" || true)
+            --jq ".[] | select(.name | test(\"$PKG\$\")) | .id" || true)
           if [ -z "$id" ]; then
             echo "package $PKG not found (already deleted?)"
             exit 0
