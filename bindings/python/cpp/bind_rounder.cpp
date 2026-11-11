@@ -10,9 +10,11 @@
 
 #include "RounderCtrl.h"
 #include "init_decls.h"
+#include "input_guards.h"
 
 namespace py = pybind11;
 using namespace py::literals;
+namespace g = tauargus::guards;
 
 void init_rounder(py::module_ &m) {
     py::class_<RounderCtrl>(m, "RounderCtrl")
@@ -30,6 +32,13 @@ void init_rounder(py::module_ &m) {
                              const std::string &solution,
                              const std::string &statistics, long max_time,
                              long zero_restricted) {
+            g::finite_non_negative("base", base);
+            // +/-Inf bounds are legal (unbounded); NaN never is.
+            g::finite_or_inf_vec("upper_bound", upper);
+            g::finite_or_inf_vec("lower_bound", lower);
+            g::non_negative("auditing", auditing);
+            g::non_negative("max_time", max_time);
+            g::non_negative("zero_restricted", zero_restricted);
             std::vector<double> u = upper, l = lower;
             double mj = 0;
             long nj = 0;
