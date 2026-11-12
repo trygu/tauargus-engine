@@ -1,7 +1,7 @@
 # Engine
 
-The C/C++ SDC engine. `CMakeLists.txt` is a superbuild of the five git
-submodules under `native/`; the build produces the five engine libraries
+The C/C++ SDC engine. `CMakeLists.txt` is a superbuild of the six git
+submodules under `native/`; the build produces the six engine libraries
 in `build/lib/`.
 
 ## Modules
@@ -12,6 +12,7 @@ in `build/lib/`.
 | `native/csp` | Cell-suppression LP (branch-and-price) and feasibility audit | HiGHS |
 | `native/hitas` | Hierarchical table suppression (HiTaS) | `csp` |
 | `native/crp` | Controlled rounding (iterative rounding, MIP audit) | HiGHS |
+| `native/ghm` | Hypercube (GH) secondary suppression (C port of GHMITER, no solver) | none |
 | `native/rounder` | Dispatch layer over `crp` | `crp` |
 
 Each module has its own README at `native/<module>/README.md`.
