@@ -276,3 +276,7 @@ tauargus::hitas, tauargus::crp, tauargus::rounder and tauargus::ghm."
             done
             echo "draft release ${tag} (id ${release_id}) with $(ls packages | wc -l) assets"
           fi
+
+# Registry re-registration: the previous revision of this file left a
+# stale entry in the Actions workflow registry (dispatch 422, push runs
+# with zero jobs). Any change to the file forces GitHub to re-sync it.
