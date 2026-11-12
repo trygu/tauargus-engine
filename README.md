@@ -67,10 +67,11 @@ least through 4.2.x, so this is a 4.x drop-in, not a guarantee of every
 legacy feature.
 
 **Supported suppression methods.** `OPT`, `MOD` and `RND` are implemented and
-regression-tested. `GH` (hypercube) is implemented for flat, non-weighted
-tables and regression-tested, validated against the legacy gfortran oracle
-(4.1 section 2.8.1); tables with a hierarchical dimension are rejected up
-front, and linked or weighted tables are not yet supported. `CKM` has a
+regression-tested. `GH` (hypercube) implements the exact-reconstruction
+criterion for flat, non-weighted, nonnegative tables; selected cases are
+compared with the legacy gfortran oracle (4.1 section 2.8.1). It does not
+enforce quantitative protection intervals. Hierarchies are rejected, and
+linked or weighted tables are not supported. `CKM` has a
 dispatch path but no dedicated end-to-end regression suite. `NET` and `CTA`
 are rejected by the headless engine although the batch parser still accepts
 their legacy syntax.
@@ -166,7 +167,15 @@ steering, cells and result file formats; the legacy gfortran build is kept
 in the module as the test oracle. The ported scope is the flat, non-weighted
 table shape of section 2.8.1: a table with a hierarchical dimension is
 rejected up front, and the linked-table and weighted-table extensions are
-not ported yet.
+not ported yet. Zero cells cannot be selected as cube corners; the call
+fails if no feasible nonzero cube exists. The native API validates that
+the cells form a complete grid and rejects unsupported controls.
+
+The port only addresses exact reconstruction. It carries the cell protection
+levels through to the output but does not enforce those quantitative
+intervals. Audit realized intervals against the publication requirements.
+The Python front-end rejects non-default apriori percentage, model size and
+singleton options; use the defaults shown below.
 
 There is no solver in this path: the algorithm is self-contained, like the
 legacy program. A GH failure is therefore an engine failure
@@ -174,10 +183,10 @@ legacy program. A GH failure is therefore an engine failure
 
 Use it like the other methods:
 
-- **Batch.** `<SUPPRESS> GH(1,100)` on a flat table; the secondary cells go
+- **Batch.** `<SUPPRESS> GH(1)` on a flat table; the secondary cells go
   out through the usual `<WRITETABLE>`.
 - **Python.** `engine.suppress(Suppress(kind="GH", tab_no=1))`, or the
-  high-level `protect(..., suppress="GH(1,100)")`.
+  high-level `protect(..., suppress="GH(1)")`.
 
 ## Architecture
 
