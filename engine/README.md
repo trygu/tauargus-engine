@@ -32,6 +32,28 @@ front-end repos:
 (Python) and
 [rtauargus.native](https://github.com/trygu/rtauargus.native) (R).
 
+## Standalone engine releases
+
+Releases are cut per `engine-vX.Y.Z` tag (the first release is
+`engine-v0.8.1`), one self-contained package per platform:
+`linux-x86_64`, `linux-arm64`, `macos-arm64`, `windows-x86_64`. Each
+package is the installed engine prefix: the six module libraries, the
+public headers under `include/`, the CMake package config, and the
+pinned HiGHS bundled under `highs/` (built static). Use it to build
+your own bindings or tools:
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(my_tool CXX)
+find_package(tauargus-engine REQUIRED)  # via CMAKE_PREFIX_PATH
+add_executable(my_tool main.cpp)
+target_link_libraries(my_tool PRIVATE tauargus::core tauargus::csp)
+```
+
+The imported targets are `tauargus::core`, `tauargus::csp`,
+`tauargus::hitas`, `tauargus::crp`, `tauargus::rounder` and
+`tauargus::ghm`; each carries its link dependencies, including HiGHS.
+
 ## Building
 
 See [Building from source](../README.md#building-from-source) at the

@@ -1,0 +1,278 @@
+# Cut standalone engine releases on GitHub Releases.
+#
+# A release bundles the installed engine prefix and the pinned HiGHS
+# (built static, the same recipe as the test workflow) into one
+# self-contained, CMake-installable tree per platform:
+#
+#   tauargus-engine-<version>-<os>-<arch>.tar.gz   (.zip on Windows)
+#
+# Consumers add the package root to CMAKE_PREFIX_PATH and use
+# find_package(tauargus-engine REQUIRED); the imported targets are
+# tauargus::core, tauargus::csp, tauargus::hitas, tauargus::crp,
+# tauargus::rounder and tauargus::ghm.
+#
+# A pushed engine-vX.Y.Z tag cuts the release (X.Y.Z must match
+# engine/ENGINE-VERSION). workflow_dispatch proves the publish path
+# with a draft release targeting the run's commit; it creates no tag.
+
+name: Engine — Release
+
+on:
+  push:
+    tags:
+      - "engine-v*"
+  workflow_dispatch:
+
+# The step scripts are bash on every platform (the windows runner
+# provides Git Bash); this matches the test workflow.
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package — ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, osname: linux, arch: x86_64, label: "Linux x86_64" }
+          - { os: ubuntu-24.04-arm, osname: linux, arch: arm64, label: "Linux arm64" }
+          - { os: macos-15, osname: macos, arch: arm64, label: "macOS arm64" }
+          - { os: windows-2022, osname: windows, arch: x86_64, label: "Windows x86_64" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # On a tag push the tag name is the version (engine-v prefix
+      # stripped); on workflow_dispatch the engine/ENGINE-VERSION
+      # content is used.
+      - name: Determine package version
+        id: ver
+        run: |
+          set -euo pipefail
+          file_version="$(tr -d '[:space:]' < engine/ENGINE-VERSION)"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#engine-v}"
+            # Release train invariant: the tag must match the file.
+            if [ "$version" != "$file_version" ]; then
+              echo "tag engine-v${version} does not match engine/ENGINE-VERSION (${file_version})" >&2
+              exit 1
+            fi
+          else
+            version="$file_version"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Read HiGHS pin
+        id: pin
+        run: echo "tag=$(tr -d '[:space:]' < engine/HiGHS-VERSION)" >> "$GITHUB_OUTPUT"
+
+      # HiGHS is built static (as the staged R release build does) so
+      # the engine libraries are self-contained; the package bundles
+      # the install tree under <prefix>/highs.
+      - name: Cache HiGHS
+        id: highs-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/highs-prefix
+          key: highs-static-${{ matrix.os }}-${{ steps.pin.outputs.tag }}
+
+      - name: Build HiGHS from source
+        if: steps.highs-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "${{ steps.pin.outputs.tag }}" https://github.com/ERGO-Code/HiGHS.git highs
+          cmake -S highs -B highs/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/highs-prefix"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build highs/build -j --config Release
+            cmake --install highs/build --config Release
+          else
+            cmake --build highs/build -j
+            cmake --install highs/build
+          fi
+
+      - name: Build engine
+        run: |
+          set -euo pipefail
+          HIGHS_CFG="$(dirname "$(find "$RUNNER_TEMP/highs-prefix" -name 'highs-config.cmake' -o -name 'highsConfig.cmake' -o -name 'HighsConfig.cmake' | head -n1)")"
+          cmake -S engine -B engine/build -DCMAKE_BUILD_TYPE=Release -DHighs_DIR="$HIGHS_CFG"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build engine/build -j --config Release
+          else
+            cmake --build engine/build -j
+          fi
+
+      # Install the engine into a staging prefix and place the pinned
+      # HiGHS under <prefix>/highs: the package config finds Highs
+      # from the bundled copy, so the release is self-contained.
+      - name: Stage package
+        run: |
+          set -euo pipefail
+          PREFIX="$RUNNER_TEMP/stage/tauargus-engine"
+          rm -rf "$RUNNER_TEMP/stage"
+          mkdir -p "$PREFIX"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --install engine/build --config Release --prefix "$PREFIX"
+          else
+            cmake --install engine/build --prefix "$PREFIX"
+          fi
+          mkdir -p "$PREFIX/highs"
+          cp -r "$RUNNER_TEMP/highs-prefix/." "$PREFIX/highs/"
+
+      # Third-party proof: a minimal CMake project finds the package
+      # from the staged prefix only (no other engine or HiGHS paths),
+      # links all six module targets and runs.
+      - name: Consumer smoke (find_package)
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/stage"
+          SMOKE="$RUNNER_TEMP/consumer-smoke"
+          mkdir -p "$SMOKE"
+          cat > "$SMOKE/CMakeLists.txt" <<'EOF'
+cmake_minimum_required(VERSION 3.16)
+project(consumer_smoke CXX)
+find_package(tauargus-engine REQUIRED)
+add_executable(consumer_smoke main.cpp)
+target_link_libraries(consumer_smoke PRIVATE
+    tauargus::core tauargus::csp tauargus::hitas
+    tauargus::crp tauargus::rounder tauargus::ghm)
+EOF
+          cat > "$SMOKE/main.cpp" <<'EOF'
+#include <cstdio>
+#include "TauArgus.h"
+
+int main() {
+    TauArgus ta;
+    std::printf("consumer smoke: tauargus %s\n", ta.GetVersion().c_str());
+    return 0;
+}
+EOF
+          BUILD="$RUNNER_TEMP/consumer-smoke-build"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # Pin the runner's native cmake and the VS generator (the
+            # same recipe as the test workflow's bundle link check).
+            if [ -x "C:/Program Files/CMake/bin/cmake.exe" ]; then
+              CM="C:/Program Files/CMake/bin/cmake.exe"
+            else
+              CM=cmake
+            fi
+            "$CM" -S "$SMOKE" -B "$BUILD" -DCMAKE_PREFIX_PATH="$STAGE" \
+              -G "Visual Studio 17 2022" -A x64
+            "$CM" --build "$BUILD" --config Release
+            BIN="$BUILD/Release/consumer_smoke.exe"
+            export PATH="$STAGE/tauargus-engine/bin:$PATH"
+          else
+            cmake -S "$SMOKE" -B "$BUILD" -DCMAKE_PREFIX_PATH="$STAGE"
+            cmake --build "$BUILD" -j
+            BIN="$BUILD/consumer_smoke"
+            if [ "$RUNNER_OS" = "Linux" ]; then
+              export LD_LIBRARY_PATH="$STAGE/tauargus-engine/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            else
+              export DYLD_LIBRARY_PATH="$STAGE/tauargus-engine/lib"
+            fi
+          fi
+          "$BIN"
+
+      - name: Create package archive
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pkg"
+          version="${{ steps.ver.outputs.version }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ( cd "$RUNNER_TEMP/stage" && zip -qr "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip" tauargus-engine )
+          else
+            tar -czf "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.tar.gz" \
+              -C "$RUNNER_TEMP/stage" tauargus-engine
+          fi
+          ls -l "$RUNNER_TEMP/pkg/"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-package-${{ matrix.osname }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/pkg
+          retention-days: 14
+
+  publish:
+    name: Publish release
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine package version
+        id: ver
+        run: |
+          set -euo pipefail
+          file_version="$(tr -d '[:space:]' < engine/ENGINE-VERSION)"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#engine-v}"
+            if [ "$version" != "$file_version" ]; then
+              echo "tag engine-v${version} does not match engine/ENGINE-VERSION (${file_version})" >&2
+              exit 1
+            fi
+          else
+            version="$file_version"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Read HiGHS pin
+        id: pin
+        run: echo "tag=$(tr -d '[:space:]' < engine/HiGHS-VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.ver.outputs.version }}"
+          tag="engine-v${version}"
+          highs="$(tr -d '[:space:]' < engine/HiGHS-VERSION)"
+          notes="## tauargus-engine ${version}
+
+Self-contained, CMake-installable engine package.
+
+- Engine version: ${version}
+- HiGHS: ${highs} (bundled, built static)
+- Modules: core, csp, hitas, crp, rounder, ghm
+
+Each package is the installed engine prefix: the six module
+libraries, the public headers under include/, the CMake package
+config and the pinned HiGHS bundled under highs/. Add the package
+root to CMAKE_PREFIX_PATH and use find_package(tauargus-engine
+REQUIRED); the imported targets are tauargus::core, tauargus::csp,
+tauargus::hitas, tauargus::crp, tauargus::rounder and tauargus::ghm."
+          ls -l packages/
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            gh release create "$tag" packages/* --title "$tag" --notes "$notes"
+            echo "release ${tag} published"
+          else
+            # workflow_dispatch: the publish path is proven with a
+            # draft release targeting this run's commit. No tag is
+            # created; the engine-vX.Y.Z tag is cut at release time.
+            release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name="$tag" \
+              -f target_commitish="${GITHUB_SHA}" \
+              -f name="$tag" \
+              -f draft=true \
+              -f body="$notes" --jq .id)"
+            for f in packages/*; do
+              gh api -F "file=@${f}" \
+                "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?name=$(basename "$f")"
+            done
+            echo "draft release ${tag} (id ${release_id}) with $(ls packages | wc -l) assets"
+          fi

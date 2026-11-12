@@ -79,3 +79,30 @@ add_subdirectory(native/hitas)
 add_subdirectory(native/crp)
 add_subdirectory(native/rounder)
 add_subdirectory(native/ghm)
+
+# ---------------------------------------------------------------------------
+# CMake package (standalone releases)
+#
+# install(EXPORT) records the six module targets with their link
+# dependencies (hitas on csp, rounder on crp, csp and crp on Highs);
+# the config file adds the tauargus::<module> alias targets and makes
+# the pinned HiGHS findable from the bundled copy under <prefix>/highs.
+# A release stage bundles that HiGHS next to the installed prefix, e.g.:
+#
+#   cmake --install engine/build --prefix <stage>/tauargus-engine
+#   cp -r <highs-install-prefix>/. <stage>/tauargus-engine/highs
+#
+# Consumers then: find_package(tauargus-engine REQUIRED).
+install(TARGETS tauargus_core tauargus_csp tauargus_hitas CRP
+        tauargus_rounder tauargus_ghm
+    EXPORT tauargus-engine)
+install(EXPORT tauargus-engine
+    FILE tauargus-engine-targets.cmake
+    NAMESPACE tauargus::
+    DESTINATION lib/cmake/tauargus-engine)
+
+include(CMakePackageConfigHelpers)
+configure_file(cmake/tauargus-engine-config.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/tauargus-engine-config.cmake" @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tauargus-engine-config.cmake"
+    DESTINATION lib/cmake/tauargus-engine)

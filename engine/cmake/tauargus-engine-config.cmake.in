@@ -1,0 +1,81 @@
+# tauargus-engine: CMake package configuration (standalone releases).
+#
+# Installed by the superbuild; find with
+#
+#   find_package(tauargus-engine REQUIRED)
+#
+# Provides the imported targets
+#   tauargus::core tauargus::csp tauargus::hitas
+#   tauargus::crp  tauargus::rounder  tauargus::ghm
+# with the same link dependencies the superbuild builds with (hitas on
+# csp, rounder on crp, csp and crp on HiGHS). Each target also adds its
+# module's installed include directory, so headers are included flat
+# (e.g. #include "TauArgus.h").
+#
+# The pinned HiGHS is bundled in the package under <prefix>/highs; the
+# Highs package is located there before the system is searched.
+
+include(CMakeFindDependencyMacro)
+
+# <prefix> is three directories above this file (lib/cmake/tauargus-engine).
+get_filename_component(_TA_ENGINE_PREFIX "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_TA_ENGINE_PREFIX "${_TA_ENGINE_PREFIX}" PATH)
+get_filename_component(_TA_ENGINE_PREFIX "${_TA_ENGINE_PREFIX}" PATH)
+get_filename_component(_TA_ENGINE_PREFIX "${_TA_ENGINE_PREFIX}" PATH)
+
+# Bundled HiGHS: the source-built install uses lib/cmake/highs, packaged
+# prefixes (e.g. Homebrew) use lib/cmake/Highs. An explicit Highs_DIR
+# from the consumer always wins.
+set(_TA_BUNDLED_HIGHS "${_TA_ENGINE_PREFIX}/highs")
+if(NOT DEFINED Highs_DIR)
+    foreach(_TA_HIGHS_DIR "${_TA_BUNDLED_HIGHS}/lib/cmake/highs"
+                          "${_TA_BUNDLED_HIGHS}/lib/cmake/Highs")
+        if(EXISTS "${_TA_HIGHS_DIR}/highs-config.cmake")
+            set(Highs_DIR "${_TA_HIGHS_DIR}")
+            break()
+        endif()
+    endforeach()
+endif()
+list(APPEND CMAKE_PREFIX_PATH "${_TA_BUNDLED_HIGHS}")
+find_dependency(Highs @TAUARGUS_HIGHS_VERSION@ REQUIRED)
+
+# Include the installed targets. On multi-config generators (Visual
+# Studio, Xcode) the export is split per configuration.
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/tauargus-engine-targets.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/tauargus-engine-targets.cmake")
+else()
+    set(_TA_TARGETS "")
+    foreach(_TA_CONFIG Release RelWithDebInfo MinSizeRel Debug)
+        if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/tauargus-engine-targets-${_TA_CONFIG}.cmake")
+            set(_TA_TARGETS "${CMAKE_CURRENT_LIST_DIR}/tauargus-engine-targets-${_TA_CONFIG}.cmake")
+            break()
+        endif()
+    endforeach()
+    if(NOT _TA_TARGETS)
+        message(FATAL_ERROR
+            "tauargus-engine: no installed targets file next to "
+            "${CMAKE_CURRENT_LIST_FILE}")
+    endif()
+    include("${_TA_TARGETS}")
+endif()
+
+# The export set carries the raw target names; provide the build-tree
+# alias names and each module's include directory on top.
+set(_TA_MODULE_NAMES  core      csp       hitas     crp       rounder ghm)
+set(_TA_MODULE_TARGETS tauargus_core tauargus_csp tauargus_hitas CRP tauargus_rounder tauargus_ghm)
+set(_TA_MODULE_INCLUDES tauargus_core tauargus_csp tauargus_hitas crp tauargus_rounder tauargus_ghm)
+list(LENGTH _TA_MODULE_NAMES _TA_MODULE_COUNT)
+math(EXPR _TA_MODULE_COUNT "${_TA_MODULE_COUNT} - 1")
+foreach(_TA_INDEX RANGE ${_TA_MODULE_COUNT})
+    list(GET _TA_MODULE_NAMES ${_TA_INDEX} _TA_NAME)
+    list(GET _TA_MODULE_TARGETS ${_TA_INDEX} _TA_TARGET)
+    list(GET _TA_MODULE_INCLUDES ${_TA_INDEX} _TA_INCLUDE)
+    if(NOT TARGET tauargus::${_TA_TARGET})
+        message(FATAL_ERROR
+            "tauargus-engine: installed target tauargus::${_TA_TARGET} is missing")
+    endif()
+    add_library(tauargus::${_TA_NAME} INTERFACE IMPORTED)
+    set_target_properties(tauargus::${_TA_NAME} PROPERTIES
+        INTERFACE_LINK_LIBRARIES "tauargus::${_TA_TARGET}"
+        INTERFACE_INCLUDE_DIRECTORIES "${_TA_ENGINE_PREFIX}/include/${_TA_INCLUDE}")
+endforeach()
