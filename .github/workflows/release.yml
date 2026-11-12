@@ -193,8 +193,10 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             # Git Bash ships no zip; bsdtar (Git for Windows) writes a
             # zip when -a infers the format from the .zip extension.
+            # Relative target path: bsdtar parses a backslashed Windows
+            # path (D:\a\...) as host:path and tries to connect to "D".
             # Same entry layout as zip -r: tauargus-engine/...
-            ( cd "$RUNNER_TEMP/stage" && tar -a -cf "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip" tauargus-engine )
+            ( cd "$RUNNER_TEMP/stage" && tar -a -cf "../pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip" tauargus-engine )
           else
             tar -czf "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.tar.gz" \
               -C "$RUNNER_TEMP/stage" tauargus-engine
