@@ -278,16 +278,17 @@ jobs:
           else
             # workflow_dispatch: the publish path is proven with a
             # draft release targeting this run's commit. No tag is
-            # created; the engine-vX.Y.Z tag is cut at release time.
-            release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+            # created; the engine-vX.Y.Z tag is cut at release time,
+            # after the draft is deleted.
+            gh api "repos/${GITHUB_REPOSITORY}/releases" \
               -f tag_name="$tag" \
               -f target_commitish="${GITHUB_SHA}" \
               -f name="$tag" \
               -F draft=true \
-              -f body="$notes" --jq .id)"
-            for f in packages/*; do
-              gh api -F "file=@${f}" \
-                "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?name=$(basename "$f")"
-            done
-            echo "draft release ${tag} (id ${release_id}) with $(ls packages | wc -l) assets"
+              -f body="$notes" > /dev/null
+            # gh api -F "file=@..." against the assets endpoint 404s;
+            # gh release upload finds the draft by tag and is the
+            # supported upload path.
+            gh release upload "$tag" packages/* --clobber
+            echo "draft release ${tag} with $(ls packages | wc -l) assets"
           fi
