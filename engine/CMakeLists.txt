@@ -26,6 +26,13 @@ string(STRIP "${_TA_HIGHS_TAG}" _TA_HIGHS_TAG)
 string(REGEX REPLACE "^v" "" TAUARGUS_HIGHS_VERSION "${_TA_HIGHS_TAG}")
 message(STATUS "tauargus: requiring HiGHS ${TAUARGUS_HIGHS_VERSION}")
 
+# Single source of truth for the engine version: engine/ENGINE-VERSION.
+# Injected into the modules (TAUARGUS_ENGINE_VERSION) and reported at
+# runtime; the release train bumps it, and engine-vX.Y.Z tags must match.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/ENGINE-VERSION" _TA_ENGINE_VERSION)
+string(STRIP "${_TA_ENGINE_VERSION}" TAUARGUS_ENGINE_VERSION)
+message(STATUS "tauargus: engine version ${TAUARGUS_ENGINE_VERSION}")
+
 option(BUILD_SHARED_LIBS "Build shared native libraries" ON)
 
 if(NOT DEFINED CMAKE_CXX_STANDARD)
