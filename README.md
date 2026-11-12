@@ -344,3 +344,6 @@ from the original author teams of each solver module.
 
 This software is provided "AS IS", without warranties or conditions of any
 kind, express or implied.
+
+Original EUPL 1.1 notices, the Article 5 later-version distribution basis,
+and the CSP historical-header ambiguity are explained in [NOTICE.txt](NOTICE.txt).
