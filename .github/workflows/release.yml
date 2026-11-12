@@ -191,7 +191,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pkg"
           version="${{ steps.ver.outputs.version }}"
           if [ "$RUNNER_OS" = "Windows" ]; then
-            ( cd "$RUNNER_TEMP/stage" && zip -qr "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip" tauargus-engine )
+            # Git Bash ships no zip; bsdtar (Git for Windows) writes a
+            # zip when -a infers the format from the .zip extension.
+            # Same entry layout as zip -r: tauargus-engine/...
+            ( cd "$RUNNER_TEMP/stage" && tar -a -cf "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip" tauargus-engine )
           else
             tar -czf "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.tar.gz" \
               -C "$RUNNER_TEMP/stage" tauargus-engine
