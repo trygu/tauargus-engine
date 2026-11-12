@@ -19,7 +19,7 @@ The user-facing front-ends live in separate repos:
 - **engine** (`engine/`): the C/C++ libraries that do the work, built
   against the open-source [HiGHS](https://github.com/ERGO-Code/HiGHS) solver.
   The legacy CPLEX, XPRESS and SCIP backends are gone.
-- **bindings**: thin bindings over the five engine libs. `bindings/python/`
+- **bindings**: thin bindings over the six engine libs. `bindings/python/`
   is the pybind11 `_tauargus` extension; `bindings/r/tauargusengine` is the
   thin R package.
 - **[pytauargus](https://github.com/trygu/pytauargus)**: the Python package
@@ -38,7 +38,7 @@ The legacy open-source τ-ARGUS is maintained by Statistics Netherlands
 (EUPL) at [sdcTools/tauargus](https://github.com/sdcTools/tauargus). This
 project starts from its C/C++ solver code and changes four things:
 
-- **Builds on a modern toolchain.** The code is reorganised into five CMake
+- **Builds on a modern toolchain.** The code is reorganised into six CMake
   modules and compiles with current GCC, Clang and MSVC.
 - **Solves with an open-source solver.** The
   [HiGHS](https://github.com/ERGO-Code/HiGHS) solver replaces the legacy
@@ -46,7 +46,7 @@ project starts from its C/C++ solver code and changes four things:
 - **Audits in-process.** The feasibility-interval audit used to be a
   separate `intervalle.exe` (Delphi) executable. Its logic is ported into
   the `csp` module, so the whole pipeline runs without anything external.
-- **Binds to Python and R.** Thin pybind11 and R bindings wrap the five
+- **Binds to Python and R.** Thin pybind11 and R bindings wrap the six
   engine libraries for the front-end repos.
 
 The front-ends that use this engine are
@@ -67,9 +67,13 @@ least through 4.2.x, so this is a 4.x drop-in, not a guarantee of every
 legacy feature.
 
 **Supported suppression methods.** `OPT`, `MOD` and `RND` are implemented and
-regression-tested. `CKM` has a dispatch path but no dedicated end-to-end
-regression suite. `GH`, `NET` and `CTA` are rejected by the headless engine
-although the batch parser still accepts their legacy syntax.
+regression-tested. `GH` (hypercube) is implemented for flat, non-weighted
+tables and regression-tested, validated against the legacy gfortran oracle
+(4.1 section 2.8.1); tables with a hierarchical dimension are rejected up
+front, and linked or weighted tables are not yet supported. `CKM` has a
+dispatch path but no dedicated end-to-end regression suite. `NET` and `CTA`
+are rejected by the headless engine although the batch parser still accepts
+their legacy syntax.
 
 **No numerical-equivalence claim.** The regression suite is a contract check,
 not proof of equivalence with original Tau-Argus. The solver change can alter
@@ -148,6 +152,33 @@ needs nothing external. Use it three ways:
   the legacy INTERMEDIATE (type-5) audit file, including the realized-interval
   columns.
 
+## Hypercube (GH)
+
+Secondary suppression by hypercubes (the legacy `GH` batch method, 4.1
+section 2.8.1): each primary-unsafe cell is covered by a hypercube, and the
+remaining corners are suppressed (secondary) so the primary cell's value
+cannot be reconstructed from the published cells.
+
+In legacy Tau-Argus this was an external program, `GHMITER`, a standalone
+Fortran executable that the Java front-end launched per table. The rewrite
+ports it to C (the `ghm` module) and runs it in-process over the same
+steering, cells and result file formats; the legacy gfortran build is kept
+in the module as the test oracle. The ported scope is the flat, non-weighted
+table shape of section 2.8.1: a table with a hierarchical dimension is
+rejected up front, and the linked-table and weighted-table extensions are
+not ported yet.
+
+There is no solver in this path: the algorithm is self-contained, like the
+legacy program. A GH failure is therefore an engine failure
+(`BatchError`, exit code 3 from the CLI), never a solver failure.
+
+Use it like the other methods:
+
+- **Batch.** `<SUPPRESS> GH(1,100)` on a flat table; the secondary cells go
+  out through the usual `<WRITETABLE>`.
+- **Python.** `engine.suppress(Suppress(kind="GH", tab_no=1))`, or the
+  high-level `protect(..., suppress="GH(1,100)")`.
+
 ## Architecture
 
 Three layers: the front-ends in separate repos, and the bindings and
@@ -158,11 +189,12 @@ pin:
 
 ```text
 tauargus-engine                   this repository: engine + bindings
-├── engine/native/                five solver modules, each a git
-│   ├── core                      submodule; C++11; all built
-│   ├── csp                       against HiGHS (version pinned in
-│   ├── hitas                     engine/HiGHS-VERSION; HiGHS is an
-│   ├── crp                       external dependency, not a submodule)
+├── engine/native/                six native modules, each a git
+│   ├── core                      submodule; C++11; the solver modules
+│   ├── csp                       are built against HiGHS (version
+│   ├── hitas                     pinned in engine/HiGHS-VERSION; HiGHS
+│   ├── crp                       is an external dependency, not a
+│   ├── ghm                       submodule)
 │   └── rounder
 ├── bindings/python               pybind11 _tauargus extension
 ├── bindings/r/tauargusengine     thin R package (R .Call over C++)
@@ -175,7 +207,7 @@ pytauargus                        Python front-end (separate repo):
                                   CLI and the pytauargus-tui terminal
                                   UI; pins this repo as a git
                                   submodule; the wheel bundles the
-                                  extension, the five engine libraries
+                                  extension, the six engine libraries
                                   and HiGHS
 
 rtauargus.native                  R front-end (separate repo), a fork
@@ -184,13 +216,15 @@ rtauargus.native                  R front-end (separate repo), a fork
                                   stages bindings/r into the package
 ```
 
-The five modules (see `engine/README.md` for the module map):
+The six modules (see `engine/README.md` for the module map):
 
 - `core`: data model, Argus/JJ file I/O, SDC entry points
 - `csp`: cell-suppression LP (branch-and-price) and the feasibility
   audit (the legacy intervalle port)
 - `hitas`: hierarchical table suppression (links `csp`)
 - `crp`: controlled rounding: iterative rounding, audit
+- `ghm`: hypercube (GH) secondary suppression, the C port of the
+  legacy GHMITER; flat, non-weighted tables, no solver
 - `rounder`: dispatch layer over `crp`
 
 ## Building from source
@@ -204,7 +238,7 @@ Requirements:
   (macOS), `sudo apt-get install libhighs-dev` (Debian/Ubuntu), or
   [build from source](https://github.com/ERGO-Code/HiGHS#building)
 
-Clone with submodules (`git clone --recurse-submodules`). Build the five native
+Clone with submodules (`git clone --recurse-submodules`). Build the six native
 libraries first; the Python binding links the resulting `engine/build/lib/`
 artifacts. CMake finds HiGHS from its installation prefix (set `Highs_DIR`
 explicitly if needed):
