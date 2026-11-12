@@ -251,6 +251,8 @@ chmod +x "$PKG_DIR/configure"
 # 5) Native engine sources (same tree and CMake recipes the superbuild uses).
 cp "$ENGINE_DIR/engine/CMakeLists.txt" "$ENGINE_DIR/engine/HiGHS-VERSION" \
    "$ENGINE_DIR/engine/ENGINE-VERSION" "$PKG_DIR/tools/engine/"
+# CMake package config template (the superbuild's configure_file reads it).
+cp -R "$ENGINE_DIR/engine/cmake" "$PKG_DIR/tools/engine/cmake"
 for m in core csp hitas crp rounder ghm; do
     mkdir -p "$PKG_DIR/tools/engine/native/$m"
     cp "$ENGINE_DIR/engine/native/$m/CMakeLists.txt" "$PKG_DIR/tools/engine/native/$m/"
