@@ -14,13 +14,14 @@ extern "C" SEXP rta_engine_meta(void)
     static const char *const keys[] = {
         "engine_sha",
         "submodule_core", "submodule_csp", "submodule_hitas",
-        "submodule_crp", "submodule_rounder",
+        "submodule_crp", "submodule_rounder", "submodule_ghm",
         "highs_version"};
     static const char *const vals[] = {
         RTA_META_ENGINE_SHA,
         RTA_META_ENGINE_SHA_CORE, RTA_META_ENGINE_SHA_CSP,
         RTA_META_ENGINE_SHA_HITAS, RTA_META_ENGINE_SHA_CRP,
-        RTA_META_ENGINE_SHA_ROUNDER, RTA_META_HIGHS_VERSION};
+        RTA_META_ENGINE_SHA_ROUNDER, RTA_META_ENGINE_SHA_GHM,
+        RTA_META_HIGHS_VERSION};
     const int n = (int)(sizeof(keys) / sizeof(keys[0]));
 
     SEXP out = PROTECT(Rf_allocVector(STRSXP, n));

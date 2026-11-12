@@ -1,0 +1,10 @@
+// Flat table for the GH (hypercube) secondary-suppression test.
+// Year and Size are both flat (non-hierarchical) variables, so the ported
+// flat hypercube algorithm (4.1 section 2.8.1) applies. The NK rule marks a
+// few primary-unsafe cells for GH to cover with hypercubes.
+<OPENMICRODATA>    "tau_testW.asc"
+<OPENMETADATA>     "tau_testW.rda"
+<SPECIFYTABLE>     "Year""Size"|"Var2"||
+<SAFETYRULE>       NK(2,75)|NK(0,0)
+<READMICRODATA>
+<GOINTERACTIVE>

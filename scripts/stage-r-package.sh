@@ -82,7 +82,7 @@ fi
 ENGINE_SHA="$(git -C "$ENGINE_DIR" rev-parse HEAD)"
 sha_of() { git -C "$ENGINE_DIR/engine/native/$1" rev-parse HEAD 2>/dev/null || echo unknown; }
 CORE_SHA="$(sha_of core)"; CSP_SHA="$(sha_of csp)"; HITAS_SHA="$(sha_of hitas)"
-CRP_SHA="$(sha_of crp)"; ROUNDER_SHA="$(sha_of rounder)"
+CRP_SHA="$(sha_of crp)"; ROUNDER_SHA="$(sha_of rounder)"; GHM_SHA="$(sha_of ghm)"
 
 if [[ -n "$MERGE_INTO" ]]; then
     # Merge mode: the front-end checkout is the package root; nothing is
@@ -172,6 +172,7 @@ cat > "$PKG_DIR/src/rta_meta.h" <<EOF
 #define RTA_META_ENGINE_SHA_HITAS "$HITAS_SHA"
 #define RTA_META_ENGINE_SHA_CRP "$CRP_SHA"
 #define RTA_META_ENGINE_SHA_ROUNDER "$ROUNDER_SHA"
+#define RTA_META_ENGINE_SHA_GHM "$GHM_SHA"
 #define RTA_META_HIGHS_VERSION "$HIGHS_VERSION"
 #endif
 EOF
@@ -250,7 +251,7 @@ chmod +x "$PKG_DIR/configure"
 # 5) Native engine sources (same tree and CMake recipes the superbuild uses).
 cp "$ENGINE_DIR/engine/CMakeLists.txt" "$ENGINE_DIR/engine/HiGHS-VERSION" \
    "$PKG_DIR/tools/engine/"
-for m in core csp hitas crp rounder; do
+for m in core csp hitas crp rounder ghm; do
     mkdir -p "$PKG_DIR/tools/engine/native/$m"
     cp "$ENGINE_DIR/engine/native/$m/CMakeLists.txt" "$PKG_DIR/tools/engine/native/$m/"
     cp -R "$ENGINE_DIR/engine/native/$m/src" "$PKG_DIR/tools/engine/native/$m/src"

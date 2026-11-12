@@ -15,6 +15,7 @@
 #define RTA_META_ENGINE_SHA_HITAS "dev"
 #define RTA_META_ENGINE_SHA_CRP "dev"
 #define RTA_META_ENGINE_SHA_ROUNDER "dev"
+#define RTA_META_ENGINE_SHA_GHM "dev"
 #define RTA_META_HIGHS_VERSION "1.15.1"
 
 #endif
