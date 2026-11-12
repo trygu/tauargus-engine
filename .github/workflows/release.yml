@@ -191,12 +191,27 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pkg"
           version="${{ steps.ver.outputs.version }}"
           if [ "$RUNNER_OS" = "Windows" ]; then
-            # Git Bash ships no zip; bsdtar (Git for Windows) writes a
-            # zip when -a infers the format from the .zip extension.
-            # Relative target path: bsdtar parses a backslashed Windows
-            # path (D:\a\...) as host:path and tries to connect to "D".
-            # Same entry layout as zip -r: tauargus-engine/...
-            ( cd "$RUNNER_TEMP/stage" && tar -a -cf "../pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip" tauargus-engine )
+            # Zip with PowerShell and verify with a real zip reader,
+            # the proven path of the R release workflow: Git Bash
+            # tar cannot be trusted to write a zip (its -a emitted a
+            # plain tar under the .zip name, which is how the 0.5.6
+            # R binary and the 0.8.1 engine package shipped broken).
+            # Relative destination path: a backslashed D:\a\... is
+            # parsed as host:path by archive tools. Compress-Archive
+            # stores entries relative to the parent of -LiteralPath,
+            # so the layout matches zip -r: tauargus-engine/...
+            ( cd "$RUNNER_TEMP/stage" && pwsh -NoProfile -Command "Compress-Archive -LiteralPath 'tauargus-engine' -DestinationPath '../pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip' -Force" )
+            python3 - "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.zip" <<'PY'
+          import sys, zipfile
+          z = zipfile.ZipFile(sys.argv[1])
+          bad = z.testzip()
+          if bad is not None:
+              sys.exit(f"corrupt entry in zip: {bad}")
+          top = {n.split("/", 1)[0] for n in z.namelist()}
+          if top != {"tauargus-engine"}:
+              sys.exit(f"unexpected top-level entries: {top}")
+          print(f"zip ok: {len(z.namelist())} entries")
+          PY
           else
             tar -czf "$RUNNER_TEMP/pkg/tauargus-engine-${version}-${{ matrix.osname }}-${{ matrix.arch }}.tar.gz" \
               -C "$RUNNER_TEMP/stage" tauargus-engine
