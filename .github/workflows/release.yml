@@ -136,25 +136,29 @@ jobs:
           STAGE="$RUNNER_TEMP/stage"
           SMOKE="$RUNNER_TEMP/consumer-smoke"
           mkdir -p "$SMOKE"
+          # The heredoc bodies keep the step's 10-space indent, so bash
+          # sees them at column 0 and the exact EOF terminator matches
+          # (no reliance on <<- blank stripping, which is tabs-only in
+          # older bash).
           cat > "$SMOKE/CMakeLists.txt" <<'EOF'
-cmake_minimum_required(VERSION 3.16)
-project(consumer_smoke CXX)
-find_package(tauargus-engine REQUIRED)
-add_executable(consumer_smoke main.cpp)
-target_link_libraries(consumer_smoke PRIVATE
-    tauargus::core tauargus::csp tauargus::hitas
-    tauargus::crp tauargus::rounder tauargus::ghm)
-EOF
+          cmake_minimum_required(VERSION 3.16)
+          project(consumer_smoke CXX)
+          find_package(tauargus-engine REQUIRED)
+          add_executable(consumer_smoke main.cpp)
+          target_link_libraries(consumer_smoke PRIVATE
+              tauargus::core tauargus::csp tauargus::hitas
+              tauargus::crp tauargus::rounder tauargus::ghm)
+          EOF
           cat > "$SMOKE/main.cpp" <<'EOF'
-#include <cstdio>
-#include "TauArgus.h"
+          #include <cstdio>
+          #include "TauArgus.h"
 
-int main() {
-    TauArgus ta;
-    std::printf("consumer smoke: tauargus %s\n", ta.GetVersion().c_str());
-    return 0;
-}
-EOF
+          int main() {
+              TauArgus ta;
+              std::printf("consumer smoke: tauargus %s\n", ta.GetVersion().c_str());
+              return 0;
+          }
+          EOF
           BUILD="$RUNNER_TEMP/consumer-smoke-build"
           if [ "$RUNNER_OS" = "Windows" ]; then
             # Pin the runner's native cmake and the VS generator (the
@@ -242,20 +246,26 @@ EOF
           version="${{ steps.ver.outputs.version }}"
           tag="engine-v${version}"
           highs="$(tr -d '[:space:]' < engine/HiGHS-VERSION)"
-          notes="## tauargus-engine ${version}
+          # The notes text is a heredoc inside the YAML block scalar:
+          # every line keeps the 10-space step indent, so bash sees it
+          # at column 0 and the unquoted delimiter expands the vars.
+          notes="$(cat <<EOF
+          ## tauargus-engine ${version}
 
-Self-contained, CMake-installable engine package.
+          Self-contained, CMake-installable engine package.
 
-- Engine version: ${version}
-- HiGHS: ${highs} (bundled, built static)
-- Modules: core, csp, hitas, crp, rounder, ghm
+          - Engine version: ${version}
+          - HiGHS: ${highs} (bundled, built static)
+          - Modules: core, csp, hitas, crp, rounder, ghm
 
-Each package is the installed engine prefix: the six module
-libraries, the public headers under include/, the CMake package
-config and the pinned HiGHS bundled under highs/. Add the package
-root to CMAKE_PREFIX_PATH and use find_package(tauargus-engine
-REQUIRED); the imported targets are tauargus::core, tauargus::csp,
-tauargus::hitas, tauargus::crp, tauargus::rounder and tauargus::ghm."
+          Each package is the installed engine prefix: the six module
+          libraries, the public headers under include/, the CMake package
+          config and the pinned HiGHS bundled under highs/. Add the package
+          root to CMAKE_PREFIX_PATH and use find_package(tauargus-engine
+          REQUIRED); the imported targets are tauargus::core, tauargus::csp,
+          tauargus::hitas, tauargus::crp, tauargus::rounder and tauargus::ghm.
+          EOF
+          )"
           ls -l packages/
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             gh release create "$tag" packages/* --title "$tag" --notes "$notes"
@@ -276,7 +286,3 @@ tauargus::hitas, tauargus::crp, tauargus::rounder and tauargus::ghm."
             done
             echo "draft release ${tag} (id ${release_id}) with $(ls packages | wc -l) assets"
           fi
-
-# Registry re-registration: the previous revision of this file left a
-# stale entry in the Actions workflow registry (dispatch 422, push runs
-# with zero jobs). Any change to the file forces GitHub to re-sync it.
