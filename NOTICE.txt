@@ -1,0 +1,47 @@
+tauargus-engine: copyright and licence notice
+
+Copyright 2014 Statistics Netherlands (Tau-Argus components).
+Copyright M.D. Montes de Oca and J.J. Salazar (CSP).
+Copyright J.J. Salazar (CRP).
+Copyright IT Nordrhein Westfalen (original GHMITER).
+Copyright 2026 Trygve Tatsuya Falch (original integration and adaptations).
+
+This engine distribution and its original integration code are licensed under
+EUPL-1.2; see LICENSE. Original EUPL 1.1 notices in the nested repositories
+are retained. Article 5 of EUPL 1.1 permits distribution under a later EUPL
+version unless an original work expressly limits distribution to that version
+only. This distribution exercises that permission. The original licence text
+is preserved in LICENSES/EUPL-1.1.txt.
+
+The engine gitlinks identify the exact six native source revisions; each
+component retains its original copyright notices. HiGHS is separately MIT
+licensed, with additional third-party notices, and pybind11 is BSD-3-Clause.
+Those permissions and notice requirements are not removed by this declaration.
+
+Source: https://github.com/trygu/tauargus-engine
+For a source checkout use git submodule update --init --recursive.
+For Python releases, the corresponding pytauargus release-manifest.json
+records engine_sha and highs_version:
+https://github.com/trygu/pytauargus/releases
+The maintainers retain freely accessible corresponding source revisions for
+as long as covered binaries continue to be distributed or communicated.
+
+Licensing clarification recorded 2026-11-12. Original source dates and notices
+are preserved; the Git history documents integration changes.
+
+CSP historical header ambiguity
+-------------------------------
+Fifteen source files, including src/Cspmain.c, retain the 2001 wording
+"to be used only inside tau-ARGUS". The upstream sdcTools/CSP project added
+an EUPL 1.1 grant to its README on 2016-06-24:
+https://github.com/sdcTools/CSP/commit/c370c044a2fe1ae0130e5d19dc3f31436bafa863
+https://github.com/sdcTools/CSP/blob/9305d4c7802bac60c98c2dc69653c5c99b643184/README.md
+
+This fork relies on that upstream EUPL grant as its distribution basis.
+The earlier wording is inconsistent with the unrestricted-purpose grant
+in Article 2 of standard EUPL 1.1. A stale header is a plausible explanation,
+but the fork maintainer has not received rights-holder confirmation
+resolving the inconsistency as of 2026-11-12. Adding LICENCE does not itself
+resolve the upstream authorship/permission question. The historical
+headers have therefore been preserved and this ambiguity is disclosed.
+Discussion: https://github.com/trygu/pytauargus/issues/26
