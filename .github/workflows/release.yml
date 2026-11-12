@@ -283,7 +283,7 @@ jobs:
               -f tag_name="$tag" \
               -f target_commitish="${GITHUB_SHA}" \
               -f name="$tag" \
-              -f draft=true \
+              -F draft=true \
               -f body="$notes" --jq .id)"
             for f in packages/*; do
               gh api -F "file=@${f}" \
