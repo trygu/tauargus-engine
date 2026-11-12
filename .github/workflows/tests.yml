@@ -25,6 +25,12 @@ jobs:
   test:
     name: Test native code and bindings — ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
+    # A stalled or scarce runner (macos-15 is the usual suspect) then
+    # fails the job on its own with logs and the diagnostics artifact
+    # intact, instead of running silently until someone cancels it.
+    # The longest legitimate run is a cold HiGHS cache on macOS
+    # (full HiGHS + two engine builds); 45 minutes leaves headroom.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
