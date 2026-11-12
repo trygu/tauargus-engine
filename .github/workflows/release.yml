@@ -21,12 +21,6 @@ on:
   push:
     tags:
       - "engine-v*"
-    # TEMPORARY (proof run): the workflow is not on the default branch
-    # yet, so workflow_dispatch cannot be triggered for it. A push to
-    # this branch runs the full pipeline and proves the publish path
-    # with a draft release; this branch filter is removed afterwards.
-    branches:
-      - feat/engine-release
   workflow_dispatch:
 
 # The step scripts are bash on every platform (the windows runner
