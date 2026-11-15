@@ -20,13 +20,18 @@ stopifnot(nchar(version) > 0L)
 # The runtime version is the train version from engine/ENGINE-VERSION (the
 # superbuild injects it at configure time). Pin it the way the Python smoke
 # does: a stale in-place build that never relinks against the rebuilt core
-# would silently report the legacy fallback version instead.
+# would silently report the legacy fallback version instead. The pin only
+# applies when the smoke runs from the engine tree; a self-contained staged
+# copy has no engine/ENGINE-VERSION four levels up, so it is skipped there
+# (the staged build is always clean, and the Python smoke still pins it).
 script <- sub("^--file=", "",
               grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE))
 if (length(script) == 1L) {
     root <- normalizePath(file.path(dirname(script), "..", "..", "..", ".."))
-    stopifnot(version == trimws(
-        readLines(file.path(root, "engine", "ENGINE-VERSION"), n = 1L)))
+    ev <- file.path(root, "engine", "ENGINE-VERSION")
+    if (file.exists(ev)) {
+        stopifnot(version == trimws(readLines(ev, n = 1L)))
+    }
 }
 
 # Exercise the 17-argument native entry point. A fresh engine has no
