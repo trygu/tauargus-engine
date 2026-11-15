@@ -17,6 +17,18 @@ version <- tauargus_version(engine)
 stopifnot(is.character(version))
 stopifnot(nchar(version) > 0L)
 
+# The runtime version is the train version from engine/ENGINE-VERSION (the
+# superbuild injects it at configure time). Pin it the way the Python smoke
+# does: a stale in-place build that never relinks against the rebuilt core
+# would silently report the legacy fallback version instead.
+script <- sub("^--file=", "",
+              grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE))
+if (length(script) == 1L) {
+    root <- normalizePath(file.path(dirname(script), "..", "..", "..", ".."))
+    stopifnot(version == trimws(
+        readLines(file.path(root, "engine", "ENGINE-VERSION"), n = 1L)))
+}
+
 # Exercise the 17-argument native entry point. A fresh engine has no
 # tables, so the engine must return its invalid-table status before
 # trying to read either ptable file.
