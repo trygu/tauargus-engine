@@ -57,11 +57,22 @@ ctest --test-dir engine/build/native/ghm --output-on-failure
 (cd bindings/python && uv run --with pytest --with pybind11 pytest tests -q)
 
 # 4) R binding smoke (only when R is installed; skips cleanly otherwise).
+# Install from a clean copy: an in-place R CMD INSTALL leaves compiled
+# .o/.so in src/, and R's generated Makefile does not track the external
+# core lib as a link dependency, so a later install reuses those stale
+# objects and never relinks against the rebuilt core (a train version bump
+# then goes unreported). Building from a copy also keeps the source tree
+# free of build artifacts. TA_ENGINE points the Makevars back at this
+# checkout, because its relative default no longer reaches the engine root
+# from a temp dir.
 if command -v Rscript >/dev/null 2>&1; then
     Rlib="$(mktemp -d)"
-    mkdir -p "$Rlib"
-    R CMD INSTALL --library="$Rlib" bindings/r/tauargusengine > /dev/null
+    Rtmp="$(mktemp -d)"
+    cp -R bindings/r/tauargusengine "$Rtmp"/
+    rm -f "$Rtmp/tauargusengine"/src/*.o "$Rtmp/tauargusengine"/src/*.so
+    TA_ENGINE="$(pwd)" R CMD INSTALL --library="$Rlib" "$Rtmp/tauargusengine" > /dev/null
     R_LIBS="$Rlib" Rscript bindings/r/tauargusengine/tests/test_binding_smoke.R
+    rm -rf "$Rtmp"
 else
     echo "R not found; skipping the R binding smoke test"
 fi
