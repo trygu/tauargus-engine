@@ -314,6 +314,16 @@ def test_do_round_rejects_bad_base_and_time(tmp_path):
         r.do_round("SCIP", jj, 5.0, max_time=-1)
 
 
+def test_do_round_writes_diagnostics_to_log_without_touching_stdout(tmp_path, capfd):
+    r = _load().RounderCtrl()
+    logfile = tmp_path / "crp.log"
+    result, *_ = r.do_round("SCIP", str(tmp_path / "missing.JJ"), 10.0,
+                             log_file=str(logfile))
+    assert result != 0
+    assert "ERROR: it is not possible to open file" in logfile.read_text()
+    assert "Controlled Rounding Solver" not in capfd.readouterr().out
+
+
 def test_do_round_upper_rejects_nan_allows_inf(tmp_path):
     r = _load().RounderCtrl()
     jj = _bad_jj(tmp_path)

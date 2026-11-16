@@ -30,8 +30,8 @@ void init_rounder(py::module_ &m) {
                              const std::vector<double> &upper,
                              const std::vector<double> &lower, long auditing,
                              const std::string &solution,
-                             const std::string &statistics, long max_time,
-                             long zero_restricted) {
+                              const std::string &statistics, long max_time,
+                              long zero_restricted, const std::string &log_file) {
             g::finite_non_negative("base", base);
             // +/-Inf bounds are legal (unbounded); NaN never is.
             g::finite_or_inf_vec("upper_bound", upper);
@@ -55,7 +55,9 @@ void init_rounder(py::module_ &m) {
                                     l.empty() ? nullptr : l.data(), auditing,
                                     const_cast<char *>(solution.c_str()),
                                     const_cast<char *>(statistics.c_str()), nullptr,
-                                    nullptr, max_time, zero_restricted, nullptr, &mj,
+                                     log_file.empty() ? nullptr :
+                                         const_cast<char *>(log_file.c_str()),
+                                     max_time, zero_restricted, nullptr, &mj,
                                     &nj, &ut, &ec);
             }
             return py::make_tuple(result, mj, nj, ut, ec);
@@ -63,6 +65,6 @@ void init_rounder(py::module_ &m) {
            py::arg("upper_bound") = py::list(), py::arg("lower_bound") = py::list(),
            py::arg("auditing") = 0, py::arg("solution_file") = "",
            py::arg("statistics_file") = "", py::arg("max_time") = 0,
-           py::arg("zero_restricted") = 0,
+           py::arg("zero_restricted") = 0, py::arg("log_file") = "",
            "-> (result, max_jump, n_jump, used_time, error_code)");
 }
