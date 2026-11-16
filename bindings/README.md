@@ -1,6 +1,6 @@
 # Bindings
 
-Thin language bindings over the five engine libraries. Both bindings
+Thin language bindings over the six engine libraries. Both bindings
 mirror the C++ API one-to-one; they are consumed by the front-end repos,
 not by end users.
 
@@ -29,11 +29,19 @@ Build instructions for the Python extension are in
 [Building from source](../README.md#building-from-source) at the
 repository root.
 
-[binding-api.md](binding-api.md) is the canonical reference for the
-raw binding surface in both languages: every method, its name in each
-language, its arguments, its return fields and the error-code
-catalogs. The user-facing APIs on top of it are documented in the
-front-end repos:
+Documentation:
+
+- [binding-api.md](binding-api.md): the shared conventions every
+  binding follows (error-code catalogs, error containment, solver
+  return semantics, process model) and a guide for adding a binding
+  for a new language.
+- [python/python-api.md](python/python-api.md): the per-method
+  reference for the Python `_tauargus` extension.
+- [r/r-api.md](r/r-api.md): the per-method reference for the R
+  `tauargusengine` package.
+
+The user-facing APIs on top of the raw binding surface are documented
+in the front-end repos:
 [pytauargus](https://github.com/trygu/pytauargus/blob/master/docs/python-api.md)
 (Python) and
 [rtauargus.native](https://github.com/trygu/rtauargus.native) (R).

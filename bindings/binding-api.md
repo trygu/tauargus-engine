@@ -1,198 +1,70 @@
-# Binding API
+# Engine bindings: conventions and guide
 
-Canonical reference for the two native bindings of the engine. The
-Python module `_tauargus` (pybind11) and the R package
-`tauargusengine` expose the same C++ classes with the same behavior.
-For every method that exists in both languages, the tables list both
-names, the arguments and the returned fields, so that any consumer
-(the pytauargus and rtauargus.native front-ends, or a new one) builds
-on a single description.
+Canonical reference for how the engine is bound to programming
+languages: what the engine exposes, the conventions every binding
+follows, and how to add a binding for a new language.
 
-Sources of truth: `python/cpp/` (`bind_core.cpp`, `bind_hitas.cpp`,
-`bind_rounder.cpp`, `bind_csp.cpp`) for Python and
-`r/tauargusengine/src/` (`rta_engine.cpp`, `rta_hitas.cpp`,
-`rta_rounder.cpp`, `rta_csp.cpp`) for R. The authoritative R export
-list is `r/tauargusengine/NAMESPACE`.
+Per-language API references:
 
-## Objects and naming
-
-| C++ class | Python | R |
+| Language | Binding | Reference |
 |---|---|---|
-| `TauArgus` (core) | `TauArgus` | `new_tauargus()`, functions `tauargus_*` |
-| `HiTaSCtrl` (hitas) | `HiTaSCtrl` | `new_hitas()`, functions `hitas_*` |
-| `RounderCtrl` (rounder) | `RounderCtrl` | `new_rounder()`, functions `rounder_*` |
-| module level | `audit_jj`, `engine_meta` | `audit_jj`, `tauargus_engine_meta` |
+| Python | `_tauargus` (pybind11 extension) | [python/python-api.md](python/python-api.md) |
+| R | `tauargusengine` package | [r/r-api.md](r/r-api.md) |
 
-Python: methods on an instance (`t = TauArgus()`, then
-`t.set_table(...)`). R: external pointer objects plus one exported
-function per method; the first argument is always the object.
-`clean_all` / `tauargus_clean_all` resets the state of an existing
-object.
+## What the engine exposes
 
-## Return conventions
+Six native modules (see `engine/README.md` for the module map):
 
-- Success flag: Python `bool`, R `logical(1)`.
-- Multiple values: Python returns a tuple (positional), R returns a
-  named list. The field order is identical in both languages.
-- Status code: Python `int`, R `numeric`. `0` is success; any other
-  value is a native error code (see [Error codes](#error-codes)).
-- Version and error strings: Python `str`, R `character`.
+- `core`: data model, Argus/JJ file I/O, SDC entry points
+- `csp`: cell-suppression LP (branch-and-price) and the feasibility
+  audit (the legacy `intervalle` port)
+- `hitas`: hierarchical table suppression (links `csp`)
+- `crp`: controlled rounding
+- `ghm`: hypercube (GH) secondary suppression, the C port of the
+  legacy `GHMITER`
+- `rounder`: dispatch layer over `crp`
 
-Multi-value returns start with a success flag `ok`, except where the
-native function reports a code instead of a flag:
-`set_secondary_jjformat` returns `code, n_set_secondary`,
-`set_cell_key_values_freq` returns `ok, min, max` with `ok` being `0`
-on success, and (Python only) `set_cta_values` returns
-`code, n_set_secondary`.
+The language surface is three C++ control classes plus module-level
+audit and build metadata:
 
-R argument names are the short legacy ones (`resp`, `shadow`, `cost`,
-`cellkey`, `lam`, `ptable`, ...); positions and types match the Python
-names given in the tables. Defaults differ in a few places; see
-[Default differences](#default-differences).
+| Surface | Header | Role |
+|---|---|---|
+| `TauArgus` | `engine/native/core/src/TauArgus.h` | core: input files, variables, code lists, tables, safety rules, computation, cell access, secondary suppression, writing |
+| `HiTaSCtrl` | `engine/native/hitas/src/HiTaSCtrl.h` | optimal (`FullJJ`) and modular (`AHiTaS`) suppression, HiGHS MIP |
+| `RounderCtrl` | `engine/native/rounder/src/RounderCtrl.h` | controlled rounding (CRP) |
+| `audit_jj` | `engine/native/csp/` | in-process feasibility audit over a `.JJ` file (the legacy `intervalle` executable) |
+| build metadata | generated at build time | engine revision, each native submodule pin, HiGHS version |
 
-## TauArgus (core)
+The C++ headers are the source of truth for method names, argument
+lists and return types. A binding mirrors the header one-to-one; when
+a binding and a header disagree, the header wins and the binding is a
+bug.
 
-| Python | R | Args (Python names, defaults shown) | Returns |
-|---|---|---|---|
-| `version` | `tauargus_version` | | str |
-| `error_string` | `tauargus_error_string` | `code` | str |
-| `clean_all` | `tauargus_clean_all` | | None |
-| `set_in_file_info` | `tauargus_set_in_file_info` | `is_fixed_format`, `separator` | None |
-| `explore_file` | `tauargus_explore_file` | `file` | ok, err, line, var |
-| `set_number_tab` | `tauargus_set_number_tab` | `n_tab` | bool |
-| `set_number_var` | `tauargus_set_number_var` | `n_var` | bool |
-| `set_variable` | `tauargus_set_variable` | `index`, `b_pos`, `n_pos`, `n_dec`, `n_missing`, `missing1`, `missing2`, `total_code`, `is_peeper`, `peeper_code1`, `peeper_code2`, `is_categorical`, `is_numeric`, `is_weight`, `is_hierarchical`, `is_holding`, `is_record_key` | bool |
-| `set_hierarchical_codelist` | `tauargus_set_hierarchical_codelist` | `var`, `file`, `level_string` | status code (0 = success, 1500+ on failure) |
-| `set_hierarchical_digits` | `tauargus_set_hierarchical_digits` | `var`, `digits` | bool |
-| `get_var_number_of_codes` | `tauargus_get_var_number_of_codes` | `var` | ok, n_codes, n_active_codes |
-| `get_var_code` | `tauargus_get_var_code` | `var`, `code` | ok, code_type, code_string, is_missing, level |
-| `get_var_code_properties` | `tauargus_get_var_code_properties` | `var`, `code` | ok, is_parent, is_active, is_missing, level, n_children, code |
-| `set_var_code_active` | `tauargus_set_var_code_active` | `var`, `code`, `active` | bool |
-| `do_active_recode` | `tauargus_do_active_recode` | `var` | bool |
-| `apply_recode` | `tauargus_apply_recode` | | bool |
-| `undo_recode` | `tauargus_undo_recode` | `var` | bool |
-| `do_recode` | `tauargus_do_recode` | `var`, `recode_data`, `n_missing`, `missing1`, `missing2` | ok, error_type, error_line, error_pos, warning |
-| `set_table` | `tauargus_set_table` | `index`, `explanatory_vars`, `is_frequency`, `response_var`, `shadow_var`, `cost_var`, `cellkey_var`, `ckm_type=""`, `ckm_topk=0`, `lam=0.0`, `max_scaled_cost=0.0`, `peep_var=-1`, `missing_as_safe=False` | bool |
-| `set_table_safety` | `tauargus_set_table_safety` | `index`, `dominance_rule`, `dominance_number`, `dominance_k`, `pq_rule`, `pq_p`, `pq_q`, `pq_n`, `min_freq`, `peep_percentage`, `peep_marge`, `peep_min_freq`, `apply_peep`, `apply_weight`, `weight_on_safety_rule`, `apply_holding`, `apply_zero_rule`, `empty_as_non_structural`, `ns_empty_safety_range`, `zero_safety_range`, `manual_safety_perc`, `cell_holding_freq_safety_perc` | bool |
-| `set_table_safety_info` | `tauargus_set_table_safety_info` | `index`, `has_max_score`, `dominance_rule`, `dominance_number`, `dominance_perc`, `pq_rule`, `pq_p`, `pq_q`, `pq_n`, `has_freq`, `freq_safety_perc`, `safe_min_rec`, `has_status`, `manual_safety_perc`, `apply_zero_rule`, `zero_safety_range`, `empty_as_non_structural`, `ns_empty_safety_range` | ok, errc |
-| `through_table` | `tauargus_through_table` | | bool |
-| `compute_tables` | `tauargus_compute_tables` | | ok, err, table_index |
-| `get_total_table_size` | `tauargus_get_total_table_size` | `tab` | ok, n_cells, size_data_cell |
-| `get_minimum_cell_value` | `tauargus_get_minimum_cell_value` | `tab` | ok, min, max |
-| `maximum_protection_level` | (Python only) | `tab` | max protection level (int) |
-| `get_table_cell_value` | `tauargus_get_table_cell_value` | `tab`, `cell` | ok, value |
-| `get_table_cell_status` | `tauargus_get_table_cell_status` | `tab`, `cell` | ok, status |
-| `get_table_cell_protection_levels` | `tauargus_get_table_cell_protection_levels` | `tab`, `cell` | ok, lower, upper |
-| `get_table_cell` | `tauargus_get_table_cell` | `tab`, `dim_index`, `topn=0` | 22 fields: ok, resp, rresp, cta, ckm, shadow, cost, key, key_nz, freq, status, ms, msw, holding_freq, hms, hnr, peep_cell, peep_holding, lower, upper, rlower, rupper |
-| `set_table_cell_cost` | `tauargus_set_table_cell_cost` | `tab`, `dim_index`, `cost` | bool |
-| `set_table_cell_status_dim` | `tauargus_set_table_cell_status_dim` | `tab`, `dim_index`, `status` | bool |
-| `set_table_cell_status_cell` | `tauargus_set_table_cell_status_cell` | `tab`, `cell`, `status` | bool |
-| `set_table_cell_protection_levels` | `tauargus_set_table_cell_protection_levels` | `tab`, `cell`, `lpl`, `upl` | bool |
-| `set_protection_levels_dim` | `tauargus_set_protection_levels_dim` | `tab`, `dim_index`, `lpl`, `upl` | bool |
-| `set_all_empty_non_structural` | (Python only) | `tab` | bool |
-| `set_secondary_jjformat` | `tauargus_set_secondary_jjformat` | `tab`, `file`, `with_bogus=False` | code, n_set_secondary (code 1 = success; 0 or JJF code 4200+ = error) |
-| `write_jj_format` | `tauargus_write_jj_format` | `tab`, `file`, `lower`, `upper`, `with_bogus=False`, `as_perc=False`, `for_rounding=False` | bool |
-| `prepare_hitas` | `tauargus_prepare_hitas` | `tab`, `name_param_file`, `name_files_file`, `tau_temp` | bool |
-| `set_secondary_hitas` | `tauargus_set_secondary_hitas` | `tab` | ok, n_set_secondary |
-| `write_ghmiter_data_cell` | (Python only) | `file`, `tab`, `is_singleton` | bool |
-| `write_ghmiter_stuer` | (Python only) | `file`, `end1`, `end2`, `tab` | bool |
-| `set_secondary_ghmiter` | (Python only) | `file`, `tab`, `is_singleton=False` | code, n_set_secondary (code 1 = success; GHM code 4000+ = error) |
-| `set_secondary_from_hierarchical_ampl` | (Python only) | `file`, `tab` | ok, err |
-| `write_hierarchical_table_in_ampl_format` | (Python only) | `ampl_file`, `temp_dir`, `tab`, `max_scale` | ok, err |
-| `set_cta_values` | (Python only) | `tab`, `cell`, `org_val`, `cta_val` | ok, n_set_secondary (ok = index/cell in range) |
-| `set_realized_lower_and_upper` | `tauargus_set_realized_lower_and_upper` | `tab`, `cell`, `upper`, `lower` | bool |
-| `set_rounded_response` | `tauargus_set_rounded_response` | `file`, `tab` | bool |
-| `set_cell_key_values_freq` | `tauargus_set_cell_key_values_freq` | `tab`, `ptable_file` | code, min_diff, max_diff (code 1 = success; -1 = bad table index, -9 = ptable read failed) |
-| `set_cell_key_values_cont` | `tauargus_set_cell_key_values_cont` | `tab`, `ptable_file_cont`, `ptable_file_sep`, `ckm_type`, `top_k`, `include_zeros`, `parity`, `separation`, `m1sqr`, `scaling`, `sigma0`, `sigma1`, `xstar`, `q`, `epsilon`, `mu_c` | status code (1 = success; -1 bad table, -90/-91/-92/-93/-94 ptable read errors) |
-| `undo_secondary_suppress` | (Python only) | `tab`, `sort=1` | bool |
-| `set_in_table` | `tauargus_set_in_table` | `index`, `codes`, `shadow`, `cost`, `response`, `freq`, `max_score_cell`, `max_score_holding`, `status`, `lpl`, `upl` | ok, err, err_var |
-| `set_in_code_list` | `tauargus_set_in_code_list` | `var_index`, `codes` | ok, err, ev |
-| `set_totals_in_code_list` | `tauargus_set_totals_in_code_list` | `var_index` | ok, err, ev |
-| `completed_table` | `tauargus_completed_table` | `index`, `file`, `compute_totals`, `calculated_totals_as_safe=False`, `for_cover_table=False` | ok, err |
-| `write_cell_records` | `tauargus_write_cell_records` | `tab`, `file`, `sbs`, `sbs_level=False`, `suppress_empty=False`, `first_line=""`, `show_unsafe=False`, `embed_quotes=True`, `resp_type=1` | bool |
-| `write_csv` | `tauargus_write_csv` | `tab`, `file`, `embed_quotes=True`, `dim_sequence=[]`, `resp_type=1` | bool |
+## Conventions
 
-Notes on the core table:
+### Return conventions
 
-- `get_table_cell` returns all configured scores; `topn` only limits
-  the length of the score arrays (`ms`, `msw`, `hms`, `hnr`). On
-  failure Python returns a single-element `(False,)` tuple; R
-  returns the full list with `ok = FALSE` and the numeric fields
-  zero.
-- The solver-backed calls (`explore_file`, `do_recode`,
-  `compute_tables`, `write_jj_format`) run with the Python GIL
-  released, so other threads (for example a TUI event loop) keep
-  running. R calls block the R process.
+- Success flag: a boolean in the target language (`bool`,
+  `logical(1)`).
+- Multiple values: one value per field, in a fixed field order that
+  is identical across methods with the same shape (positional tuple
+  in Python, named list in R).
+- Status code: an integer. `0` means success unless the method is
+  documented to return a code instead of a flag (for example
+  `set_secondary_jjformat` returns `1` on success; `set_cta_values`
+  and `set_cell_key_values_freq` report a code).
+- Version and error strings: a string.
 
-## HiTaSCtrl (optimal suppression)
+### Error codes
 
-| Python | R | Args (Python names, defaults shown) | Returns |
-|---|---|---|---|
-| `version` | (Python only) | | str |
-| `error_string` | `hitas_error_string` | `code` | str |
-| `set_jj_constants_int` | (Python only) | `name`, `value` | None |
-| `set_jj_constants_dbl` | (Python only) | `name`, `value` | None |
-| `set_debug_mode` | (Python only) | `debug` | None |
-| `full_jj` | `hitas_full_jj` | `in_file_jj`, `out_file`, `max_time=0`, `ilm_file=""`, `out_dir=""`, `solver="SCIP"` | status code (0 = success, otherwise a HiTaS error code) |
-| `a_hitas` | `hitas_a_hitas` | `pars_file`, `files_file`, `max_time=0`, `ilm_file=""`, `tau_out_dir=""`, `solver="SCIP"`, `single_with_single=False`, `single_with_more=False`, `do_count_bounds=False` | status code (0 = success, otherwise a HiTaS error code) |
-
-`full_jj` and `a_hitas` run the HiGHS MIP with the GIL released. The
-legacy port throws raw integer error codes from its file operations;
-the bindings catch those and return the value as the status code, so
-a caller never sees a raw exception from a file failure.
-
-## RounderCtrl (controlled rounding)
-
-| Python | R | Args (Python names, defaults shown) | Returns |
-|---|---|---|---|
-| `version` | (Python only) | | str |
-| `error_string` | `rounder_error_string` | `code` | str |
-| `set_double_constant` | `rounder_set_double_constant` | `variable`, `value` | None |
-| `do_round` | `rounder_do_round` | `solver`, `in_file`, `base`, `upper_bound=[]`, `lower_bound=[]`, `auditing=0`, `solution_file=""`, `statistics_file=""`, `max_time=0`, `zero_restricted=0` | result, max_jump, n_jump, used_time, error_code |
-
-`do_round` returns a 5-tuple in Python and a length-5 numeric vector
-in R, in the same field order. `error_code` is a CRP ErrorTypes value
-(see [Error codes](#error-codes)).
-
-## Module level
-
-| Python | R | Args | Returns |
-|---|---|---|---|
-| `audit_jj` | `audit_jj` | `jjfile` | list of `{cell, min, max, value, status, unsafe}` dicts / data.frame with the same columns, ascending cell order |
-| `engine_meta` | `tauargus_engine_meta` | | dict `engine_sha`, `highs_version` / named character vector with the engine revision, each native submodule pin and the HiGHS version |
-
-`audit_jj` computes the realized feasibility intervals for the
-suppressed cells of the table described by the JJ file (the legacy
-intervalle audit). On failure both languages raise an error
-(`RuntimeError` in Python, an R error) carrying the native rc and the
-file name.
-
-## Python-only methods
-
-The Python binding exposes methods the R binding does not. They cover
-the interactive and legacy-GUI paths that the R front-end does not
-use (GHMITER secondary suppression, hierarchical AMPL, CTA, JJ solver
-constants, version strings of the two solver controls):
-
-- core: `maximum_protection_level`, `set_all_empty_non_structural`,
-  `set_secondary_ghmiter`, `write_ghmiter_data_cell`,
-  `write_ghmiter_stuer`, `set_secondary_from_hierarchical_ampl`,
-  `write_hierarchical_table_in_ampl_format`, `set_cta_values`,
-  `undo_secondary_suppress`
-- hitas: `version`, `set_jj_constants_int`, `set_jj_constants_dbl`,
-  `set_debug_mode`
-- rounder: `version`
-
-## Error codes
-
-Native calls report failures as integer codes. Each binding object
+Native calls report failures as integer codes. Each control object
 translates the codes of its own library:
 
 | Translator | Catalog | Ranges |
 |---|---|---|
-| `TauArgus.error_string` / `tauargus_error_string` | core `ErrorCodes` (native/core/src/defines.h), embedded in native/core/src/TauArgusErrorStrings.h | 1000-1027, 1500-1507, 2000-2006, 3000-3003, 4000-4008, 4200-4202, 4225-4232 |
-| `HiTaSCtrl.error_string` / `hitas_error_string` | HiTaS catalog (native/hitas/ErrorStrings.txt), including the JJ-routine and solver codes | 5000-5012, 6000-6016, 7000-7003, 8000-8001 |
-| `RounderCtrl.error_string` / `rounder_error_string` | CRP `ErrorTypes` (native/crp/src/WrapCRP.h) | 7100-7110 |
+| `TauArgus.error_string` | core `ErrorCodes` (`native/core/src/defines.h`), embedded in `native/core/src/TauArgusErrorStrings.h` | 1000-1027, 1500-1507, 2000-2006, 3000-3003, 4000-4008, 4200-4202, 4225-4232 |
+| `HiTaSCtrl.error_string` | HiTaS catalog (`native/hitas/ErrorStrings.txt`), including the JJ-routine and solver codes | 5000-5012, 6000-6016, 7000-7003, 8000-8001 |
+| `RounderCtrl.error_string` | CRP `ErrorTypes` (`native/crp/src/WrapCRP.h`) | 7100-7110 |
 
 - A code missing from a catalog returns `"UnKnown Error (N)"` in all
   three libraries.
@@ -206,11 +78,64 @@ translates the codes of its own library:
 - The 8000-8001 codes (XPress, CPLEX license) are legacy; the engine
   uses HiGHS and never reports them.
 
-## Default differences
+### Error containment
 
-Positions and types match; the defaults listed here differ between the
-two bindings. Callers that rely on a default should check the side
-they use.
+The legacy port throws raw integer error codes from its file
+operations (for example `OpenFile` in the HiTaS file I/O). A raw
+integer crossing a language boundary is undefined behaviour in some
+bindings (pybind11 only translates `std::exception`), so every
+binding catches those integers at the boundary and either returns
+them as the status code or signals a language error carrying the code
+and its `error_string` translation. A caller never sees a raw integer
+throw.
+
+### Solver return semantics
+
+- `FullJJ` returns `0` (optimal) or `1` (sub-optimal); anything above
+  `1` is a HiTaS error code.
+- `AHiTaS` returns `0` on success; anything else is a HiTaS error
+  code.
+
+How each language surfaces a failure code (returned status code
+versus raised error) is documented in the per-language references.
+
+### Input guards
+
+The native core assumes well-formed input: indices and counts are
+non-negative whole numbers, and the doubles it compares or stores are
+finite. A negative index or a NaN/Inf can turn into out-of-bounds
+access or a solver abort. Every binding validates such arguments
+before the native call and rejects them with the language's value
+error, naming the argument (Python: `ValueError`; R: an error). See
+the per-language references for the guarded argument classes.
+
+### Long-running calls
+
+The solver-backed calls (`compute_tables`, the HiTaS solves,
+`do_round`, the `audit_jj` audit) are blocking and can take a long
+time on large or high-dimensional tables. A binding documents which
+calls are long-running and, where the language allows it, yields
+during them (Python releases the GIL).
+
+### Process model
+
+Run one job per process and per working/output directory. The native
+solver keeps process-global state, and concurrent engine calls in one
+process are not validated.
+
+### Build metadata
+
+Expose build provenance at module level: the engine commit, the
+recorded pin of each native submodule and the pinned HiGHS version,
+baked in at build time. Both existing bindings do this
+(`engine_meta()` in Python, `tauargus_engine_meta()` in R).
+
+### Known default differences
+
+Positions and types match across the Python and R bindings; the
+defaults in the table differ. Callers that rely on a default should
+check the side they use (each per-language reference shows its own
+defaults).
 
 | Method | Arg | Python default | R default |
 |---|---|---|---|
@@ -218,6 +143,7 @@ they use.
 | `set_table` | cellkey | required | -1 |
 | `set_table` | ckm_topk | 0 | -1 |
 | `set_table` | max_scaled_cost | 0.0 | 20000 |
+| `get_table_cell` | topn | 0 | required |
 | `write_jj_format` | lower | required | 0 |
 | `write_jj_format` | upper | required | 1000 |
 | `write_cell_records` | sbs | required | 1 |
@@ -225,3 +151,32 @@ they use.
 | `write_cell_records` | resp_type | 1 | 0 |
 | `write_csv` | embed_quotes | True | FALSE |
 | `write_csv` | resp_type | 1 | 0 |
+
+## Adding a binding for a new language
+
+1. Read the three headers (`TauArgus.h`, `HiTaSCtrl.h`,
+   `RounderCtrl.h`) and the module-level audit entry point. They are
+   the API.
+2. Wrap the three classes and the module-level functions, following
+   the conventions above. Keep the mapping one-to-one: one language
+   export per C++ method, the object as the first argument.
+3. Catch the raw integer throws at the file-operation boundaries and
+   convert them per the error-containment convention.
+4. Add input guards for index/count and double arguments.
+5. Generate the build-metadata header at CMake configure time, the
+   way `python/cpp/py_meta.h.in` and
+   `r/tauargusengine/src/rta_meta.h` do it.
+6. Link the six native libraries from `engine/build/lib/` and the
+   HiGHS at the version pinned in `engine/HiGHS-VERSION`.
+7. Add a smoke test that mirrors the existing ones: create each
+   object, call `version` and `error_string`, run `compute_tables`
+   plus a secondary suppression and `audit_jj` on a fixture from
+   `data/`, and check the input guards.
+8. Add the binding to the table at the top of this file.
+
+The Python and R bindings are the reference implementations, and
+their source is the starting point for a new binding: `python/cpp/`
+(`bind_core.cpp`, `bind_csp.cpp`, `bind_hitas.cpp`,
+`bind_rounder.cpp`, `module.cpp`, `input_guards.h`) and
+`r/tauargusengine/src/` (`rta_engine.cpp`, `rta_csp.cpp`,
+`rta_hitas.cpp`, `rta_rounder.cpp`, `rta_meta.h`, `rta_cpp.h`).
