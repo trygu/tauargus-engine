@@ -1,17 +1,25 @@
 # tauargus-engine
 
 Native, headless engine for statistical disclosure control (SDC) of tabular
-data, with thin Python and R bindings. Together with the
-[pytauargus](https://github.com/trygu/pytauargus) front-end it is a drop-in
-replacement for the supported batch mode of the legacy open-source τ-ARGUS:
-the same `.arb` batch files, file formats and outputs, without the GUI. See
+data, with thin Python and R bindings. It is a drop-in replacement for the
+computational core of the legacy open-source τ-ARGUS executable: the same
+protection methods, the same legacy file formats (ARGUS `.asc` microdata,
+`.rda` metadata, `.tab` tables, `.JJ` files and INTERMEDIATE audit output)
+and the same outputs, without the GUI. The GUI is replaced by headless
+front-ends on the bindings: the
+[pytauargus](https://github.com/trygu/pytauargus) package with its `tauargus`
+CLI, terminal UI and MCP consultant server, and the
+[rtauargus.native](https://github.com/trygu/rtauargus.native) R package. The
+legacy helper executables (`intervalle.exe`, the Delphi audit, and `GHMITER`,
+the Fortran hypercube program) now run in-process. Drive the engine with a
+legacy `.arb` batch file or directly through the Python or R binding. See
 [Compatibility and validation](#compatibility-and-validation) for which
 methods and batch commands are supported.
 
 This is a personal rewrite of the legacy product, started a few years ago and
 worked on in on-and-off sprints. The C/C++ solver engine is rebuilt on a
 modern toolchain and an open-source solver; the Java/Swing desktop front-end
-is replaced by a headless Python CLI.
+is replaced by headless front-ends.
 
 This repo holds the foundation: the engine and the thin language bindings.
 The user-facing front-ends live in separate repos:
@@ -113,7 +121,7 @@ bounds can reveal it, so related cells are protected too. This is the tabular
 counterpart to [mu-Argus](https://github.com/INSEE/Argus), which protects
 microdata.
 
-A batch file drives the whole pipeline:
+A `.arb` batch file or a front-end API call drives the whole pipeline:
 
 ```text
 input data + metadata
