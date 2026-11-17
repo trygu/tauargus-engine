@@ -148,12 +148,15 @@ a caller never sees a raw exception from a file failure.
 | `version` | none | str |
 | `error_string` | `code` | str |
 | `set_double_constant` | `variable`, `value` | None |
-| `do_round` | `solver`, `in_file`, `base`, `upper_bound=[]`, `lower_bound=[]`, `auditing=0`, `solution_file=""`, `statistics_file=""`, `max_time=0`, `zero_restricted=0` | result, max_jump, n_jump, used_time, error_code |
+| `do_round` | `solver`, `in_file`, `base`, `upper_bound=[]`, `lower_bound=[]`, `auditing=0`, `solution_file=""`, `statistics_file=""`, `max_time=0`, `zero_restricted=0`, `log_file=""` | result, max_jump, n_jump, used_time, error_code |
 
 `do_round` returns a 5-tuple, in the same field order as the R
 length-5 numeric vector, with the GIL released. `error_code` is a CRP
 ErrorTypes value (see
 [Error codes](../binding-api.md#error-codes)).
+With `log_file`, CRP writes its diagnostics to that file without replacing
+process stdout or stderr. The default keeps console output for callers
+that do not request a log file.
 
 ## Module level
 
